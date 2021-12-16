@@ -3,7 +3,7 @@
 
 # Development
 
-1. Provide your private key in the PRIVATE_KEY environment variable
+1. Provide your private key in the PRIVATE_KEY ```.env``` file
 
 2. Compile all contracts before running migrations ```truffle compile --all```
 
