@@ -9,8 +9,9 @@ import "../interfaces/IUniswapV2Factory.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "../utils/Cooldown.sol";
 
-contract QuickswapFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgradeable, ReentrancyGuard {
+contract QuickswapFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgradeable, ReentrancyGuard, Cooldown {
     using SafeMath for uint256;
 
     /**
@@ -104,18 +105,18 @@ contract QuickswapFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgr
      * @dev Function that makes the deposits
      * If it's not the first deposit, withdraws {lpStakingPool} and deposits new tokens with the old ones.
      */
-    function deposit(uint256 amountA, uint256 amountB, uint256 amountLP, address origin) external onlyOwner nonReentrant returns(uint256){
-        uint256 withdrawAmount = 0;
+    function deposit(uint256 amountA, uint256 amountB, uint256 amountLP, address origin) external onlyOwner startCooldown(origin) nonReentrant returns(uint256){
+        uint256 withdrawAmount;
         if (stakes[origin] != 0) {
-             withdrawAmount = withdrawToContract(origin);
+            withdrawAmount = withdrawToContract(origin);
         }
 
-        uint256 returnedA = amountA;
-        uint256 returnedB = amountB;
-        uint256 addedLiquidity = 0;
+        uint256 sentA;
+        uint256 sentB;
+        uint256 addedLiquidity;
         
         if(amountA > 0 && amountB > 0){
-            (returnedA, returnedB, addedLiquidity) = quickswapRouter.addLiquidity(tokenA, tokenB, amountA, amountB, 0, 0, address(this), block.timestamp.add(600));
+            (sentA, sentB, addedLiquidity) = quickswapRouter.addLiquidity(tokenA, tokenB, amountA, amountB, 0, 0, address(this), block.timestamp.add(600));
         }
 
         uint256 depositAmount = addedLiquidity.add(withdrawAmount).add(amountLP);
@@ -127,8 +128,8 @@ contract QuickswapFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgr
 
         lpStakingPool.stake(depositAmount);
 
-        IERC20(tokenA).transfer(origin, returnedA);
-        IERC20(tokenB).transfer(origin, returnedB); 
+        IERC20(tokenA).transfer(origin, amountA.sub(sentA));
+        IERC20(tokenB).transfer(origin, amountB.sub(sentB)); 
 
         return depositAmount;
     }
@@ -136,7 +137,7 @@ contract QuickswapFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgr
     /**
      * @dev Withdraws funds and sends them to the {{origin}}.
      */
-    function withdraw(address origin, bool withdrawLP) external onlyOwner nonReentrant returns(uint256){
+    function withdraw(address origin, bool withdrawLP) external onlyOwner checkCooldown(origin) nonReentrant returns(uint256){
         require(stakes[origin] > 0, "The amount staked should be more than 0");
         uint256 withdrawAmount = withdrawToContract(origin);
 

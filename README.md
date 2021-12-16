@@ -22,17 +22,17 @@ All contracts are deployed on the Polygon(Matic) Blockchain
 ## Quickswap
 
 #### quickswapFarmFactoryBeacon
-0xF0800015eC92F26FD869B8a38D839d5217a3f08F
+0x33Ef8918f8871A5b5b36c3df6Bcaf0FEe39aAAD6
 
 #### quickswapDualFarmFactoryBeacon
-0xd416Eddf5C566dFd0f9fB10175B58A9C4190fb9E
+0xF635DB454B99057EC340A8DF5f8996662612dBD2
 
 ## Sushiswap
 
 #### sushiFarmFactoryBeacon
-0xE5A46456C72993A852bf823BADb91d2C6BA4f0bE
+0x3FA2cfdb68a8cC42dc255128370E4A83a1158CB6
 
 ## Balancer
 
 #### balancerFarmFactoryBeacon
-0x4B1b372913e68D59cFf4A156e21F75e9BD76dE04
+0x941071edC3c443784167333Cb5992c31bc553a95

@@ -11,8 +11,9 @@ import "../interfaces/IUniswapV2Factory.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "../utils/Cooldown.sol";
 
-contract BalancerFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgradeable, ReentrancyGuard {
+contract BalancerFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgradeable, ReentrancyGuard, Cooldown {
     using SafeMath for uint256; 
 
     /**
@@ -56,7 +57,7 @@ contract BalancerFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgra
      * @dev Function that makes the deposits
      * Deposits all the tokens from this contract's balance to the {Vault}.
      */
-    function deposit(uint256[] memory amounts, IERC20[] memory tokens, uint256 LPAmount, address origin) external onlyOwner nonReentrant returns(uint256){
+    function deposit(uint256[] memory amounts, IERC20[] memory tokens, uint256 LPAmount, address origin) external onlyOwner startCooldown(origin) nonReentrant returns(uint256){
         (IERC20[] memory poolTokens, IAsset[] memory assets,) = getTokens();
     
         bool joinPool = false;
@@ -80,6 +81,7 @@ contract BalancerFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgra
             uint256 amountAfter = IERC20(lpPair).balanceOf(address(this));
 
             depositAmount = amountAfter.sub(amountBefore).add(LPAmount); 
+            require(depositAmount > 0, 'The amount provided is 0');
         }
         
         stakes[origin] = depositAmount.add(userBalance(origin));
@@ -92,7 +94,7 @@ contract BalancerFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgra
     /**
      * @dev Withdraws funds and sends them to the {msg.sender}.
      */
-    function withdraw(address origin, bool withdrawLP) external onlyOwner nonReentrant returns(uint256){
+    function withdraw(address origin, bool withdrawLP) external onlyOwner checkCooldown(origin) nonReentrant returns(uint256){
         require(stakes[origin] > 0, "The amount staked should be more than 0");
         
         uint256 withdrawAmount = userBalance(origin);
