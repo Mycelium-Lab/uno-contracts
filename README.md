@@ -17,7 +17,7 @@ All contracts are deployed on the Polygon(Matic) Blockchain
 ### Helper Contracts
 
 #### UnoInfo
-0x80A2eFBAcA2d0daEb9857758A88d423cF5dA33fE
+0xCeF69B937EC25F95b75A6fb7A38E4972E6Dc5051
 
 ## Quickswap
 
