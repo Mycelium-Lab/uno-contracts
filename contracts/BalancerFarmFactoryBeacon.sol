@@ -15,11 +15,11 @@ contract BalancerFarmFactoryBeacon is Initializable{
 
     /**
      * @dev Contract Variables:
-     * {Farms} - links {lpPairs} to the deployed Farm contract.
-     * {lpPairs} - list of pools that have corresponding deployed Farm contract.
+     * {Farms} - links {lpPools} to the deployed Farm contract.
+     * {lpPools} - list of pools that have corresponding deployed Farm contract.
      */
     mapping(address => Farm) public Farms;
-    address[] public lpPairs;
+    address[] public lpPools;
 
     event FarmDeployed(address farmAddress);
     event Deposit(address sender, address lpPair, uint256 amount);
@@ -50,12 +50,12 @@ contract BalancerFarmFactoryBeacon is Initializable{
      * {lpPair} - The address of the pool to deposit tokens in.
      */
     function deposit(uint256[] memory amounts, IERC20[] memory tokens, uint256 LPAmount, address lpPair) external {
+        require (amounts.length == tokens.length, "Amounts and tokens must have the same length");
         if(Farms[lpPair] == Farm(address(0))){
             Farms[lpPair] = Farm(createFarm(lpPair));
-            lpPairs.push(lpPair);
+            lpPools.push(lpPair);
         }
 
-        require (amounts.length == tokens.length, "Amounts and tokens must have the same length");
         for (uint256 i = 0; i < tokens.length; i++) {
             if(amounts[i] > 0){
                 tokens[i].transferFrom(msg.sender, address(Farms[lpPair]), amounts[i]);
@@ -130,7 +130,7 @@ contract BalancerFarmFactoryBeacon is Initializable{
      * @dev poolLength().
      */
     function poolLength() external view returns (uint256){
-        return lpPairs.length;
+        return lpPools.length;
     }
 
     function transferDistributor(address newDistributor) external distributorOnly {

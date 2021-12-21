@@ -25,10 +25,60 @@ contract UnoInfo {
     address constant private WMATIC = address(0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270);
     address constant private WETH = address(0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619);
 
+    bytes32 QUICKSWAP = keccak256(bytes('quickswap'));
+    bytes32 QUICKSWAPDUAL = keccak256(bytes('quickswapDual'));
+    bytes32 SUSHISWAP = keccak256(bytes('sushiswap'));
+
+    function getLPPrice(address lpPool, uint256 value, string memory app) external view returns (uint256) {
+        if(keccak256(bytes(app)) == QUICKSWAP || keccak256(bytes(app)) == QUICKSWAPDUAL){
+            return quickswapLPPrice(lpPool, value);
+        }
+        if(keccak256(bytes(app)) == SUSHISWAP){
+            return sushiswapLPPrice(lpPool, value);
+        }
+        return 0;
+    }
+
+    function getRewardRate(address lpPool, string memory app) external view returns (uint256) {
+        if(keccak256(bytes(app)) == QUICKSWAP){
+            return quickswapRewardRate(lpPool);
+        }
+        if(keccak256(bytes(app)) == QUICKSWAPDUAL){
+            return quickswapDualRewardRate(lpPool);
+        }
+        if(keccak256(bytes(app)) == SUSHISWAP){
+            return sushiswapRewardRate(lpPool);
+        }
+        return 0;
+    }
+
+    function getRewardsToken(address lpPool, string memory app) external view returns (address) {
+        if(keccak256(bytes(app)) == QUICKSWAP){
+            return getQuickswapRewardsToken(lpPool);
+        }
+        if(keccak256(bytes(app)) == QUICKSWAPDUAL){
+            return getQuickswapDualRewardsToken();
+        }
+        if(keccak256(bytes(app)) == SUSHISWAP){
+            return getSushiswapRewardsToken();
+        }
+        return address(0);
+    }
+
+    function getQuickswapRewardsToken(address lpPool) internal view returns (address){
+       return IStakingRewards(lpPool).rewardsToken();
+    }
+    function getQuickswapDualRewardsToken() internal view returns (address){
+       return WMATIC;
+    }
+    function getSushiswapRewardsToken() internal view returns (address){
+       return SUSHI;
+    }
+
     /**
     * @dev Returns the price for the given pair (WMATIC)
     */ 
-    function quickswapLPPrice(address lpPair, uint256 value) external view returns (uint256) {//make price returned not affected by slippage rate
+    function quickswapLPPrice(address lpPair, uint256 value) internal view returns (uint256) {//make price returned not affected by slippage rate
         uint256 totalSupply = IERC20(lpPair).totalSupply();
         address token0 = IUniswapV2Pair(lpPair).token0();
         uint256 totalTokenAmount = IERC20(token0).balanceOf(lpPair).mul(2);
@@ -45,7 +95,7 @@ contract UnoInfo {
         return price[price.length - 1];
     }
 
-    function sushiswapLPPrice(address lpPair, uint256 value) external view returns (uint256) {//make price returned not affected by slippage rate
+    function sushiswapLPPrice(address lpPair, uint256 value) internal view returns (uint256) {//make price returned not affected by slippage rate
       uint256 totalSupply = IERC20(lpPair).totalSupply();
       address token0 = IUniswapV2Pair(lpPair).token0();
       uint256 totalTokenAmount = IERC20(token0).balanceOf(lpPair).mul(2);
@@ -79,14 +129,14 @@ contract UnoInfo {
     /**
      * @dev Returns current reward rate.
      */ 
-    function quickswapRewardRate(address lpStakingPool) external view returns (uint256) {
+    function quickswapRewardRate(address lpStakingPool) internal view returns (uint256) {
         return IStakingRewards(lpStakingPool).rewardRate();
     }
 
     /**
      * @dev Returns current reward rate. (WMATIC)
      */ 
-    function quickswapDualRewardRate(address lpStakingPool) public view returns(uint256){
+    function quickswapDualRewardRate(address lpStakingPool) internal view returns(uint256){
         uint256 rewardRateA = IStakingDualRewards(lpStakingPool).rewardRateA();
         address rewardTokenA = IStakingDualRewards(lpStakingPool).rewardsTokenA();
         if(quickswapFactory.getPair(WMATIC, rewardTokenA) == address(0)){
@@ -113,8 +163,7 @@ contract UnoInfo {
         return rewardRateA.add(rewardRateB);
     }
 
-
-    function sushiswapRewardRate(address lpPair) external view returns (uint256) {
+    function sushiswapRewardRate(address lpPair) internal view returns (uint256) {
         uint256 pid = getPid(lpPair);
         IMiniChefV2.PoolInfo memory poolInfo = miniChef.poolInfo(pid);
         uint256 totalAllocPoint = miniChef.totalAllocPoint();
@@ -131,13 +180,6 @@ contract UnoInfo {
             return price[price.length - 1].add(sushiRewardRate);
         }
         return sushiRewardRate;
-    }
-
-      /**
-     * @dev Returns {lpPair} for the {lpStakingPool}.
-     */ 
-    function getQuickswapPairAddress(address lpStakingPool) external view returns(address){
-      return address(IStakingRewards(lpStakingPool).stakingToken());
     }
 
     function getPid(address lpPair) internal view returns(uint256 _pid) {

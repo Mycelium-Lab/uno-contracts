@@ -14,11 +14,11 @@ contract QuickswapDualFarmFactoryBeacon is Initializable{
 
     /**
      * @dev Contract Variables:
-     * {Farms} - links {lpStakingPools} to the deployed Farm contract.
-     * {lpStakingPools} - list of pools that have corresponding deployed Farm contract.
+     * {Farms} - links {lpPools} to the deployed Farm contract.
+     * {lpPools} - list of pools that have corresponding deployed Farm contract.
      */
     mapping(address => Farm) public Farms;
-    address[] public lpStakingPools;
+    address[] public lpPools;
 
     event FarmDeployed(address farmAddress);
     event Deposit(address sender, address lpPair, uint256 amount);
@@ -43,7 +43,7 @@ contract QuickswapDualFarmFactoryBeacon is Initializable{
     function deposit(uint256 amountA, uint256 amountB, uint256 amountLP, address lpStakingPool) external {
         if(Farms[lpStakingPool] == Farm(address(0))){
             Farms[lpStakingPool] = Farm(createFarm(lpStakingPool));
-            lpStakingPools.push(lpStakingPool);
+            lpPools.push(lpStakingPool);
         }
 
         if(amountA > 0){
@@ -118,7 +118,7 @@ contract QuickswapDualFarmFactoryBeacon is Initializable{
      * @dev poolLength()
      */
     function poolLength() external view returns (uint256) {
-        return lpStakingPools.length;
+        return lpPools.length;
     }
     
     function createFarm(address lpStakingPool) internal returns (address) {
