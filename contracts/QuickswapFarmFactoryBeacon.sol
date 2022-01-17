@@ -10,20 +10,22 @@ import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 contract QuickswapFarmFactoryBeacon is Initializable{
     using SafeMath for uint256; 
 
-    address public farmBeacon;
-
     /**
      * @dev Contract Variables:
+     * {farmBeacon} - Farm contract implementation.
+     *
      * {Farms} - links {lpPools} to the deployed Farm contract.
      * {lpPools} - list of pools that have corresponding deployed Farm contract.
      */
+    address public farmBeacon;
+
     mapping(address => Farm) public Farms;
     address[] public lpPools;
 
-    event FarmDeployed(address farmAddress);
-    event Deposit(address sender, address lpPair, uint256 amount);
-    event Withdraw(address sender, address lpPair, uint256 amount);
-    event Distribute(address lpPair);
+    event FarmDeployed(address indexed farmAddress);
+    event Deposit(address indexed sender, address indexed lpPool, uint256 amount);
+    event Withdraw(address indexed sender, address indexed lpPool, uint256 amount);
+    event Distribute(address indexed lpPool);
 
     // ============ Methods ============
 
@@ -36,11 +38,15 @@ contract QuickswapFarmFactoryBeacon is Initializable{
     }
 
     /**
-     * @dev Creates a new contract if there isn't one and deposits LP tokens to the lpStakingPool.
-     * {amount} - the amount of LP tokens to deposit.
-     * {lpStakingPool} - LP pool to deposit tokens to. 
+     * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the lpStakingPool and deposits tokens.
+     * {amountA, amountB} - Amounts of tokens to deposit.
+     * {amountLP} - Amounts of LP tokens to deposit.
+     * {lpStakingPool} - Address of the pool to deposit tokens in.
+     *
+     * {sentA, sentB} - Token amounts sent to the farm.
+     * {liquidity} - Total liquidity sent to the farm (in lpTokens).
      */
-    function deposit(uint256 amountA, uint256 amountB, uint256 amountLP, address lpStakingPool) external {
+    function deposit(uint256 amountA, uint256 amountB, uint256 amountLP, address lpStakingPool) external returns(uint256 sentA, uint256 sentB, uint256 liquidity){
         if(Farms[lpStakingPool] == Farm(address(0))){
             Farms[lpStakingPool] = Farm(createFarm(lpStakingPool));
             lpPools.push(lpStakingPool);
@@ -55,27 +61,31 @@ contract QuickswapFarmFactoryBeacon is Initializable{
             tokenB.transferFrom(msg.sender, address(Farms[lpStakingPool]), amountB);
         }
         if(amountLP > 0){
-            IERC20 lpPair = IERC20(Farms[lpStakingPool].lpPair());
+            IERC20 lpPair = IERC20(Farms[lpStakingPool].lpPair()); 
             lpPair.transferFrom(msg.sender, address(Farms[lpStakingPool]), amountLP);
         }
         
-        uint256 depositedAmount = Farms[lpStakingPool].deposit(amountA, amountB, amountLP, msg.sender); 
-        emit Deposit(msg.sender, lpStakingPool, depositedAmount); 
+       (sentA, sentB, liquidity) = Farms[lpStakingPool].deposit(amountA, amountB, amountLP, msg.sender); 
+        emit Deposit(msg.sender, lpStakingPool, liquidity); 
     }
 
     /**
      * @dev Withdraws tokens from the given pool. 
      * {lpStakingPool} - LP pool to withdraw from.
-     * {withdrawLP} - true: Withdraw in LP tokens, false: Withdraw in tokens.
-     */ 
-    function withdraw(address lpStakingPool, bool withdrawLP) external {
+     * {amount} - LP amount to withdraw. 
+     * {withdrawLP} - True: Withdraw in LP tokens, False: Withdraw in normal tokens.
+     * {recipient} - The address which will recieve tokens.
+     *
+     * {amountA, amountB} - Token amounts sent to the {recipient}, 0 if withdrawLP == false.
+     */  
+    function withdraw(address lpStakingPool, uint256 amount, bool withdrawLP, address recipient) external returns(uint256 amountA, uint256 amountB){
         require(Farms[lpStakingPool] != Farm(address(0)), 'The given pool doesnt exist');
-        uint256 withdrawAmount = Farms[lpStakingPool].withdraw(msg.sender, withdrawLP);
-        emit Withdraw(msg.sender, lpStakingPool, withdrawAmount);
+        (amountA, amountB) = Farms[lpStakingPool].withdraw(msg.sender, amount, withdrawLP, recipient); 
+        emit Withdraw(msg.sender, lpStakingPool, amount);  
     }
 
-     /**
-     * @dev Distributes tokens between users for a single { Farms[lpStakingPool] }.
+    /**
+     * @dev Distributes tokens between users for a single {Farms[lpStakingPool]}.
      */ 
     function distribute(address lpStakingPool) external {
         require(Farms[lpStakingPool] != Farm(address(0)), 'The given pool doesnt exist');
@@ -84,7 +94,7 @@ contract QuickswapFarmFactoryBeacon is Initializable{
     }
 
     /**
-     * @dev Returns token values staked by the user for the given {lpStakingPool}
+     * @dev Returns tokens staked by the {_address} for the given {lpStakingPool}.
      */
     function userStake(address _address, address lpStakingPool) external view returns (uint256 lpStake, uint256 token0Stake, uint256 token1Stake) {
         if (Farms[lpStakingPool] != Farm(address(0))) {
@@ -105,8 +115,8 @@ contract QuickswapFarmFactoryBeacon is Initializable{
     }
 
     /**
-     * @dev Returns total amount locked in the pool. Doesn't take rewards after last distribution into account.
-     */
+     * @dev Returns total amount locked in the pool. Doesn't take pending rewards into account.
+     */ 
     function totalDeposits(address lpStakingPool) external view returns (uint256) {
         if (Farms[lpStakingPool] != Farm(address(0))) {
             return Farms[lpStakingPool].getTotalDeposits();
@@ -114,13 +124,13 @@ contract QuickswapFarmFactoryBeacon is Initializable{
         return 0;
     }
 
-    /**
-     * @dev poolLength()
-     */
     function poolLength() external view returns (uint256) {
         return lpPools.length;
     }
     
+    /**
+     * @dev Deploys new Farm contract and calls initialize on it.
+     */
     function createFarm(address lpStakingPool) internal returns (address) {
         BeaconProxy proxy = new BeaconProxy(
             farmBeacon,

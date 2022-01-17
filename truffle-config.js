@@ -14,9 +14,16 @@ module.exports = {
         })
       },
       gas: 7500000,
-      gasPrice: 40000000000,
+      gasPrice: 100000000000,
       network_id: 137,
       addressIndex: 0
+    },
+    test: {
+      host: '127.0.0.1',
+      port: 8545,
+      gas: 7500000,
+      gasPrice: 1,
+      network_id: 137
     }
   },
 

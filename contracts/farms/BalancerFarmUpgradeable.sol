@@ -18,21 +18,22 @@ contract BalancerFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgra
 
     /**
      * @dev Third Party Contracts:
-     * {Vault} - the main Balancer contract used for pool exits/joins and swaps
-     * {merkleOrchard} - The contract that distributes reward tokens
+     * {Vault} - the main Balancer contract used for pool exits/joins and swaps.
+     * {merkleOrchard} - The contract that distributes reward tokens.
      */   
     IVault constant private Vault = IVault(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
     MerkleOrchard constant private merkleOrchard = MerkleOrchard(0x0F3e0c4218b7b0108a3643cFe9D3ec0d4F57c54e);
+
     /**
      * @dev Contract Variables:
-     *  {lpPair} - The pair and the pool
-     * {poolId} - Bytes32 representation of the {lpPair}
+     * {lpPair} - The pair and the pool.
+     * {poolId} - Bytes32 representation of the {lpPair}.
      * 
-     * The implementation of “Scalable Reward Distribution on the Ethereum Blockchain” paper by B. Batog, L. Boca and N. Johnson
-     * {totalDeposits} - The sum of all active stake deposits | (T)
-     * {sumOfRewards} - The sum of (rewards)/(totalDeposits) | (S)
-     * {stakes} - All stakes made by users | (stake)
-     * {sumOfRewardsForUser} - A sumOfRewards for users at pool join time | (S0)
+     * The implementation of “Scalable Reward Distribution on the Ethereum Blockchain” paper by B. Batog, L. Boca and N. Johnson.
+     * {totalDeposits} - The sum of all active stake deposits | (T).
+     * {sumOfRewards} - The sum of (rewards)/(totalDeposits) | (S).
+     * {stakes} - All stakes made by users | (stake).
+     * {sumOfRewardsForUser} - A sumOfRewards for users at pool join time | (S0).
      */
     address public lpPair;
     bytes32 public poolId;
@@ -54,10 +55,10 @@ contract BalancerFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgra
     }
 
    /**
-     * @dev Function that makes the deposits
-     * Deposits all the tokens from this contract's balance to the {Vault}.
+     * @dev Function that makes the deposits.
+     * Deposits the {amounts} of {tokens} from this contract's balance to the {Vault}.
      */
-    function deposit(uint256[] memory amounts, IERC20[] memory tokens, uint256 LPAmount, address origin) external onlyOwner startCooldown(origin) nonReentrant returns(uint256){
+    function deposit(uint256[] memory amounts, IERC20[] memory tokens, uint256 amountLP, address origin) external onlyOwner startCooldown(origin) nonReentrant returns(uint256 liquidity){
         (IERC20[] memory poolTokens, IAsset[] memory assets,) = getTokens();
     
         bool joinPool = false;
@@ -71,7 +72,6 @@ contract BalancerFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgra
             }
         }
 
-        uint256 depositAmount = 0;
         {
             uint256 amountBefore = IERC20(lpPair).balanceOf(address(this));
             if(joinPool){
@@ -80,41 +80,42 @@ contract BalancerFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgra
             }
             uint256 amountAfter = IERC20(lpPair).balanceOf(address(this));
 
-            depositAmount = amountAfter.sub(amountBefore).add(LPAmount); 
-            require(depositAmount > 0, 'The amount provided is 0');
+            liquidity = amountAfter.sub(amountBefore).add(amountLP); 
+            require(liquidity > 0, 'The amount provided is 0');
         }
         
-        stakes[origin] = depositAmount.add(userBalance(origin));
+        stakes[origin] = liquidity.add(userBalance(origin));
         sumOfRewardsForUser[origin] = sumOfRewards;
-        totalDeposits = totalDeposits.add(depositAmount);
-
-        return depositAmount;
+        totalDeposits = totalDeposits.add(liquidity);
     }
 
     /**
-     * @dev Withdraws funds and sends them to the {msg.sender}.
+     * @dev Withdraws funds and sends them to the {recipient}.
      */
-    function withdraw(address origin, bool withdrawLP) external onlyOwner checkCooldown(origin) nonReentrant returns(uint256){
+    function withdraw(address origin, uint256 amount, bool withdrawLP, address recipient) external onlyOwner checkCooldown(origin) nonReentrant{
         require(stakes[origin] > 0, "The amount staked should be more than 0");
-        
-        uint256 withdrawAmount = userBalance(origin);
-        totalDeposits = totalDeposits.sub(stakes[origin]);
-        stakes[origin] = 0;
+        {
+            uint256 depositAmount = userBalance(origin).sub(amount);
+            totalDeposits = totalDeposits.sub(stakes[origin]).add(depositAmount);
+            stakes[origin] = depositAmount;
 
+            if(depositAmount > 0) {
+                sumOfRewardsForUser[origin] = sumOfRewards;
+            }
+        }
         if(withdrawLP){
-            IERC20(lpPair).transfer(origin, withdrawAmount);
-            return withdrawAmount;
+            IERC20(lpPair).transfer(recipient, amount);
+            return;
         }
 
         (, IAsset[] memory assets, uint256[] memory amounts) = getTokens();
-        Vault.exitPool(poolId, address(this), payable(origin), IVault.ExitPoolRequest(assets, amounts, abi.encode(1, withdrawAmount), false));
-        return withdrawAmount;
+        Vault.exitPool(poolId, address(this), payable(recipient), IVault.ExitPoolRequest(assets, amounts, abi.encode(1, amount), false));
     }
 
     /**
      * @dev Core function of the strat, in charge of updating, collecting and re-investing rewards.
      * 1. It claims rewards from the {merkleOrchard}.
-     * 2. It swaps the {rewardTokens} token for {assets}
+     * 2. It swaps the {rewardTokens} token for {assets}.
      * 3. Then deposits the new tokens back to the {Vault}.
      */
     function distribute(
@@ -154,7 +155,7 @@ contract BalancerFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgra
     }
 
     /**
-     * @dev Returns total funds staked by the {_address} 
+     * @dev Returns total funds staked by the {_address}.
      */
     function userBalance(address _address) public view returns (uint256){
         uint256 reward = stakes[_address].mul(sumOfRewards.sub(sumOfRewardsForUser[_address])).div(uint256(1 ether));
@@ -169,7 +170,7 @@ contract BalancerFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgra
     }
 
     /**
-     * @dev Returns (getPoolTokens(), IAsset(getPoolTokens()), new uint256[](tokens.length))
+     * @dev Utility function used to create IAsset array.
      */ 
     function getTokens() internal view returns(IERC20[] memory tokens, IAsset[] memory assets, uint256[] memory amounts){
         (tokens, , ) = Vault.getPoolTokens(poolId);

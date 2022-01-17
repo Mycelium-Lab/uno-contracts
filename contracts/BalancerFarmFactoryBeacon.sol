@@ -10,21 +10,24 @@ import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 contract BalancerFarmFactoryBeacon is Initializable{
     using SafeMath for uint256; 
 
-    address public farmBeacon;
-    address private distributor;
-
     /**
      * @dev Contract Variables:
-     * {Farms} - links {lpPools} to the deployed Farm contract.
-     * {lpPools} - list of pools that have corresponding deployed Farm contract.
+     * {farmBeacon} - Farm contract implementation.
+     *
+     * {distributor} - Address authorized to make distributions.
+     * {Farms} - Links {lpPools} to the deployed Farm contract.
+     * {lpPools} - List of pools that have corresponding deployed Farm contract.
      */
+    address public farmBeacon;
+
+    address private distributor;
     mapping(address => Farm) public Farms;
     address[] public lpPools;
 
-    event FarmDeployed(address farmAddress);
-    event Deposit(address sender, address lpPair, uint256 amount);
-    event Withdraw(address sender, address lpPair, uint256 amount);
-    event Distribute(address lpPair);
+    event FarmDeployed(address indexed farmAddress);
+    event Deposit(address indexed sender, address indexed lpPool, uint256 amount);
+    event Withdraw(address indexed sender, address indexed lpPool, uint256 amount);
+    event Distribute(address indexed lpPool);
 
     modifier distributorOnly(){
         require(msg.sender == distributor);
@@ -43,13 +46,15 @@ contract BalancerFarmFactoryBeacon is Initializable{
     }
 
     /**
-     * @dev Creates a new contract if there isn't one and deposits tokens to the lpStakingPool.
-     * {amounts} - The amounts of the tokens to deposit.
-     * {tokens} - The tokens to deposit.
-     * {LPAmount} - The amounts of the LP tokens to deposit.
-     * {lpPair} - The address of the pool to deposit tokens in.
+     * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the lpPair and deposits tokens.
+     * {amounts} - Amounts of tokens to deposit.
+     * {tokens} - Tokens to deposit.
+     * {amountLP} - Amounts of LP tokens to deposit.
+     * {lpPair} - Address of the pool to deposit tokens in.
+     *
+     * {liquidity} - Total liquidity sent to the farm (in lpTokens).
      */
-    function deposit(uint256[] memory amounts, IERC20[] memory tokens, uint256 LPAmount, address lpPair) external {
+    function deposit(uint256[] memory amounts, IERC20[] memory tokens, uint256 amountLP, address lpPair) external returns(uint256 liquidity){
         require (amounts.length == tokens.length, "Amounts and tokens must have the same length");
         if(Farms[lpPair] == Farm(address(0))){
             Farms[lpPair] = Farm(createFarm(lpPair));
@@ -61,32 +66,35 @@ contract BalancerFarmFactoryBeacon is Initializable{
                 tokens[i].transferFrom(msg.sender, address(Farms[lpPair]), amounts[i]);
             }
         }
-        if(LPAmount > 0){
-            IERC20(lpPair).transferFrom(msg.sender, address(Farms[lpPair]), LPAmount);
+        if(amountLP > 0){
+            IERC20(lpPair).transferFrom(msg.sender, address(Farms[lpPair]), amountLP);
         }
 
-        uint256 depositedAmount = Farms[lpPair].deposit(amounts, tokens, LPAmount, msg.sender);
-        emit Deposit(msg.sender, lpPair, depositedAmount);
+        liquidity = Farms[lpPair].deposit(amounts, tokens, amountLP, msg.sender);
+        emit Deposit(msg.sender, lpPair, liquidity);
     }
 
     /**
      * @dev Withdraws tokens from the given pool. 
-     * {lpPair} - The pool to withdraw from.
-     * {LP} - True: Withdraw in LP tokens, False: Withdraw in normal tokens.
+     * {lpPair} - LP pool to withdraw from.
+     * {amount} - LP amount to withdraw. 
+     * {withdrawLP} - True: Withdraw in LP tokens, False: Withdraw in normal tokens.
+     * {recipient} - The address which will recieve tokens.
      */ 
-    function withdraw(address lpPair, bool withdrawLP) external { 
-        require(Farms[lpPair] != Farm(address(0)), 'The given pool doesnt exist');
-        uint256 withdrawAmount = Farms[lpPair].withdraw(msg.sender, withdrawLP);
-        emit Withdraw(msg.sender, lpPair, withdrawAmount);
+    function withdraw(address lpPair, uint256 amount, bool withdrawLP, address recipient) external{ 
+        require(Farms[lpPair] != Farm(address(0)), 'The given pool doesnt exist'); 
+        Farms[lpPair].withdraw(msg.sender, amount, withdrawLP, recipient); 
+        emit Withdraw(msg.sender, lpPair, amount);
     }
 
      /**
-     * @dev Distributes tokens between users for a single { Farms[lpPair] }.
-     * {lpPair} - The pool to distribute. (Calculated off-chain)
-     * {claims} - Balancer token claims. (Calculated off-chain)
-     * {rewardTokens} - Reward tokens to recieve from the pool (Calculated off-chain)
-     * {swaps,assets,funds,limits} - The data used to swap reward tokens for the needed tokens (Calculated off-chain)
-     * ADMIN ONLY
+     * @dev Distributes tokens between users for a single {Farms[lpPair]}.
+     * {lpPair} - The pool to distribute. 
+     * {claims} - Balancer token claims. 
+     * {rewardTokens} - Reward tokens to recieve from the pool.
+     * {swaps,assets,funds,limits} - The data used to swap reward tokens for the needed tokens.
+     *
+     * This function can only be called by the distributor.
      */
     function distribute(
         address lpPair,
@@ -107,7 +115,7 @@ contract BalancerFarmFactoryBeacon is Initializable{
     }
 
     /**
-     * @dev Returns token values staked by the user
+     * @dev Returns LP tokens staked by the {_address} for the given {lpPair}.
      */ 
     function userStake(address _address, address lpPair) external view returns(uint256){
         if(Farms[lpPair] != Farm(address(0))){
@@ -126,9 +134,6 @@ contract BalancerFarmFactoryBeacon is Initializable{
         return 0;
     }
 
-    /**
-     * @dev poolLength().
-     */
     function poolLength() external view returns (uint256){
         return lpPools.length;
     }
@@ -137,6 +142,9 @@ contract BalancerFarmFactoryBeacon is Initializable{
         distributor = newDistributor;
     }
 
+    /**
+     * @dev Deploys new Farm contract and calls initialize on it.
+     */
     function createFarm(address lpPair) internal returns (address) {
         BeaconProxy proxy = new BeaconProxy(
             farmBeacon,
@@ -149,5 +157,4 @@ contract BalancerFarmFactoryBeacon is Initializable{
         emit FarmDeployed(address(proxy));
         return address(proxy);
     }
-
 }
