@@ -12,9 +12,12 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "../utils/Cooldown.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
 contract BalancerFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgradeable, ReentrancyGuard, Cooldown {
     using SafeMath for uint256; 
+    using SafeERC20Upgradeable for IERC20Upgradeable;
 
     /**
      * @dev Third Party Contracts:
@@ -58,12 +61,12 @@ contract BalancerFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgra
      * @dev Function that makes the deposits.
      * Deposits the {amounts} of {tokens} from this contract's balance to the {Vault}.
      */
-    function deposit(uint256[] memory amounts, IERC20[] memory tokens, uint256 amountLP, address origin) external onlyOwner startCooldown(origin) nonReentrant returns(uint256 liquidity){
+    function deposit(uint256[] memory amounts, address[] memory tokens, uint256 amountLP, address recipient) external onlyOwner nonReentrant returns(uint256 liquidity){
         (IERC20[] memory poolTokens, IAsset[] memory assets,) = getTokens();
     
         bool joinPool = false;
         for (uint256 i = 0; i < poolTokens.length; i++) {
-            require (tokens[i] == poolTokens[i], "Tokens don't match getPoolTokens()");
+            require (IERC20(tokens[i]) == poolTokens[i], "Tokens don't match getPoolTokens()");
             if(amounts[i] > 0){
                 if(!joinPool){
                     joinPool = true;
@@ -84,15 +87,15 @@ contract BalancerFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgra
             require(liquidity > 0, 'The amount provided is 0');
         }
         
-        stakes[origin] = liquidity.add(userBalance(origin));
-        sumOfRewardsForUser[origin] = sumOfRewards;
+        stakes[recipient] = liquidity.add(userBalance(recipient));
+        sumOfRewardsForUser[recipient] = sumOfRewards;
         totalDeposits = totalDeposits.add(liquidity);
     }
 
     /**
      * @dev Withdraws funds and sends them to the {recipient}.
      */
-    function withdraw(address origin, uint256 amount, bool withdrawLP, address recipient) external onlyOwner checkCooldown(origin) nonReentrant{
+    function withdraw(address origin, uint256 amount, bool withdrawLP, address recipient) external onlyOwner nonReentrant{
         require(stakes[origin] > 0, "The amount staked should be more than 0");
         {
             uint256 depositAmount = userBalance(origin).sub(amount);
@@ -104,7 +107,7 @@ contract BalancerFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgra
             }
         }
         if(withdrawLP){
-            IERC20(lpPair).transfer(recipient, amount);
+            IERC20Upgradeable(lpPair).safeTransfer(recipient, amount);
             return;
         }
 

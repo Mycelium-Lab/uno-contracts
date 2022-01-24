@@ -14,7 +14,7 @@ module.exports = {
         })
       },
       gas: 7500000,
-      gasPrice: 100000000000,
+      gasPrice: 60000000000,
       network_id: 137,
       addressIndex: 0
     },

@@ -2,20 +2,21 @@
 pragma solidity 0.8.10;
 pragma experimental ABIEncoderV2;
 
-import {QuickswapDualFarmUpgradeable as Farm, SafeMath, IERC20, IUniswapV2Pair, Initializable} from "./farms/QuickswapDualFarmUpgradeable.sol"; 
+import {QuickswapDualFarmUpgradeable as Farm, SafeMath, IERC20, IERC20Upgradeable, SafeERC20Upgradeable, IUniswapV2Pair, Initializable} from "./farms/QuickswapDualFarmUpgradeable.sol"; 
 
 import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 
 contract QuickswapDualFarmFactoryBeacon is Initializable{
     using SafeMath for uint256; 
+    using SafeERC20Upgradeable for IERC20Upgradeable;
 
     /**
      * @dev Contract Variables:
-     * {farmBeacon} - Farm contract implementation.
+     * farmBeacon - Farm contract implementation.
      *
-     * {Farms} - Links {lpPools} to the deployed Farm contract.
-     * {lpPools} - List of pools that have corresponding deployed Farm contract.
+     * Farms - Links {lpPools} to the deployed Farm contract.
+     * lpPools - List of pools that have corresponding deployed Farm contract.
      */
     address public farmBeacon;
 
@@ -38,45 +39,49 @@ contract QuickswapDualFarmFactoryBeacon is Initializable{
     }
 
     /**
-     * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the lpStakingPool and deposits tokens.
-     * {amountA, amountB} - Amounts of tokens to deposit.
-     * {amountLP} - Amounts of LP tokens to deposit.
-     * {lpStakingPool} - Address of the pool to deposit tokens in.
-     *
-     * {sentA, sentB} - Token amounts sent to the farm.
-     * {liquidity} - Total liquidity sent to the farm (in lpTokens).
+     * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the lpPair and deposits tokens.
+     * @param amountA  - Token A amount to deposit.
+     * @param amountB -  Token B amount to deposit.
+     * @param amountLP - LP Token amount to deposit.
+     * @param lpStakingPool - Address of the pool to deposit tokens in.
+     * @param recipient - Address which will recieve the deposit and leftover tokens.
+     
+     * @return sentA - Token A amount sent to the farm.
+     * @return sentB - Token B amount sent to the farm.
+     * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
-    function deposit(uint256 amountA, uint256 amountB, uint256 amountLP, address lpStakingPool) external returns(uint256 sentA, uint256 sentB, uint256 liquidity) {
+    function deposit(uint256 amountA, uint256 amountB, uint256 amountLP, address lpStakingPool, address recipient) external returns(uint256 sentA, uint256 sentB, uint256 liquidity) {
         if(Farms[lpStakingPool] == Farm(address(0))){
             Farms[lpStakingPool] = Farm(createFarm(lpStakingPool));
             lpPools.push(lpStakingPool); 
         }
 
         if(amountA > 0){
-            IERC20 tokenA = IERC20(Farms[lpStakingPool].tokenA());
-            tokenA.transferFrom(msg.sender, address(Farms[lpStakingPool]), amountA);
+            IERC20Upgradeable tokenA = IERC20Upgradeable(Farms[lpStakingPool].tokenA());
+            tokenA.safeTransferFrom(msg.sender, address(Farms[lpStakingPool]), amountA);
         }
         if(amountB > 0){
-            IERC20 tokenB = IERC20(Farms[lpStakingPool].tokenB());
-            tokenB.transferFrom(msg.sender, address(Farms[lpStakingPool]), amountB); 
+            IERC20Upgradeable tokenB = IERC20Upgradeable(Farms[lpStakingPool].tokenB());
+            tokenB.safeTransferFrom(msg.sender, address(Farms[lpStakingPool]), amountB); 
         }
         if(amountLP > 0){
-            IERC20 lpPair = IERC20(Farms[lpStakingPool].lpPair());
-            lpPair.transferFrom(msg.sender, address(Farms[lpStakingPool]), amountLP);
+            IERC20Upgradeable lpPair = IERC20Upgradeable(Farms[lpStakingPool].lpPair());
+            lpPair.safeTransferFrom(msg.sender, address(Farms[lpStakingPool]), amountLP);
         }
         
-        (sentA, sentB, liquidity) = Farms[lpStakingPool].deposit(amountA, amountB, amountLP, msg.sender); 
-        emit Deposit(msg.sender, lpStakingPool, liquidity); 
+        (sentA, sentB, liquidity) = Farms[lpStakingPool].deposit(amountA, amountB, amountLP, recipient); 
+        emit Deposit(recipient, lpStakingPool, liquidity); 
     }
 
-    /**
+    /** 
      * @dev Withdraws tokens from the given pool. 
-     * {lpStakingPool} - LP pool to withdraw from.
-     * {amount} - LP amount to withdraw. 
-     * {withdrawLP} - True: Withdraw in LP tokens, False: Withdraw in normal tokens.
-     * {recipient} - The address which will recieve tokens.
-     *
-     * {amountA, amountB} - Token amounts sent to the {recipient}, 0 if withdrawLP == false.
+     * @param lpStakingPool - LP pool to withdraw from.
+     * @param amount - LP amount to withdraw. 
+     * @param withdrawLP - True: Withdraw in LP tokens, False: Withdraw in normal tokens.
+     * @param recipient - The address which will recieve tokens.
+
+     * @return amountA - Token A amount sent to the {recipient}, 0 if withdrawLP == false.
+     * @return amountB - Token B amount sent to the {recipient}, 0 if withdrawLP == false.
      */ 
     function withdraw(address lpStakingPool, uint256 amount, bool withdrawLP, address recipient) external returns(uint256 amountA, uint256 amountB){
         require(Farms[lpStakingPool] != Farm(address(0)), 'The given pool doesnt exist');
@@ -85,7 +90,8 @@ contract QuickswapDualFarmFactoryBeacon is Initializable{
     }
 
     /**
-     * @dev Distributes tokens between users for a single {Farms[lpStakingPool]}.
+     * @dev Distributes tokens between users.
+     * @param lpStakingPool - LP pool to distribute tokens in.
      */ 
     function distribute(address lpStakingPool) external {
         require(Farms[lpStakingPool] != Farm(address(0)), 'The given pool doesnt exist');
@@ -94,34 +100,34 @@ contract QuickswapDualFarmFactoryBeacon is Initializable{
     }
 
     /**
-     * @dev Returns tokens staked by the {_address} for the given {lpStakingPool}.
+     * @dev Returns tokens staked by the {_address} for the given {lpPair}.
+     * @param _address - The address to check stakes for.
+     * @param lpStakingPool - LP pool to check stakes in.
+
+     * @return stakeLP - Total user stake(in LP tokens).
+     * @return stakeA - Token A stake.
+     * @return stakeB - Token B stake.
      */
-    function userStake(address _address, address lpStakingPool) external view returns (uint256 lpStake, uint256 token0Stake, uint256 token1Stake) {
+    function userStake(address _address, address lpStakingPool) external view returns (uint256 stakeLP, uint256 stakeA, uint256 stakeB) {
         if (Farms[lpStakingPool] != Farm(address(0))) {
-            lpStake = Farms[lpStakingPool].userBalance(_address);
-            address lpPair = Farms[lpStakingPool].lpPair();
-
-            uint256 totalSupply = IERC20(lpPair).totalSupply();
-            uint256 totalToken0Amount = IERC20(Farms[lpStakingPool].tokenA()).balanceOf(lpPair);
-            token0Stake = lpStake.mul(totalToken0Amount).div(totalSupply);
-
-            uint256 totalToken1Amount = IERC20(Farms[lpStakingPool].tokenB()).balanceOf(lpPair);
-            token1Stake = lpStake.mul(totalToken1Amount).div(totalSupply);
-        } else {
-            lpStake = 0;
-            token0Stake = 0;
-            token1Stake = 0;
+            stakeLP = Farms[lpStakingPool].userBalance(_address);
+            (stakeA, stakeB) = getTokenStake(lpStakingPool, stakeLP);
         }
     }
 
     /**
      * @dev Returns total amount locked in the pool. Doesn't take pending rewards into account.
-     */ 
-    function totalDeposits(address lpStakingPool) external view returns (uint256) {
+     * @param lpStakingPool - LP pool to check total deposits in.
+
+     * @return totalDepositsLP - Total deposits (in LP tokens).
+     * @return totalDepositsA - Token A deposits.
+     * @return totalDepositsB - Token B deposits.
+     */  
+    function totalDeposits(address lpStakingPool) external view returns (uint256 totalDepositsLP, uint256 totalDepositsA, uint256 totalDepositsB) {
         if (Farms[lpStakingPool] != Farm(address(0))) {
-            return Farms[lpStakingPool].getTotalDeposits();
+            totalDepositsLP = Farms[lpStakingPool].getTotalDeposits();
+            (totalDepositsA, totalDepositsB) = getTokenStake(lpStakingPool, totalDepositsLP);
         }
-        return 0;
     }
 
     function poolLength() external view returns (uint256) {
@@ -142,5 +148,25 @@ contract QuickswapDualFarmFactoryBeacon is Initializable{
         );
         emit FarmDeployed(address(proxy));
         return address(proxy);
+    }
+
+    /**
+     * @dev Converts LP tokens to normal tokens, value(amountA) == value(amountB) == 0.5*amountLP
+     * @param lpStakingPool - LP pool to check total deposits in.
+     * @param amountLP - Amount of LP tokens to convert.
+
+     * @return amountA - Token A amount.
+     * @return amountB - Token B amount.
+     */ 
+    function getTokenStake(address lpStakingPool, uint256 amountLP) internal view returns (uint256 amountA, uint256 amountB) {
+        if (Farms[lpStakingPool] != Farm(address(0))) {
+            address lpPair = Farms[lpStakingPool].lpPair();
+            uint256 totalSupply = IERC20(lpPair).totalSupply();
+            uint256 totalTokenAAmount = IERC20(Farms[lpStakingPool].tokenA()).balanceOf(lpPair);
+            amountA = amountLP.mul(totalTokenAAmount).div(totalSupply);
+
+            uint256 totalTokenBAmount = IERC20(Farms[lpStakingPool].tokenB()).balanceOf(lpPair);
+            amountB = amountLP.mul(totalTokenBAmount).div(totalSupply);
+        }
     }
 } 

@@ -11,9 +11,12 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "../utils/Cooldown.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
 contract SushiswapFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgradeable, ReentrancyGuard, Cooldown {
     using SafeMath for uint256;
+    using SafeERC20Upgradeable for IERC20Upgradeable;
 
     /**
      * @dev Tokens Used:
@@ -143,10 +146,10 @@ contract SushiswapFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgr
      * @dev Function that makes the deposits.
      * If it's not the first deposit, withdraws {lpStakingPool} and deposits new tokens with the old ones.
      */
-    function deposit(uint256 amountA, uint256 amountB, uint256 amountLP, address origin) external onlyOwner startCooldown(origin) nonReentrant returns(uint256 sentA, uint256 sentB, uint256 liquidity){
+    function deposit(uint256 amountA, uint256 amountB, uint256 amountLP, address recipient) external onlyOwner nonReentrant returns(uint256 sentA, uint256 sentB, uint256 liquidity){
         uint256 withdrawAmount = 0;
-        if (stakes[origin] != 0) {
-            withdrawAmount = withdrawToContract(origin);
+        if (stakes[recipient] != 0) {
+            withdrawAmount = withdrawToContract(recipient);
         }
 
         uint256 addedLiquidity;
@@ -158,14 +161,14 @@ contract SushiswapFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgr
         require(addedLiquidity.add(amountLP) > 0, 'The amount provided is 0');
         uint256 depositAmount = addedLiquidity.add(amountLP).add(withdrawAmount);
 
-        stakes[origin] = depositAmount;
-        sumOfRewardsForUser[origin] = sumOfRewards;
+        stakes[recipient] = depositAmount;
+        sumOfRewardsForUser[recipient] = sumOfRewards;
         totalDeposits = totalDeposits.add(depositAmount);
 
         MiniChef.deposit(pid, depositAmount, address(this));
 
-        IERC20(tokenA).transfer(origin, amountA.sub(sentA));
-        IERC20(tokenB).transfer(origin, amountB.sub(sentB));
+        IERC20Upgradeable(tokenA).safeTransfer(recipient, amountA.sub(sentA));
+        IERC20Upgradeable(tokenB).safeTransfer(recipient, amountB.sub(sentB));
 
         return (sentA, sentB, addedLiquidity.add(amountLP));
     }
@@ -173,7 +176,7 @@ contract SushiswapFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgr
     /**
      * @dev Withdraws funds and sends them to the {recipient}.
      */
-    function withdraw(address origin, uint256 amount, bool withdrawLP, address recipient) external onlyOwner checkCooldown(origin) nonReentrant returns(uint256 amountA, uint256 amountB){
+    function withdraw(address origin, uint256 amount, bool withdrawLP, address recipient) external onlyOwner nonReentrant returns(uint256 amountA, uint256 amountB){
         require(stakes[origin] > 0, "The amount staked should be more than 0");
         uint256 withdrawAmount = withdrawToContract(origin);
 
@@ -187,7 +190,7 @@ contract SushiswapFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgr
         }
 
         if(withdrawLP){
-            IERC20(lpPair).transfer(recipient, amount);
+            IERC20Upgradeable(lpPair).safeTransfer(recipient, amount);
             return (0, 0);
         }
         (amountA, amountB) = sushiswapRouter.removeLiquidity(tokenA, tokenB, amount, 0, 0, recipient, block.timestamp.add(600));

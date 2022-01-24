@@ -24,6 +24,7 @@ contract UnoInfo {
     address constant private SUSHI = address(0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a);
     address constant private WMATIC = address(0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270);
     address constant private WETH = address(0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619);
+    address constant private USDC = address(0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174);
 
     bytes32 QUICKSWAP = keccak256(bytes('quickswap'));
     bytes32 QUICKSWAPDUAL = keccak256(bytes('quickswapDual'));
@@ -68,10 +69,10 @@ contract UnoInfo {
     function getQuickswapRewardsToken(address lpPool) internal view returns (address){
        return IStakingRewards(lpPool).rewardsToken();
     }
-    function getQuickswapDualRewardsToken() internal view returns (address){
+    function getQuickswapDualRewardsToken() internal pure returns (address){
        return WMATIC;
     }
-    function getSushiswapRewardsToken() internal view returns (address){
+    function getSushiswapRewardsToken() internal pure returns (address){
        return SUSHI;
     }
 
@@ -87,10 +88,17 @@ contract UnoInfo {
         if(amountIn == 0 || token0 == WMATIC){
              return amountIn;
         }
-        
-        address[] memory route =  new address[](2);
-        route[0] = token0;
-        route[1] = WMATIC;
+        address[] memory route;
+        if(quickswapFactory.getPair(token0, WMATIC) == address(0)){
+            route =  new address[](3);
+            route[0] = token0;
+            route[1] = USDC;
+            route[2] = WMATIC;
+        }else{
+            route =  new address[](2);
+            route[0] = token0;
+            route[1] = WMATIC;
+        }
         uint256[] memory price = quickswapRouter.getAmountsOut(amountIn, route);
         return price[price.length - 1];
     }
