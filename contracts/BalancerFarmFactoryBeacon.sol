@@ -2,13 +2,13 @@
 pragma solidity 0.8.10;
 pragma experimental ABIEncoderV2;
 
-import {BalancerFarmUpgradeable as Farm, SafeMath, IERC20, IERC20Upgradeable, SafeERC20Upgradeable, IUniswapV2Pair, Initializable, MerkleOrchard, IVault, IAsset} from "./farms/BalancerFarmUpgradeable.sol"; 
- 
+import {BalancerFarmUpgradeable as Farm, IERC20, Initializable, MerkleOrchard, IVault, IAsset} from "./farms/BalancerFarmUpgradeable.sol"; 
 import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol"; 
 import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
 contract BalancerFarmFactoryBeacon is Initializable{
-    using SafeMath for uint256; 
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     /**
@@ -21,7 +21,7 @@ contract BalancerFarmFactoryBeacon is Initializable{
      */
     address public farmBeacon;
 
-    address private distributor;
+    address public distributor;
     mapping(address => Farm) public Farms;
     address[] public lpPools;
 
@@ -29,15 +29,16 @@ contract BalancerFarmFactoryBeacon is Initializable{
     event Deposit(address indexed sender, address indexed lpPool, uint256 amount);
     event Withdraw(address indexed sender, address indexed lpPool, uint256 amount);
     event Distribute(address indexed lpPool);
+    event DistributorChanged(address indexed newDistributor);
 
     modifier distributorOnly(){
-        require(msg.sender == distributor);
+        require(distributor == address(0) || msg.sender == distributor, 'The caller is not distributor');
         _;
     }
 
     // ============ Methods ============
 
-    function initialize(address upgrader, address _distributor) public initializer {
+    function initialize(address upgrader, address _distributor) external initializer {
         UpgradeableBeacon _farmBeacon = new UpgradeableBeacon(
             address(new Farm())
         );
@@ -111,9 +112,7 @@ contract BalancerFarmFactoryBeacon is Initializable{
         int256[][] memory limits
     ) external distributorOnly {
         require(Farms[lpPair] != Farm(address(0)), 'The pool doesnt exist');
-        require(swaps.length == assets.length, "Swaps' length doesn't match assets'");
-        require(swaps.length == funds.length,  "Swaps' length doesn't match funds'");
-        require(swaps.length == limits.length, "Swaps' length doesn't match limits'");
+        require((swaps.length == assets.length) && (swaps.length == funds.length) && (swaps.length == limits.length));
 
         Farms[lpPair].distribute(claims, rewardTokens, swaps, assets, funds, limits);
         emit Distribute(lpPair);
@@ -121,6 +120,7 @@ contract BalancerFarmFactoryBeacon is Initializable{
 
     function transferDistributor(address newDistributor) external distributorOnly {
         distributor = newDistributor;
+        emit DistributorChanged(newDistributor);
     }
 
     /**

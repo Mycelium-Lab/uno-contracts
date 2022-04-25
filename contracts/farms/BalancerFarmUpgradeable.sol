@@ -1,23 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
 
-import "../interfaces/IUniswapV2Pair.sol";
-import "../interfaces/IUniswapV2Router.sol";
 import "../interfaces/IVault.sol";
 import "../interfaces/MerkleOrchard.sol"; 
 import "../interfaces/IBasePool.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "../interfaces/IUniswapV2Factory.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "../utils/Cooldown.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
 contract BalancerFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgradeable, ReentrancyGuard, Cooldown {
     using SafeMath for uint256; 
-    using SafeERC20Upgradeable for IERC20Upgradeable;
 
     /**
      * @dev Third Party Contracts:
@@ -107,7 +101,7 @@ contract BalancerFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgra
             }
         }
         if(withdrawLP){
-            IERC20Upgradeable(lpPair).safeTransfer(recipient, amount);
+            IERC20(lpPair).transfer(recipient, amount);
             return;
         }
 

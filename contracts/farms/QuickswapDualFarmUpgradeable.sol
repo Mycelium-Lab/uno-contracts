@@ -25,8 +25,8 @@ contract QuickswapDualFarmUpgradeable is UUPSUpgradeable, Initializable, Ownable
      * {lpPair} - Token that the strategy maximizes. The same token that users deposit in the {lpStakingPool}.
      * {tokenA, tokenB} - Tokens that the strategy maximizes.
      */
-    address private constant WETH = address(0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619);
-    address private constant QUICK = address(0x831753DD7087CaC61aB5644b308642cc1c33Dc13);
+    address private constant WETH = address(0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619);//UNUSED
+    address private constant QUICK = address(0x831753DD7087CaC61aB5644b308642cc1c33Dc13);//UNUSED
     address public rewardTokenA;
     address public rewardTokenB;
     address public lpPair;
@@ -40,18 +40,18 @@ contract QuickswapDualFarmUpgradeable is UUPSUpgradeable, Initializable, Ownable
      * {lpStakingPool} - The contract that distibutes {rewardTokenA, rewardTokenB}.
      */
     IUniswapV2Router01 private constant quickswapRouter = IUniswapV2Router01(0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff);
-    IUniswapV2Factory private constant QuickswapV2Factory = IUniswapV2Factory(0x5757371414417b8C6CAad45bAeF941aBc7d3Ab32);
+    IUniswapV2Factory private constant QuickswapV2Factory = IUniswapV2Factory(0x5757371414417b8C6CAad45bAeF941aBc7d3Ab32);//UNUSED
     IStakingDualRewards private lpStakingPool;
     
      /**
      * @dev Routes:
      * {rewardTokenAToTokenARoute, rewardTokenAToTokenBRoute, rewardTokenBToTokenARoute, rewardTokenBToTokenBRoute} - The routes to trade tokens with.
      */
-    address[] private rewardTokenAToTokenARoute;
-    address[] private rewardTokenAToTokenBRoute;
+    address[] private rewardTokenAToTokenARoute;//UNUSED
+    address[] private rewardTokenAToTokenBRoute;//UNUSED
     
-    address[] private rewardTokenBToTokenARoute;
-    address[] private rewardTokenBToTokenBRoute;
+    address[] private rewardTokenBToTokenARoute;//UNUSED
+    address[] private rewardTokenBToTokenBRoute;//UNUSED
     
     /**
      * @dev Contract Variables:
@@ -80,48 +80,6 @@ contract QuickswapDualFarmUpgradeable is UUPSUpgradeable, Initializable, Ownable
         
         tokenA = IUniswapV2Pair(lpPair).token0();
         tokenB = IUniswapV2Pair(lpPair).token1();
-
-        if(tokenA == WETH){
-            rewardTokenAToTokenARoute = [rewardTokenA, WETH];
-            rewardTokenBToTokenARoute = [rewardTokenB, WETH];
-        }
-        else {
-            if(tokenA != rewardTokenA){
-                if(QuickswapV2Factory.getPair(WETH, tokenA) == address(0)){
-                    rewardTokenAToTokenARoute = [rewardTokenA, WETH, QUICK, tokenA]; 
-                } else {
-                    rewardTokenAToTokenARoute = [rewardTokenA, WETH, tokenA];
-                }
-            }
-            if(tokenA != rewardTokenB){
-                if(QuickswapV2Factory.getPair(WETH, tokenA) == address(0)){
-                    rewardTokenBToTokenARoute = [rewardTokenB, WETH, QUICK, tokenA]; 
-                } else {
-                    rewardTokenBToTokenARoute = [rewardTokenB, WETH, tokenA];
-                }
-            }
-        }
-                
-        if(tokenB == WETH){
-            rewardTokenAToTokenBRoute = [rewardTokenA, WETH];
-            rewardTokenBToTokenBRoute = [rewardTokenB, WETH];
-        }
-        else {
-            if(tokenB != rewardTokenA){
-                if(QuickswapV2Factory.getPair(WETH, tokenB) == address(0)){
-                    rewardTokenAToTokenBRoute = [rewardTokenA, WETH, QUICK, tokenB];
-                } else {
-                    rewardTokenAToTokenBRoute = [rewardTokenA, WETH, tokenB];
-                }
-            }
-            if(tokenB != rewardTokenB){
-                if(QuickswapV2Factory.getPair(WETH, tokenB) == address(0)){
-                    rewardTokenBToTokenBRoute = [rewardTokenB, WETH, QUICK, tokenB];
-                } else {
-                    rewardTokenBToTokenBRoute = [rewardTokenB, WETH, tokenB];
-                }
-            }
-        }
         
         uint256 MAX_UINT = uint256(2**256 - 1);
         IERC20(lpPair).approve(_lpStakingPool, MAX_UINT);
@@ -139,28 +97,20 @@ contract QuickswapDualFarmUpgradeable is UUPSUpgradeable, Initializable, Ownable
     function deposit(uint256 amountA, uint256 amountB, uint256 amountLP, address recipient) external onlyOwner nonReentrant returns(uint256 sentA, uint256 sentB, uint256 liquidity){
         uint256 withdrawAmount = 0;
         if (stakes[recipient] != 0) {
-            withdrawAmount = withdrawToContract(recipient);
+            withdrawAmount = _withdraw(recipient);
         }
 
         uint256 addedLiquidity;
-        
         if(amountA > 0 && amountB > 0) {
             (sentA, sentB, addedLiquidity) = quickswapRouter.addLiquidity(tokenA, tokenB, amountA, amountB, 0, 0, address(this), block.timestamp.add(600));
         }
 
-        require(addedLiquidity.add(amountLP) > 0, 'The amount provided is 0');
-        uint256 depositAmount = addedLiquidity.add(amountLP).add(withdrawAmount);
-
-        stakes[recipient] = depositAmount;
-        sumOfRewardsForUser[recipient] = sumOfRewards;
-        totalDeposits = totalDeposits.add(depositAmount);
-
-        lpStakingPool.stake(depositAmount);
+        liquidity = addedLiquidity.add(amountLP);
+        require(liquidity > 0, 'The amount provided is 0');
+        _deposit(recipient, liquidity.add(withdrawAmount));
 
         IERC20Upgradeable(tokenA).safeTransfer(recipient, amountA.sub(sentA));
         IERC20Upgradeable(tokenB).safeTransfer(recipient, amountB.sub(sentB));
-        
-        return (sentA, sentB, addedLiquidity.add(amountLP));
     }
 
      /**
@@ -168,15 +118,11 @@ contract QuickswapDualFarmUpgradeable is UUPSUpgradeable, Initializable, Ownable
      */
     function withdraw(address origin, uint256 amount, bool withdrawLP, address recipient) external onlyOwner nonReentrant returns(uint256 amountA, uint256 amountB){
         require(stakes[origin] > 0, "The amount staked should be more than 0");
-        uint256 withdrawAmount = withdrawToContract(origin);
+        uint256 withdrawAmount = _withdraw(origin);
 
         uint256 depositAmount = withdrawAmount.sub(amount);
         if(depositAmount > 0) {
-            stakes[origin] = depositAmount;
-            sumOfRewardsForUser[origin] = sumOfRewards;
-            totalDeposits = totalDeposits.add(depositAmount);
-
-            lpStakingPool.stake(depositAmount);
+            _deposit(origin, depositAmount);
         }
 
         if(withdrawLP){
@@ -190,13 +136,24 @@ contract QuickswapDualFarmUpgradeable is UUPSUpgradeable, Initializable, Ownable
      * @dev Withdraws funds to this contract.
      * It withdraws {lpPair} from the {lpStakingPool} to this contract.
      */
-    function withdrawToContract(address origin) internal returns(uint256){
-        uint256 withdrawAmount = userBalance(origin);
-        totalDeposits = totalDeposits.sub(stakes[origin]);
-
+    function _withdraw(address _address) internal returns(uint256){
+        uint256 withdrawAmount = userBalance(_address);
+        totalDeposits = totalDeposits.sub(stakes[_address]);
+        stakes[_address] = 0;
+        
         lpStakingPool.withdraw(withdrawAmount);
-        stakes[origin] = 0;
         return withdrawAmount;
+    }
+
+    /**
+     * @dev Deposits funds to lpStakingPool.
+     */
+    function _deposit(address _address, uint256 amount) internal {
+        stakes[_address] = amount;
+        sumOfRewardsForUser[_address] = sumOfRewards;
+        totalDeposits = totalDeposits.add(amount);
+
+        lpStakingPool.stake(amount);
     }
 
     /**
@@ -205,7 +162,7 @@ contract QuickswapDualFarmUpgradeable is UUPSUpgradeable, Initializable, Ownable
      * 2. It swaps the {rewardTokenA} & {rewardTokenB} tokens for {tokenA} & {tokenB}.
      * 3. It deposits the new LP tokens back to the {lpStakingPool}.
      */
-    function distribute() external onlyOwner nonReentrant{
+    function distribute(address[] calldata _rewardTokenAToTokenARoute, address[] calldata _rewardTokenAToTokenBRoute, address[] calldata _rewardTokenBToTokenARoute, address[] calldata _rewardTokenBToTokenBRoute) external onlyOwner nonReentrant{
         require(totalDeposits > 0, 'There should be some tokens in the pool');
                 
         lpStakingPool.getReward();
@@ -213,19 +170,19 @@ contract QuickswapDualFarmUpgradeable is UUPSUpgradeable, Initializable, Ownable
         uint256 rewardTokenBHalf = IERC20(rewardTokenB).balanceOf(address(this)).div(2);
                 
         if (tokenA != rewardTokenA) {
-            quickswapRouter.swapExactTokensForTokens(rewardTokenAHalf, 0, rewardTokenAToTokenARoute, address(this), block.timestamp.add(600));
+            quickswapRouter.swapExactTokensForTokens(rewardTokenAHalf, 0, _rewardTokenAToTokenARoute, address(this), block.timestamp.add(600));
         }
         
         if (tokenB != rewardTokenA) {
-            quickswapRouter.swapExactTokensForTokens(rewardTokenAHalf, 0, rewardTokenAToTokenBRoute, address(this), block.timestamp.add(600));
+            quickswapRouter.swapExactTokensForTokens(rewardTokenAHalf, 0, _rewardTokenAToTokenBRoute, address(this), block.timestamp.add(600));
         }
         
         if (tokenA != rewardTokenB) {
-            quickswapRouter.swapExactTokensForTokens(rewardTokenBHalf, 0, rewardTokenBToTokenARoute, address(this), block.timestamp.add(600));
+            quickswapRouter.swapExactTokensForTokens(rewardTokenBHalf, 0, _rewardTokenBToTokenARoute, address(this), block.timestamp.add(600));
         }
         
         if (tokenB != rewardTokenB) {
-            quickswapRouter.swapExactTokensForTokens(rewardTokenBHalf, 0, rewardTokenBToTokenBRoute, address(this), block.timestamp.add(600));
+            quickswapRouter.swapExactTokensForTokens(rewardTokenBHalf, 0, _rewardTokenBToTokenBRoute, address(this), block.timestamp.add(600));
         }
         
         uint256 tokenABalance = IERC20(tokenA).balanceOf(address(this));

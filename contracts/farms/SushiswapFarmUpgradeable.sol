@@ -27,7 +27,7 @@ contract SushiswapFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgr
      * {tokenA, tokenB} - Tokens that the strategy maximizes.
      * {pid} - Pool ID.
      */
-    address private constant WMATIC = address(0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270);
+    address private constant WMATIC = address(0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270);//UNUSED
     address public rewardToken;
     address public rewarderToken;
     address public lpPair;
@@ -49,13 +49,13 @@ contract SushiswapFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgr
      * @dev Routes:
      * {rewardTokenToTokenARoute, rewardTokenToTokenBRoute, rewarderTokenToTokenARoute, rewarderTokenToTokenBRoute, rewarderTokenToRewardToken} - The routes to trade tokens with.
      */
-    address[] private rewardTokenToTokenARoute;
-    address[] private rewardTokenToTokenBRoute;
+    address[] private rewardTokenToTokenARoute;//UNUSED
+    address[] private rewardTokenToTokenBRoute;//UNUSED
 
-    address[] private rewarderTokenToTokenARoute;
-    address[] private rewarderTokenToTokenBRoute;
+    address[] private rewarderTokenToTokenARoute;//UNUSED
+    address[] private rewarderTokenToTokenBRoute;//UNUSED
 
-    address[] private rewarderTokenToRewardToken;
+    address[] private rewarderTokenToRewardToken;//UNUSED
     
     /**
      * @dev Contract Variables:
@@ -91,48 +91,6 @@ contract SushiswapFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgr
         tokenA = IUniswapV2Pair(lpPair).token0();
         tokenB = IUniswapV2Pair(lpPair).token1();
 
-        if (rewarderToken == WMATIC) {
-            if (tokenA != WMATIC) {
-                rewarderTokenToTokenARoute = [rewarderToken, tokenA];
-            }
-            if (tokenB != WMATIC) {
-                rewarderTokenToTokenBRoute = [rewarderToken, tokenB];
-            }
-            if (rewardToken != WMATIC) {
-                rewarderTokenToRewardToken = [rewarderToken, rewardToken];
-            }
-        } else {
-            if (tokenA != WMATIC) {
-                rewarderTokenToTokenARoute = [rewarderToken, WMATIC, tokenA];
-            } else {
-                rewarderTokenToTokenARoute = [rewarderToken, tokenA];
-            }
-
-            if (tokenB != WMATIC) {
-                rewarderTokenToTokenBRoute = [rewarderToken, WMATIC, tokenB];
-            } else {
-                rewarderTokenToTokenBRoute = [rewarderToken, tokenB];
-            }
-
-            if (rewardToken != WMATIC) {
-                rewarderTokenToRewardToken = [rewarderToken, WMATIC, rewardToken];
-            } else {
-                rewarderTokenToRewardToken = [rewarderToken, rewardToken];
-            }
-        }
-
-        if (tokenA == WMATIC) {
-            rewardTokenToTokenARoute = [rewardToken, WMATIC];
-        } else if (tokenA != rewardToken) {
-            rewardTokenToTokenARoute = [rewardToken, WMATIC, tokenA];
-        }
-
-        if (tokenB == WMATIC) {
-            rewardTokenToTokenBRoute = [rewardToken, WMATIC];
-        } else if (tokenB != rewardToken) {
-            rewardTokenToTokenBRoute = [rewardToken, WMATIC, tokenB];
-        }
-
         uint256 MAX_UINT = uint256(2**256 - 1);
         IERC20(lpPair).approve(address(MiniChef), MAX_UINT);
         IERC20(lpPair).approve(address(sushiswapRouter), MAX_UINT);
@@ -149,28 +107,20 @@ contract SushiswapFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgr
     function deposit(uint256 amountA, uint256 amountB, uint256 amountLP, address recipient) external onlyOwner nonReentrant returns(uint256 sentA, uint256 sentB, uint256 liquidity){
         uint256 withdrawAmount = 0;
         if (stakes[recipient] != 0) {
-            withdrawAmount = withdrawToContract(recipient);
+            withdrawAmount = _withdraw(recipient);
         }
 
         uint256 addedLiquidity;
-        
         if(amountA > 0 && amountB > 0){
             (sentA, sentB, addedLiquidity) = sushiswapRouter.addLiquidity(tokenA, tokenB, amountA, amountB, 0, 0, address(this), block.timestamp.add(600));
         }
 
-        require(addedLiquidity.add(amountLP) > 0, 'The amount provided is 0');
-        uint256 depositAmount = addedLiquidity.add(amountLP).add(withdrawAmount);
-
-        stakes[recipient] = depositAmount;
-        sumOfRewardsForUser[recipient] = sumOfRewards;
-        totalDeposits = totalDeposits.add(depositAmount);
-
-        MiniChef.deposit(pid, depositAmount, address(this));
+        liquidity = addedLiquidity.add(amountLP);
+        require(liquidity > 0, 'The amount provided is 0');
+        _deposit(recipient, liquidity.add(withdrawAmount));
 
         IERC20Upgradeable(tokenA).safeTransfer(recipient, amountA.sub(sentA));
         IERC20Upgradeable(tokenB).safeTransfer(recipient, amountB.sub(sentB));
-
-        return (sentA, sentB, addedLiquidity.add(amountLP));
     }
 
     /**
@@ -178,15 +128,11 @@ contract SushiswapFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgr
      */
     function withdraw(address origin, uint256 amount, bool withdrawLP, address recipient) external onlyOwner nonReentrant returns(uint256 amountA, uint256 amountB){
         require(stakes[origin] > 0, "The amount staked should be more than 0");
-        uint256 withdrawAmount = withdrawToContract(origin);
+        uint256 withdrawAmount = _withdraw(origin);
 
         uint256 depositAmount = withdrawAmount.sub(amount);
         if(depositAmount > 0) {
-            stakes[origin] = depositAmount;
-            sumOfRewardsForUser[origin] = sumOfRewards;
-            totalDeposits = totalDeposits.add(depositAmount);
-
-            MiniChef.deposit(pid, depositAmount, address(this));
+            _deposit(origin, depositAmount);
         }
 
         if(withdrawLP){
@@ -200,15 +146,25 @@ contract SushiswapFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgr
      * @dev Withdraws funds to this contract.
      * It withdraws {lpPair} from the {lpStakingPool} to this contract.
      */
-    function withdrawToContract(address origin) internal returns(uint256){
-        uint256 withdrawAmount = userBalance(origin);
-        totalDeposits = totalDeposits.sub(stakes[origin]);
+    function _withdraw(address _address) internal returns(uint256){
+        uint256 withdrawAmount = userBalance(_address);
+        totalDeposits = totalDeposits.sub(stakes[_address]);
+        stakes[_address] = 0;
         
         MiniChef.withdraw(pid, withdrawAmount, address(this));
-        stakes[origin] = 0;
         return withdrawAmount;
     }
 
+    /**
+     * @dev Deposits funds to lpStakingPool.
+     */
+    function _deposit(address _address, uint256 amount) internal {
+        stakes[_address] = amount;
+        sumOfRewardsForUser[_address] = sumOfRewards;
+        totalDeposits = totalDeposits.add(amount);
+
+        MiniChef.deposit(pid, amount, address(this));
+    }
     
     /**
      * @dev Core function of the strat, in charge of updating, collecting and re-investing rewards.
@@ -216,7 +172,7 @@ contract SushiswapFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgr
      * 2. It swaps the {rewardToken} & {rewarderToken} token for {tokenA} & {tokenB}.
      * 3. It deposits the new LP tokens back in the {lpStakingPool}.
      */
-    function distribute() external onlyOwner nonReentrant{
+    function distribute(address[] calldata _rewarderTokenToTokenARoute, address[] calldata _rewarderTokenToTokenBRoute, address[] calldata _rewardTokenToTokenARoute, address[] calldata _rewardTokenToTokenBRoute) external onlyOwner nonReentrant{
         require(totalDeposits > 0, "There should be some tokens in the pool");
 
         MiniChef.harvest(pid, address(this));
@@ -225,20 +181,20 @@ contract SushiswapFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgr
         if (address(ComplexRewarderTime) != address(0)) {
             uint256 rewarderTokenHalf = IERC20(rewarderToken).balanceOf(address(this)).div(2);
             if (tokenA != rewarderToken) {
-                sushiswapRouter.swapExactTokensForTokens(rewarderTokenHalf, 0, rewarderTokenToTokenARoute, address(this), block.timestamp.add(600));
+                sushiswapRouter.swapExactTokensForTokens(rewarderTokenHalf, 0, _rewarderTokenToTokenARoute, address(this), block.timestamp.add(600));
             }
 
             if (tokenB != rewarderToken) {
-                sushiswapRouter.swapExactTokensForTokens(rewarderTokenHalf, 0, rewarderTokenToTokenBRoute, address(this), block.timestamp.add(600));
+                sushiswapRouter.swapExactTokensForTokens(rewarderTokenHalf, 0, _rewarderTokenToTokenBRoute, address(this), block.timestamp.add(600));
             }
         }
 
         if (tokenA != rewardToken) {
-            sushiswapRouter.swapExactTokensForTokens(rewardTokenHalf, 0, rewardTokenToTokenARoute, address(this), block.timestamp.add(600));
+            sushiswapRouter.swapExactTokensForTokens(rewardTokenHalf, 0, _rewardTokenToTokenARoute, address(this), block.timestamp.add(600));
         }
 
         if (tokenB != rewardToken) {
-            sushiswapRouter.swapExactTokensForTokens(rewardTokenHalf, 0, rewardTokenToTokenBRoute, address(this), block.timestamp.add(600));
+            sushiswapRouter.swapExactTokensForTokens(rewardTokenHalf, 0, _rewardTokenToTokenBRoute, address(this), block.timestamp.add(600));
         }
 
         uint256 tokenABalance = IERC20(tokenA).balanceOf(address(this));

@@ -17,16 +17,24 @@ contract QuickswapFarmFactoryBeacon is Initializable{
      *
      * Farms - links {lpPools} to the deployed Farm contract.
      * lpPools - list of pools that have corresponding deployed Farm contract.
+     * distributor - Address authorized to make distributions.
      */
     address public farmBeacon;
 
     mapping(address => Farm) public Farms;
     address[] public lpPools;
+    address public distributor;
 
     event FarmDeployed(address indexed farmAddress);
     event Deposit(address indexed sender, address indexed lpPool, uint256 amount);
     event Withdraw(address indexed sender, address indexed lpPool, uint256 amount);
     event Distribute(address indexed lpPool);
+    event DistributorChanged(address indexed newDistributor);
+
+    modifier distributorOnly(){
+        require(distributor == address(0) || msg.sender == distributor, 'The caller is not distributor');
+        _;
+    }
 
     // ============ Methods ============
 
@@ -92,10 +100,19 @@ contract QuickswapFarmFactoryBeacon is Initializable{
     /**
      * @dev Distributes tokens between users.
      * @param lpStakingPool - LP pool to distribute tokens in.
+     * @param rewardTokenToTokenARoute An array of token addresses.
+     * @param rewardTokenToTokenBRoute An array of token addresses.
+     *
+     * Note: This function can only be called by the distributor.
      */ 
-    function distribute(address lpStakingPool) external {
+    function distribute(
+        address lpStakingPool,
+        address[] calldata rewardTokenToTokenARoute, 
+        address[] calldata rewardTokenToTokenBRoute
+    ) external distributorOnly {
         require(Farms[lpStakingPool] != Farm(address(0)), 'The given pool doesnt exist');
-        Farms[lpStakingPool].distribute();
+
+        Farms[lpStakingPool].distribute(rewardTokenToTokenARoute, rewardTokenToTokenBRoute);
         emit Distribute(lpStakingPool);
     }
 
@@ -168,5 +185,10 @@ contract QuickswapFarmFactoryBeacon is Initializable{
             uint256 totalTokenBAmount = IERC20(Farms[lpStakingPool].tokenB()).balanceOf(lpPair);
             amountB = amountLP.mul(totalTokenBAmount).div(totalSupply);
         }
+    }
+
+    function transferDistributor(address newDistributor) external distributorOnly {
+        distributor = newDistributor;
+        emit DistributorChanged(newDistributor);
     }
 }

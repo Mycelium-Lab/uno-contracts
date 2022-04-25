@@ -17,20 +17,28 @@ contract QuickswapDualFarmFactoryBeacon is Initializable{
      *
      * Farms - Links {lpPools} to the deployed Farm contract.
      * lpPools - List of pools that have corresponding deployed Farm contract.
+     * distributor - Address authorized to make distributions.
      */
     address public farmBeacon;
 
     mapping(address => Farm) public Farms;
     address[] public lpPools;
+    address public distributor;
 
     event FarmDeployed(address indexed farmAddress);
     event Deposit(address indexed sender, address indexed lpPool, uint256 amount);
     event Withdraw(address indexed sender, address indexed lpPool, uint256 amount);
     event Distribute(address indexed lpPool);
+    event DistributorChanged(address indexed newDistributor);
+
+    modifier distributorOnly(){
+        require(distributor == address(0) || msg.sender == distributor, 'The caller is not distributor');
+        _;
+    }
 
     // ============ Methods ============
 
-    function initialize(address upgrader) public initializer {
+    function initialize(address upgrader) external initializer {
         UpgradeableBeacon _farmBeacon = new UpgradeableBeacon(
             address(new Farm())
         );
@@ -92,10 +100,23 @@ contract QuickswapDualFarmFactoryBeacon is Initializable{
     /**
      * @dev Distributes tokens between users.
      * @param lpStakingPool - LP pool to distribute tokens in.
+     * @param rewardTokenAToTokenARoute An array of token addresses.
+     * @param rewardTokenAToTokenBRoute An array of token addresses.
+     * @param rewardTokenBToTokenARoute An array of token addresses.
+     * @param rewardTokenBToTokenBRoute An array of token addresses.
+     *
+     * Note: This function can only be called by the distributor.
      */ 
-    function distribute(address lpStakingPool) external {
+    function distribute(
+        address lpStakingPool,
+        address[] calldata rewardTokenAToTokenARoute,
+        address[] calldata rewardTokenAToTokenBRoute,
+        address[] calldata rewardTokenBToTokenARoute,
+        address[] calldata rewardTokenBToTokenBRoute
+    ) external distributorOnly {
         require(Farms[lpStakingPool] != Farm(address(0)), 'The given pool doesnt exist');
-        Farms[lpStakingPool].distribute();
+        
+        Farms[lpStakingPool].distribute(rewardTokenAToTokenARoute, rewardTokenAToTokenBRoute, rewardTokenBToTokenARoute, rewardTokenBToTokenBRoute);
         emit Distribute(lpStakingPool);
     }
 
@@ -168,5 +189,10 @@ contract QuickswapDualFarmFactoryBeacon is Initializable{
             uint256 totalTokenBAmount = IERC20(Farms[lpStakingPool].tokenB()).balanceOf(lpPair);
             amountB = amountLP.mul(totalTokenBAmount).div(totalSupply);
         }
+    }
+
+    function transferDistributor(address newDistributor) external distributorOnly {
+        distributor = newDistributor;
+        emit DistributorChanged(newDistributor);
     }
 } 

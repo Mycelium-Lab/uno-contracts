@@ -17,16 +17,24 @@ contract SushiswapFarmFactoryBeacon is Initializable{
      *
      * Farms - Links {lpPools} to the deployed Farm contract.
      * lpPools - List of pools that have corresponding deployed Farm contract.
+     * distributor - Address authorized to make distributions.
      */
     address public farmBeacon;
 
     mapping(address => Farm) public Farms;
     address[] public lpPools;
+    address public distributor;
 
     event FarmDeployed(address indexed farmAddress);
     event Deposit(address indexed sender, address indexed lpPool, uint256 amount);
     event Withdraw(address indexed sender, address indexed lpPool, uint256 amount);
     event Distribute(address indexed lpPool);
+    event DistributorChanged(address indexed newDistributor);
+
+    modifier distributorOnly(){
+        require(distributor == address(0) || msg.sender == distributor, 'The caller is not distributor');
+        _;
+    }
 
     // ============ Methods ============
 
@@ -91,10 +99,23 @@ contract SushiswapFarmFactoryBeacon is Initializable{
     /**
      * @dev Distributes tokens between users.
      * @param lpPair - LP pool to distribute tokens in.
+     * @param rewarderTokenToTokenARoute An array of token addresses.
+     * @param rewarderTokenToTokenBRoute An array of token addresses.
+     * @param rewardTokenToTokenARoute An array of token addresses.
+     * @param rewardTokenToTokenBRoute An array of token addresses.
+     *
+     * Note: This function can only be called by the distributor.
      */ 
-    function distribute(address lpPair) external {
+    function distribute(
+        address lpPair,
+        address[] calldata rewarderTokenToTokenARoute,
+        address[] calldata rewarderTokenToTokenBRoute,
+        address[] calldata rewardTokenToTokenARoute,
+        address[] calldata rewardTokenToTokenBRoute
+    ) external distributorOnly{
         require(Farms[lpPair] != Farm(address(0)), 'The given pool doesnt exist'); 
-        Farms[lpPair].distribute();
+        
+        Farms[lpPair].distribute(rewarderTokenToTokenARoute, rewarderTokenToTokenBRoute, rewardTokenToTokenARoute, rewardTokenToTokenBRoute);
         emit Distribute(lpPair);
     }
 
@@ -167,5 +188,10 @@ contract SushiswapFarmFactoryBeacon is Initializable{
             uint256 totalTokenBAmount = IERC20(Farms[lpPair].tokenB()).balanceOf(lpPair);
             amountB = amountLP.mul(totalTokenBAmount).div(totalSupply);
         }
+    }
+
+    function transferDistributor(address newDistributor) external distributorOnly {
+        distributor = newDistributor;
+        emit DistributorChanged(newDistributor);
     }
 }
