@@ -5,12 +5,11 @@ import "../interfaces/IVault.sol";
 import "../interfaces/MerkleOrchard.sol"; 
 import "../interfaces/IBasePool.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "../utils/OwnableUpgradeableNoTransfer.sol";
 import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "../utils/Cooldown.sol";
 
-contract BalancerFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgradeable, ReentrancyGuard, Cooldown {
+contract BalancerFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgradeableNoTransfer, ReentrancyGuard {
     using SafeMath for uint256; 
 
     /**
@@ -42,9 +41,8 @@ contract BalancerFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgra
 
     // ============ Methods ============
 
-    function initialize(address _lpPair, address owner) public initializer {
+    function initialize(address _lpPair) external initializer {
         __Ownable_init();
-        transferOwnership(owner);
         
         lpPair = _lpPair;
         poolId = IBasePool(_lpPair).getPoolId();
@@ -91,15 +89,14 @@ contract BalancerFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgra
      */
     function withdraw(address origin, uint256 amount, bool withdrawLP, address recipient) external onlyOwner nonReentrant{
         require(stakes[origin] > 0, "The amount staked should be more than 0");
-        {
-            uint256 depositAmount = userBalance(origin).sub(amount);
-            totalDeposits = totalDeposits.sub(stakes[origin]).add(depositAmount);
-            stakes[origin] = depositAmount;
-
-            if(depositAmount > 0) {
-                sumOfRewardsForUser[origin] = sumOfRewards;
-            }
+        
+        uint256 depositAmount = userBalance(origin).sub(amount);
+        totalDeposits = totalDeposits.sub(stakes[origin]).add(depositAmount);
+        stakes[origin] = depositAmount;
+        if(depositAmount > 0) {
+            sumOfRewardsForUser[origin] = sumOfRewards;
         }
+        
         if(withdrawLP){
             IERC20(lpPair).transfer(recipient, amount);
             return;

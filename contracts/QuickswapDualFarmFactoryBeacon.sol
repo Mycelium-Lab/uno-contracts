@@ -6,8 +6,10 @@ import {QuickswapDualFarmUpgradeable as Farm, SafeMath, IERC20, IERC20Upgradeabl
 
 import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-contract QuickswapDualFarmFactoryBeacon is Initializable{
+contract QuickswapDualFarmFactoryBeacon is Initializable, PausableUpgradeable, OwnableUpgradeable{
     using SafeMath for uint256; 
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
@@ -15,15 +17,15 @@ contract QuickswapDualFarmFactoryBeacon is Initializable{
      * @dev Contract Variables:
      * farmBeacon - Farm contract implementation.
      *
+     * distributor - Address authorized to make distributions.
      * Farms - Links {lpPools} to the deployed Farm contract.
      * lpPools - List of pools that have corresponding deployed Farm contract.
-     * distributor - Address authorized to make distributions.
      */
     address public farmBeacon;
 
+    address public distributor;
     mapping(address => Farm) public Farms;
     address[] public lpPools;
-    address public distributor;
 
     event FarmDeployed(address indexed farmAddress);
     event Deposit(address indexed sender, address indexed lpPool, uint256 amount);
@@ -31,19 +33,16 @@ contract QuickswapDualFarmFactoryBeacon is Initializable{
     event Distribute(address indexed lpPool);
     event DistributorChanged(address indexed newDistributor);
 
-    modifier distributorOnly(){
-        require(distributor == address(0) || msg.sender == distributor, 'The caller is not distributor');
-        _;
-    }
-
     // ============ Methods ============
 
     function initialize(address upgrader) external initializer {
+        __Pausable_init();
+        __Ownable_init();
         UpgradeableBeacon _farmBeacon = new UpgradeableBeacon(
             address(new Farm())
         );
-        _farmBeacon.transferOwnership(upgrader);
         farmBeacon = address(_farmBeacon);
+        transferOwnership(upgrader);
     }
 
     /**
@@ -58,7 +57,7 @@ contract QuickswapDualFarmFactoryBeacon is Initializable{
      * @return sentB - Token B amount sent to the farm.
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
-    function deposit(uint256 amountA, uint256 amountB, uint256 amountLP, address lpStakingPool, address recipient) external returns(uint256 sentA, uint256 sentB, uint256 liquidity) {
+    function deposit(uint256 amountA, uint256 amountB, uint256 amountLP, address lpStakingPool, address recipient) external whenNotPaused returns(uint256 sentA, uint256 sentB, uint256 liquidity) {
         if(Farms[lpStakingPool] == Farm(address(0))){
             Farms[lpStakingPool] = Farm(createFarm(lpStakingPool));
             lpPools.push(lpStakingPool); 
@@ -91,7 +90,7 @@ contract QuickswapDualFarmFactoryBeacon is Initializable{
      * @return amountA - Token A amount sent to the {recipient}, 0 if withdrawLP == false.
      * @return amountB - Token B amount sent to the {recipient}, 0 if withdrawLP == false.
      */ 
-    function withdraw(address lpStakingPool, uint256 amount, bool withdrawLP, address recipient) external returns(uint256 amountA, uint256 amountB){
+    function withdraw(address lpStakingPool, uint256 amount, bool withdrawLP, address recipient) external whenNotPaused returns(uint256 amountA, uint256 amountB){
         require(Farms[lpStakingPool] != Farm(address(0)), 'The given pool doesnt exist');
         (amountA, amountB) = Farms[lpStakingPool].withdraw(msg.sender, amount, withdrawLP, recipient); 
         emit Withdraw(msg.sender, lpStakingPool, amount); 
@@ -113,7 +112,8 @@ contract QuickswapDualFarmFactoryBeacon is Initializable{
         address[] calldata rewardTokenAToTokenBRoute,
         address[] calldata rewardTokenBToTokenARoute,
         address[] calldata rewardTokenBToTokenBRoute
-    ) external distributorOnly {
+    ) external whenNotPaused {
+        require(msg.sender == distributor, 'Caller is not a distributor');
         require(Farms[lpStakingPool] != Farm(address(0)), 'The given pool doesnt exist');
         
         Farms[lpStakingPool].distribute(rewardTokenAToTokenARoute, rewardTokenAToTokenBRoute, rewardTokenBToTokenARoute, rewardTokenBToTokenBRoute);
@@ -155,20 +155,28 @@ contract QuickswapDualFarmFactoryBeacon is Initializable{
         return lpPools.length;
     }
 
-    /**
-     * @dev Deploys new Farm contract and calls initialize on it.
-     */
-    function createFarm(address lpStakingPool) internal returns (address) {
-        BeaconProxy proxy = new BeaconProxy(
-            farmBeacon,
-            abi.encodeWithSelector(
-                Farm(address(0)).initialize.selector,
-                lpStakingPool,
-                address(this)
-            )
-        );
-        emit FarmDeployed(address(proxy));
-        return address(proxy);
+    function transferDistributor(address newDistributor) external onlyOwner {
+        distributor = newDistributor;
+        emit DistributorChanged(newDistributor);
+    }
+
+    function transferOwnership(address newOwner) public override onlyOwner {
+        require(newOwner != address(0), "Ownable: new owner is the zero address");
+        _transferOwnership(newOwner);
+        UpgradeableBeacon(farmBeacon).transferOwnership(newOwner);
+    }
+
+    function renounceOwnership() public override onlyOwner {
+        _transferOwnership(address(0));
+        UpgradeableBeacon(farmBeacon).renounceOwnership();
+    }
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
     }
 
     /**
@@ -191,8 +199,18 @@ contract QuickswapDualFarmFactoryBeacon is Initializable{
         }
     }
 
-    function transferDistributor(address newDistributor) external distributorOnly {
-        distributor = newDistributor;
-        emit DistributorChanged(newDistributor);
+    /**
+     * @dev Deploys new Farm contract and calls initialize on it.
+     */
+    function createFarm(address lpStakingPool) internal returns (address) {
+        BeaconProxy proxy = new BeaconProxy(
+            farmBeacon,
+            abi.encodeWithSelector(
+                Farm(address(0)).initialize.selector,
+                lpStakingPool
+            )
+        );
+        emit FarmDeployed(address(proxy));
+        return address(proxy);
     }
 } 

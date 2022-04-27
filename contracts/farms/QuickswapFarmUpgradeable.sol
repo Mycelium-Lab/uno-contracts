@@ -5,15 +5,13 @@ import "../interfaces/IUniswapV2Pair.sol";
 import "../interfaces/IUniswapV2Router.sol";
 import "../interfaces/IStakingRewards.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "../interfaces/IUniswapV2Factory.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "../utils/OwnableUpgradeableNoTransfer.sol";
 import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "../utils/Cooldown.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
-contract QuickswapFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgradeable, ReentrancyGuard, Cooldown {
+contract QuickswapFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgradeableNoTransfer, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
@@ -35,19 +33,10 @@ contract QuickswapFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgr
     /**
      * @dev Third Party Contracts:
      * {quickswapRouter} - The contract that executes swaps.
-     * {QuickswapV2Factory} - Pairs factory contract.
      * {lpStakingPool} - The contract that distibutes {rewardToken}.
      */
     IUniswapV2Router01 private constant quickswapRouter = IUniswapV2Router01(0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff); 
-    IUniswapV2Factory private constant QuickswapV2Factory = IUniswapV2Factory(0x5757371414417b8C6CAad45bAeF941aBc7d3Ab32);//UNUSED
     IStakingRewards private lpStakingPool;
-
-    /**
-     * @dev Routes:
-     * {rewardTokenToTokenARoute, rewardTokenToTokenBRoute} - The routes to trade tokens with.
-     */
-    address[] private rewardTokenToTokenARoute;//UNUSED
-    address[] private rewardTokenToTokenBRoute;//UNUSED
 
     /**
      * @dev Contract Variables:
@@ -64,9 +53,8 @@ contract QuickswapFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgr
 
     // ============ Methods ============
 
-    function initialize(address _lpStakingPool, address owner) public initializer {
+    function initialize(address _lpStakingPool) external initializer {
         __Ownable_init();
-        transferOwnership(owner);
 
         lpStakingPool = IStakingRewards(_lpStakingPool);
         lpPair = address(lpStakingPool.stakingToken());

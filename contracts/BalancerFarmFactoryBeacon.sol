@@ -5,10 +5,12 @@ pragma experimental ABIEncoderV2;
 import {BalancerFarmUpgradeable as Farm, IERC20, Initializable, MerkleOrchard, IVault, IAsset} from "./farms/BalancerFarmUpgradeable.sol"; 
 import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol"; 
 import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-contract BalancerFarmFactoryBeacon is Initializable{
+contract BalancerFarmFactoryBeacon is Initializable, PausableUpgradeable, OwnableUpgradeable{
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     /**
@@ -31,20 +33,16 @@ contract BalancerFarmFactoryBeacon is Initializable{
     event Distribute(address indexed lpPool);
     event DistributorChanged(address indexed newDistributor);
 
-    modifier distributorOnly(){
-        require(distributor == address(0) || msg.sender == distributor, 'The caller is not distributor');
-        _;
-    }
-
     // ============ Methods ============
 
-    function initialize(address upgrader, address _distributor) external initializer {
+    function initialize(address upgrader) external initializer {
+        __Pausable_init();
+        __Ownable_init();
         UpgradeableBeacon _farmBeacon = new UpgradeableBeacon(
             address(new Farm())
         );
-        _farmBeacon.transferOwnership(upgrader);
         farmBeacon = address(_farmBeacon);
-        distributor = _distributor;
+        transferOwnership(upgrader);
     }
 
     /**
@@ -57,7 +55,7 @@ contract BalancerFarmFactoryBeacon is Initializable{
 
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
-    function deposit(uint256[] memory amounts, address[] memory tokens, uint256 amountLP, address lpPair, address recipient) external returns(uint256 liquidity){
+    function deposit(uint256[] memory amounts, address[] memory tokens, uint256 amountLP, address lpPair, address recipient) external whenNotPaused returns(uint256 liquidity){
         require (amounts.length == tokens.length, "Amounts and tokens must have the same length");
         if(Farms[lpPair] == Farm(address(0))){
             Farms[lpPair] = Farm(createFarm(lpPair));
@@ -84,7 +82,7 @@ contract BalancerFarmFactoryBeacon is Initializable{
      * @param withdrawLP - True: Withdraw in LP tokens, False: Withdraw in normal tokens.
      * @param recipient - The address which will recieve tokens.
      */ 
-    function withdraw(address lpPair, uint256 amount, bool withdrawLP, address recipient) external{ 
+    function withdraw(address lpPair, uint256 amount, bool withdrawLP, address recipient) external whenNotPaused { 
         require(Farms[lpPair] != Farm(address(0)), 'The given pool doesnt exist'); 
         Farms[lpPair].withdraw(msg.sender, amount, withdrawLP, recipient); 
         emit Withdraw(msg.sender, lpPair, amount);
@@ -110,17 +108,13 @@ contract BalancerFarmFactoryBeacon is Initializable{
         IAsset[][] memory assets,
         IVault.FundManagement[] memory funds,
         int256[][] memory limits
-    ) external distributorOnly {
+    )  external whenNotPaused {
+        require(msg.sender == distributor);
         require(Farms[lpPair] != Farm(address(0)), 'The pool doesnt exist');
         require((swaps.length == assets.length) && (swaps.length == funds.length) && (swaps.length == limits.length));
 
         Farms[lpPair].distribute(claims, rewardTokens, swaps, assets, funds, limits);
         emit Distribute(lpPair);
-    }
-
-    function transferDistributor(address newDistributor) external distributorOnly {
-        distributor = newDistributor;
-        emit DistributorChanged(newDistributor);
     }
 
     /**
@@ -154,6 +148,30 @@ contract BalancerFarmFactoryBeacon is Initializable{
         return lpPools.length;
     }
 
+    function transferDistributor(address newDistributor) external onlyOwner{
+        distributor = newDistributor;
+        emit DistributorChanged(newDistributor);
+    }
+
+    function transferOwnership(address newOwner) public override onlyOwner {
+        require(newOwner != address(0), "Ownable: new owner is the zero address");
+        _transferOwnership(newOwner);
+        UpgradeableBeacon(farmBeacon).transferOwnership(newOwner);
+    }
+
+    function renounceOwnership() public override onlyOwner {
+        _transferOwnership(address(0));
+        UpgradeableBeacon(farmBeacon).renounceOwnership();
+    }
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
     /**
      * @dev Deploys new Farm contract and calls initialize on it.
      */
@@ -162,8 +180,7 @@ contract BalancerFarmFactoryBeacon is Initializable{
             farmBeacon,
             abi.encodeWithSelector(
                 Farm(address(0)).initialize.selector,
-                lpPair,
-                address(this)
+                lpPair
             )
         );
         emit FarmDeployed(address(proxy));

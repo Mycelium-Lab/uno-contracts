@@ -6,15 +6,13 @@ import "../interfaces/IUniswapV2Router.sol";
 import "../interfaces/IMiniChefV2.sol";
 import "../interfaces/IRewarder.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "../interfaces/IUniswapV2Factory.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "../utils/OwnableUpgradeableNoTransfer.sol";
 import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "../utils/Cooldown.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
-contract SushiswapFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgradeable, ReentrancyGuard, Cooldown {
+contract SushiswapFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgradeableNoTransfer, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
@@ -44,18 +42,6 @@ contract SushiswapFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgr
     IUniswapV2Router01 private constant sushiswapRouter = IUniswapV2Router01(0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506);
     IMiniChefV2 private constant MiniChef = IMiniChefV2(0x0769fd68dFb93167989C6f7254cd0D766Fb2841F);
     IRewarder private ComplexRewarderTime;
-
-    /**
-     * @dev Routes:
-     * {rewardTokenToTokenARoute, rewardTokenToTokenBRoute, rewarderTokenToTokenARoute, rewarderTokenToTokenBRoute, rewarderTokenToRewardToken} - The routes to trade tokens with.
-     */
-    address[] private rewardTokenToTokenARoute;//UNUSED
-    address[] private rewardTokenToTokenBRoute;//UNUSED
-
-    address[] private rewarderTokenToTokenARoute;//UNUSED
-    address[] private rewarderTokenToTokenBRoute;//UNUSED
-
-    address[] private rewarderTokenToRewardToken;//UNUSED
     
     /**
      * @dev Contract Variables:
@@ -72,9 +58,8 @@ contract SushiswapFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgr
 
     // ============ Methods ============
 
-    function initialize(address _lpPair, address owner) public initializer {
+    function initialize(address _lpPair) external initializer {
         __Ownable_init();
-        transferOwnership(owner);
 
         pid = getPid(_lpPair);
 
