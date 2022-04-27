@@ -14,11 +14,6 @@
 
 All contracts are deployed on the Polygon(Matic) Blockchain
 
-### Helper Contracts
-
-#### UnoInfo
-0xCeF69B937EC25F95b75A6fb7A38E4972E6Dc5051
-
 ## Quickswap
 
 #### quickswapFarmFactoryBeacon
