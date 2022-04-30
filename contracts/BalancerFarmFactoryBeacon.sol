@@ -33,6 +33,11 @@ contract BalancerFarmFactoryBeacon is Initializable, PausableUpgradeable, Ownabl
     event Distribute(address indexed lpPool);
     event DistributorChanged(address indexed newDistributor);
 
+    modifier distributorOnly(){
+        require(msg.sender == distributor, 'Caller is not a distributor');
+        _;
+    }
+
     // ============ Methods ============
 
     function initialize(address upgrader) external initializer {
@@ -108,8 +113,7 @@ contract BalancerFarmFactoryBeacon is Initializable, PausableUpgradeable, Ownabl
         IAsset[][] memory assets,
         IVault.FundManagement[] memory funds,
         int256[][] memory limits
-    )  external whenNotPaused {
-        require(msg.sender == distributor);
+    )  external distributorOnly whenNotPaused {
         require(Farms[lpPair] != Farm(address(0)), 'The pool doesnt exist');
         require((swaps.length == assets.length) && (swaps.length == funds.length) && (swaps.length == limits.length));
 

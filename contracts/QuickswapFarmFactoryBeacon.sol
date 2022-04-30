@@ -33,6 +33,11 @@ contract QuickswapFarmFactoryBeacon is Initializable, PausableUpgradeable, Ownab
     event Distribute(address indexed lpPool);
     event DistributorChanged(address indexed newDistributor);
 
+    modifier distributorOnly(){
+        require(msg.sender == distributor, 'Caller is not a distributor');
+        _;
+    }
+
     // ============ Methods ============
 
     function initialize(address upgrader) external initializer {
@@ -108,8 +113,7 @@ contract QuickswapFarmFactoryBeacon is Initializable, PausableUpgradeable, Ownab
         address lpStakingPool,
         address[] calldata rewardTokenToTokenARoute, 
         address[] calldata rewardTokenToTokenBRoute
-    ) external whenNotPaused {
-        require(msg.sender == distributor, 'Caller is not a distributor');
+    ) external distributorOnly whenNotPaused {
         require(Farms[lpStakingPool] != Farm(address(0)), 'The given pool doesnt exist');
 
         Farms[lpStakingPool].distribute(rewardTokenToTokenARoute, rewardTokenToTokenBRoute);

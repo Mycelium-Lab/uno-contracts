@@ -44,7 +44,7 @@ abstract contract OwnableUpgradeableNoTransfer is Initializable, ContextUpgradea
      * @dev Throws if called by any account other than the owner.
      */
     modifier onlyOwner() {
-        require(owner() == _msgSender(), "Ownable: caller is not the owner");
+        require(owner() == _msgSender());
         _;
     }
 

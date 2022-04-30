@@ -14,7 +14,7 @@ module.exports = {
         })
       },
       gas: 7500000,
-      gasPrice: 100000000000,
+      gasPrice: 50000000000,
       network_id: 137,
       addressIndex: 0
     },
@@ -33,7 +33,7 @@ module.exports = {
       settings: {
         optimizer: {
           enabled: true,
-          runs: 200
+          runs: 1
         },
       }
     }

@@ -2,7 +2,7 @@
 pragma solidity 0.8.10;
 pragma experimental ABIEncoderV2;
 
-import {QuickswapDualFarmUpgradeable as Farm, SafeMath, IERC20, IERC20Upgradeable, SafeERC20Upgradeable, IUniswapV2Pair, Initializable} from "./farms/QuickswapDualFarmUpgradeable.sol"; 
+import {QuickswapDualFarmUpgradeable as Farm, IERC20, IERC20Upgradeable, SafeERC20Upgradeable, IUniswapV2Pair, Initializable} from "./farms/QuickswapDualFarmUpgradeable.sol"; 
 
 import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
@@ -10,7 +10,6 @@ import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 contract QuickswapDualFarmFactoryBeacon is Initializable, PausableUpgradeable, OwnableUpgradeable{
-    using SafeMath for uint256; 
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     /**
@@ -33,15 +32,19 @@ contract QuickswapDualFarmFactoryBeacon is Initializable, PausableUpgradeable, O
     event Distribute(address indexed lpPool);
     event DistributorChanged(address indexed newDistributor);
 
+    modifier distributorOnly(){
+        require(msg.sender == distributor);
+        _;
+    }
+
     // ============ Methods ============
 
     function initialize(address upgrader) external initializer {
         __Pausable_init();
         __Ownable_init();
-        UpgradeableBeacon _farmBeacon = new UpgradeableBeacon(
+        farmBeacon = address(new UpgradeableBeacon(
             address(new Farm())
-        );
-        farmBeacon = address(_farmBeacon);
+        ));
         transferOwnership(upgrader);
     }
 
@@ -64,16 +67,13 @@ contract QuickswapDualFarmFactoryBeacon is Initializable, PausableUpgradeable, O
         }
 
         if(amountA > 0){
-            IERC20Upgradeable tokenA = IERC20Upgradeable(Farms[lpStakingPool].tokenA());
-            tokenA.safeTransferFrom(msg.sender, address(Farms[lpStakingPool]), amountA);
+            IERC20Upgradeable(Farms[lpStakingPool].tokenA()).safeTransferFrom(msg.sender, address(Farms[lpStakingPool]), amountA);
         }
         if(amountB > 0){
-            IERC20Upgradeable tokenB = IERC20Upgradeable(Farms[lpStakingPool].tokenB());
-            tokenB.safeTransferFrom(msg.sender, address(Farms[lpStakingPool]), amountB); 
+            IERC20Upgradeable(Farms[lpStakingPool].tokenB()).safeTransferFrom(msg.sender, address(Farms[lpStakingPool]), amountB); 
         }
         if(amountLP > 0){
-            IERC20Upgradeable lpPair = IERC20Upgradeable(Farms[lpStakingPool].lpPair());
-            lpPair.safeTransferFrom(msg.sender, address(Farms[lpStakingPool]), amountLP);
+            IERC20Upgradeable(Farms[lpStakingPool].lpPair()).safeTransferFrom(msg.sender, address(Farms[lpStakingPool]), amountLP);
         }
         
         (sentA, sentB, liquidity) = Farms[lpStakingPool].deposit(amountA, amountB, amountLP, recipient); 
@@ -91,9 +91,22 @@ contract QuickswapDualFarmFactoryBeacon is Initializable, PausableUpgradeable, O
      * @return amountB - Token B amount sent to the {recipient}, 0 if withdrawLP == false.
      */ 
     function withdraw(address lpStakingPool, uint256 amount, bool withdrawLP, address recipient) external whenNotPaused returns(uint256 amountA, uint256 amountB){
-        require(Farms[lpStakingPool] != Farm(address(0)), 'The given pool doesnt exist');
+        require(Farms[lpStakingPool] != Farm(address(0)));
         (amountA, amountB) = Farms[lpStakingPool].withdraw(msg.sender, amount, withdrawLP, recipient); 
         emit Withdraw(msg.sender, lpStakingPool, amount); 
+    }
+
+    /**
+     * @dev Sets expected reward amount and block for token distribution calculations.
+     * @param lpStakingPool - LP pool to check total deposits in.
+     * @param expectedReward - New reward amount.
+     * @param expectedRewardBlock - New reward block.
+     *
+     * Note: This function can only be called by the distributor.
+     */  
+    function setExpectedReward(address lpStakingPool, uint256 expectedReward, uint256 expectedRewardBlock) external distributorOnly {
+        require(Farms[lpStakingPool] != Farm(address(0)));
+        Farms[lpStakingPool].setExpectedReward(expectedReward, expectedRewardBlock); 
     }
 
     /**
@@ -112,10 +125,8 @@ contract QuickswapDualFarmFactoryBeacon is Initializable, PausableUpgradeable, O
         address[] calldata rewardTokenAToTokenBRoute,
         address[] calldata rewardTokenBToTokenARoute,
         address[] calldata rewardTokenBToTokenBRoute
-    ) external whenNotPaused {
-        require(msg.sender == distributor, 'Caller is not a distributor');
-        require(Farms[lpStakingPool] != Farm(address(0)), 'The given pool doesnt exist');
-        
+    ) external distributorOnly whenNotPaused {
+        require(Farms[lpStakingPool] != Farm(address(0)));
         Farms[lpStakingPool].distribute(rewardTokenAToTokenARoute, rewardTokenAToTokenBRoute, rewardTokenBToTokenARoute, rewardTokenBToTokenBRoute);
         emit Distribute(lpStakingPool);
     }
@@ -146,7 +157,7 @@ contract QuickswapDualFarmFactoryBeacon is Initializable, PausableUpgradeable, O
      */  
     function totalDeposits(address lpStakingPool) external view returns (uint256 totalDepositsLP, uint256 totalDepositsA, uint256 totalDepositsB) {
         if (Farms[lpStakingPool] != Farm(address(0))) {
-            totalDepositsLP = Farms[lpStakingPool].getTotalDeposits();
+            totalDepositsLP = Farms[lpStakingPool].totalDeposits(); 
             (totalDepositsA, totalDepositsB) = getTokenStake(lpStakingPool, totalDepositsLP);
         }
     }
@@ -161,7 +172,7 @@ contract QuickswapDualFarmFactoryBeacon is Initializable, PausableUpgradeable, O
     }
 
     function transferOwnership(address newOwner) public override onlyOwner {
-        require(newOwner != address(0), "Ownable: new owner is the zero address");
+        require(newOwner != address(0));
         _transferOwnership(newOwner);
         UpgradeableBeacon(farmBeacon).transferOwnership(newOwner);
     }
@@ -191,11 +202,8 @@ contract QuickswapDualFarmFactoryBeacon is Initializable, PausableUpgradeable, O
         if (Farms[lpStakingPool] != Farm(address(0))) {
             address lpPair = Farms[lpStakingPool].lpPair();
             uint256 totalSupply = IERC20(lpPair).totalSupply();
-            uint256 totalTokenAAmount = IERC20(Farms[lpStakingPool].tokenA()).balanceOf(lpPair);
-            amountA = amountLP.mul(totalTokenAAmount).div(totalSupply);
-
-            uint256 totalTokenBAmount = IERC20(Farms[lpStakingPool].tokenB()).balanceOf(lpPair);
-            amountB = amountLP.mul(totalTokenBAmount).div(totalSupply);
+            amountA = amountLP * IERC20(Farms[lpStakingPool].tokenA()).balanceOf(lpPair) / totalSupply;
+            amountB = amountLP * IERC20(Farms[lpStakingPool].tokenB()).balanceOf(lpPair) / totalSupply;
         }
     }
 
