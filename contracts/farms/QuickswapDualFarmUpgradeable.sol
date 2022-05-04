@@ -45,6 +45,7 @@ contract QuickswapDualFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initia
     uint256 private expectedRewardBlock;
     uint256 private expectedReward;
     uint256 private lastRewardBlock;
+    uint256 private lastRewardPeriod;
 
     mapping(address => uint256) private userDeposit;
     mapping(address => uint256) private userDepositAge;
@@ -80,7 +81,7 @@ contract QuickswapDualFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initia
         IERC20(tokenB).approve(address(quickswapRouter), MAX_UINT);
 
         lastRewardBlock = block.number;
-        expectedRewardBlock = 2*block.number;
+        lastRewardPeriod = 1200000; //this is somewhere around 1 month at the time of writing this contract
     }
 
     /**
@@ -106,7 +107,7 @@ contract QuickswapDualFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initia
         if(expectedRewardBlock > block.number){
             blocksTillReward = expectedRewardBlock - block.number;
         }else{
-            blocksTillReward = 1;
+            blocksTillReward = lastRewardPeriod / 2;
         }
 
         uint256 totalExpectedDepositAgePrev = totalDeposits * blocksTillReward + totalDepositAge;
@@ -125,7 +126,6 @@ contract QuickswapDualFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initia
         IERC20Upgradeable(tokenA).safeTransfer(recipient, amountA - sentA);
         IERC20Upgradeable(tokenB).safeTransfer(recipient, amountB - sentB);
     }
-
 
     function _mintLP(uint256 blocksTillReward, uint256 totalExpectedDepositAge, uint256 liquidity, address recipient) internal {
         if (totalSupply == 0) {
@@ -155,7 +155,7 @@ contract QuickswapDualFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initia
         if(expectedRewardBlock > block.number){
             blocksTillReward = expectedRewardBlock - block.number;
         }else{
-            blocksTillReward = 1;
+            blocksTillReward = lastRewardPeriod / 2;
         }
 
         uint256 totalExpectedDepositAgePrev = totalDeposits * blocksTillReward + totalDepositAge;
@@ -183,11 +183,11 @@ contract QuickswapDualFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initia
         }
         uint256 userExpectedReward = expectedReward * (userDeposit[origin] * blocksTillReward + userDepositAge[origin]) / totalExpectedDepositAge;
         uint256 userNewShare = fractionMultiplier * (userDeposit[origin] + userExpectedReward) / (totalDeposits + expectedReward);
-        _burn(origin, fractionMultiplier * (balanceOf[origin] - userNewShare * totalDeposits / fractionMultiplier)/(fractionMultiplier - userNewShare));
+        _burn(origin, fractionMultiplier * (balanceOf[origin] - userNewShare * totalSupply / fractionMultiplier)/(fractionMultiplier - userNewShare));
     }
 
     function _updateDeposit(address _address) internal {
-        if (userDALastUpdated[_address] > lastRewardBlock || userDepositChanged[_address][lastRewardBlock]) {
+        if (userDepositChanged[_address][lastRewardBlock]) {
             // add deposit age from previous deposit age update till now
             userDepositAge[_address] += (block.number - userDALastUpdated[_address]) * userDeposit[_address];
         } else {
@@ -195,6 +195,7 @@ contract QuickswapDualFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initia
             userDeposit[_address] = userBalance(_address);
             // count fresh deposit age from that reward distribution till now
             userDepositAge[_address] = (block.number - lastRewardBlock) * userDeposit[_address];
+            userDepositChanged[_address][lastRewardBlock] = true;
         }
 
         // same with total deposit age
@@ -203,10 +204,9 @@ contract QuickswapDualFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initia
         } else {
             totalDepositAge = (block.number - lastRewardBlock) * totalDeposits;
         }
+
         userDALastUpdated[_address] = block.number;
         totalDALastUpdated = block.number;
-
-        userDepositChanged[_address][lastRewardBlock] = true;
     }
 
     /**
@@ -248,10 +248,10 @@ contract QuickswapDualFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initia
         uint256 reward = IERC20(lpPair).balanceOf(address(this));
         if (reward > 0) {
             totalDeposits += reward;
-
             lpStakingPool.stake(reward);
         }
-        uint256 lastRewardPeriod = block.number - lastRewardBlock;
+
+        lastRewardPeriod = block.number - lastRewardBlock;
         _setExpectedReward(reward, block.number + lastRewardPeriod);
         lastRewardBlock = block.number;
     }
@@ -269,7 +269,7 @@ contract QuickswapDualFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initia
      * @dev Returns total funds staked by the {_address}.
      */
     function userBalance(address _address) public view returns (uint256) {
-        if (userDALastUpdated[_address] > lastRewardBlock || userDepositChanged[_address][lastRewardBlock]) {
+        if (userDepositChanged[_address][lastRewardBlock]) {
             return userDeposit[_address];
         } else {
             if (totalSupply == 0) {
