@@ -109,34 +109,18 @@ contract QuickswapFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initializa
             expectedReward = expectedReward * totalExpectedDepositAge / totalExpectedDepositAgePrev;
         }
 
-        _mintLP(blocksTillReward, totalExpectedDepositAge, liquidity, recipient);
+        _mintLP(blocksTillReward, totalExpectedDepositAge, recipient);
             
         lpStakingPool.stake(liquidity);
         IERC20Upgradeable(tokenA).safeTransfer(recipient, amountA - sentA);
         IERC20Upgradeable(tokenB).safeTransfer(recipient, amountB - sentB);
     }
 
-    function _mintLP(uint256 blocksTillReward, uint256 totalExpectedDepositAge, uint256 liquidity, address recipient) internal {
-        if (totalSupply == 0) {
-            _mint(recipient, 10**decimals);
-            return;
-        }
-        uint256 userExpectedReward = expectedReward * (userDeposit[recipient] * blocksTillReward + userDepositAge[recipient]) / totalExpectedDepositAge;
-        uint256 userExpectedDeposit = userDeposit[recipient] + userExpectedReward;
-        uint256 expectedTotalDeposit = totalDeposits + expectedReward;
-        if (userExpectedDeposit == expectedTotalDeposit) {
-            _mint(recipient, totalSupply * userDeposit[recipient] / (userDeposit[recipient] - liquidity) - totalSupply);
-            return;
-        }
-        uint256 userNewShare = fractionMultiplier * userExpectedDeposit / expectedTotalDeposit;
-        _mint(recipient, fractionMultiplier * (userNewShare * totalSupply / fractionMultiplier - balanceOf[recipient]) / (fractionMultiplier - userNewShare));
-    }
-
     /**
      * @dev Withdraws funds and sends them to the {recipient}.
      */
     function withdraw(address origin, uint256 amount, bool withdrawLP, address recipient) external onlyOwner nonReentrant returns(uint256 amountA, uint256 amountB){
-        require(userDeposit[origin] > 0);
+        require(amount > 0 && userDeposit[origin] > 0);
 
         _updateDeposit(origin);
 
@@ -155,7 +139,7 @@ contract QuickswapFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initializa
         // expected reward will decrease proportionally to the decrease of total expected deposit age
         expectedReward = expectedReward * totalExpectedDepositAge / totalExpectedDepositAgePrev;
 
-        _burnLP(blocksTillReward, totalExpectedDepositAge, amount, origin);
+        _burnLP(blocksTillReward, totalExpectedDepositAge, origin);
 
         lpStakingPool.withdraw(amount);
         if(withdrawLP){
@@ -165,14 +149,30 @@ contract QuickswapFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initializa
         (amountA, amountB) = quickswapRouter.removeLiquidity(tokenA, tokenB, amount, 0, 0, recipient, block.timestamp + 600);
     }
 
-    function _burnLP(uint256 blocksTillReward, uint256 totalExpectedDepositAge, uint256 amount, address origin) internal{
+    function _mintLP(uint256 blocksTillReward, uint256 totalExpectedDepositAge, address recipient) internal {
+        if (totalSupply == 0) {
+            _mint(recipient, 10**decimals);
+            return;
+        }
+        if (balanceOf[recipient] == totalSupply) {
+            return;
+        }
+        uint256 userExpectedReward = expectedReward * (userDeposit[recipient] * blocksTillReward + userDepositAge[recipient]) / totalExpectedDepositAge;
+        uint256 userNewShare = fractionMultiplier * (userDeposit[recipient] + userExpectedReward) / (totalDeposits + expectedReward);
+        _mint(recipient, fractionMultiplier * (userNewShare * totalSupply / fractionMultiplier - balanceOf[recipient]) / (fractionMultiplier - userNewShare));
+    }
+
+    function _burnLP(uint256 blocksTillReward, uint256 totalExpectedDepositAge, address origin) internal{
+        if(userDeposit[origin] == 0){
+            _burn(origin, balanceOf[origin]);
+            return;
+        }
         if (balanceOf[origin] == totalSupply) {
-            _burn(origin, totalSupply * amount / (userDeposit[origin] + amount));
             return;
         }
         uint256 userExpectedReward = expectedReward * (userDeposit[origin] * blocksTillReward + userDepositAge[origin]) / totalExpectedDepositAge;
         uint256 userNewShare = fractionMultiplier * (userDeposit[origin] + userExpectedReward) / (totalDeposits + expectedReward);
-        _burn(origin, fractionMultiplier * (balanceOf[origin] - userNewShare * totalSupply / fractionMultiplier)/(fractionMultiplier - userNewShare));
+        _burn(origin, fractionMultiplier * (balanceOf[origin] - userNewShare * totalSupply / fractionMultiplier) / (fractionMultiplier - userNewShare));
     }
 
     function _updateDeposit(address _address) internal {
@@ -247,7 +247,7 @@ contract QuickswapFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initializa
      * @dev Returns total funds staked by the {_address}.
      */
     function userBalance(address _address) public view returns (uint256) {
-         if (userDepositChanged[_address][lastRewardBlock]) {
+        if (userDepositChanged[_address][lastRewardBlock]) {
             return userDeposit[_address];
         } else {
             if (totalSupply == 0) {

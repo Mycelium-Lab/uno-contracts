@@ -2,7 +2,7 @@
 pragma solidity 0.8.10;
 pragma experimental ABIEncoderV2;
 
-import {SushiswapFarmUpgradeable as Farm, SafeMath, IERC20, IERC20Upgradeable, SafeERC20Upgradeable, IUniswapV2Pair, Initializable} from "./farms/SushiswapFarmUpgradeable.sol"; 
+import {SushiswapFarmUpgradeable as Farm, IERC20, IERC20Upgradeable, SafeERC20Upgradeable, IUniswapV2Pair, Initializable} from "./farms/SushiswapFarmUpgradeable.sol"; 
  
 import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
@@ -10,7 +10,6 @@ import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 contract SushiswapFarmFactoryBeacon is Initializable, PausableUpgradeable, OwnableUpgradeable {
-    using SafeMath for uint256; 
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     /**
@@ -34,7 +33,7 @@ contract SushiswapFarmFactoryBeacon is Initializable, PausableUpgradeable, Ownab
     event DistributorChanged(address indexed newDistributor);
 
     modifier distributorOnly(){
-        require(msg.sender == distributor, 'Caller is not a distributor');
+        require(msg.sender == distributor);
         _;
     }
 
@@ -43,10 +42,9 @@ contract SushiswapFarmFactoryBeacon is Initializable, PausableUpgradeable, Ownab
     function initialize(address upgrader) external initializer {
         __Pausable_init();
         __Ownable_init();
-        UpgradeableBeacon _farmBeacon = new UpgradeableBeacon(
+        farmBeacon = address(new UpgradeableBeacon(
             address(new Farm())
-        );
-        farmBeacon = address(_farmBeacon);
+        ));
         transferOwnership(upgrader);
     }
 
@@ -69,12 +67,10 @@ contract SushiswapFarmFactoryBeacon is Initializable, PausableUpgradeable, Ownab
         }
 
         if(amountA > 0){
-            IERC20Upgradeable tokenA = IERC20Upgradeable(Farms[lpPair].tokenA());
-            tokenA.safeTransferFrom(msg.sender, address(Farms[lpPair]), amountA);
+            IERC20Upgradeable(Farms[lpPair].tokenA()).safeTransferFrom(msg.sender, address(Farms[lpPair]), amountA);
         }
         if(amountB > 0){
-            IERC20Upgradeable tokenB = IERC20Upgradeable(Farms[lpPair].tokenB());
-            tokenB.safeTransferFrom(msg.sender, address(Farms[lpPair]), amountB);
+            IERC20Upgradeable(Farms[lpPair].tokenB()).safeTransferFrom(msg.sender, address(Farms[lpPair]), amountB);
         }
         if(amountLP > 0){
             IERC20Upgradeable(lpPair).safeTransferFrom(msg.sender, address(Farms[lpPair]), amountLP);
@@ -95,9 +91,22 @@ contract SushiswapFarmFactoryBeacon is Initializable, PausableUpgradeable, Ownab
      * @return amountB - Token B amount sent to the {recipient}, 0 if withdrawLP == false.
      */ 
     function withdraw(address lpPair, uint256 amount, bool withdrawLP, address recipient) external whenNotPaused returns(uint256 amountA, uint256 amountB){  
-        require(Farms[lpPair] != Farm(address(0)), 'The given pool doesnt exist');
+        require(Farms[lpPair] != Farm(address(0)));
         (amountA, amountB) = Farms[lpPair].withdraw(msg.sender, amount, withdrawLP, recipient);
         emit Withdraw(msg.sender, lpPair, amount);
+    }
+
+    /**
+     * @dev Sets expected reward amount and block for token distribution calculations.
+     * @param lpPair - LP pool to check total deposits in.
+     * @param expectedReward - New reward amount.
+     * @param expectedRewardBlock - New reward block.
+     *
+     * Note: This function can only be called by the distributor.
+     */  
+    function setExpectedReward(address lpPair, uint256 expectedReward, uint256 expectedRewardBlock) external distributorOnly {
+        require(Farms[lpPair] != Farm(address(0)));
+        Farms[lpPair].setExpectedReward(expectedReward, expectedRewardBlock); 
     }
 
     /**
@@ -117,7 +126,7 @@ contract SushiswapFarmFactoryBeacon is Initializable, PausableUpgradeable, Ownab
         address[] calldata rewardTokenToTokenARoute,
         address[] calldata rewardTokenToTokenBRoute
     ) external distributorOnly whenNotPaused{
-        require(Farms[lpPair] != Farm(address(0)), 'The given pool doesnt exist'); 
+        require(Farms[lpPair] != Farm(address(0))); 
         
         Farms[lpPair].distribute(rewarderTokenToTokenARoute, rewarderTokenToTokenBRoute, rewardTokenToTokenARoute, rewardTokenToTokenBRoute);
         emit Distribute(lpPair);
@@ -149,7 +158,7 @@ contract SushiswapFarmFactoryBeacon is Initializable, PausableUpgradeable, Ownab
      */ 
     function totalDeposits(address lpPair) external view returns (uint256 totalDepositsLP, uint256 totalDepositsA, uint256 totalDepositsB) {
         if (Farms[lpPair] != Farm(address(0))) {
-            totalDepositsLP = Farms[lpPair].getTotalDeposits();
+            totalDepositsLP = Farms[lpPair].totalDeposits();
             (totalDepositsA, totalDepositsB) = getTokenStake(lpPair, totalDepositsLP);
         }
     }
@@ -164,7 +173,7 @@ contract SushiswapFarmFactoryBeacon is Initializable, PausableUpgradeable, Ownab
     }
 
     function transferOwnership(address newOwner) public override onlyOwner {
-        require(newOwner != address(0), "Ownable: new owner is the zero address");
+        require(newOwner != address(0));
         _transferOwnership(newOwner);
         UpgradeableBeacon(farmBeacon).transferOwnership(newOwner);
     }
@@ -193,11 +202,8 @@ contract SushiswapFarmFactoryBeacon is Initializable, PausableUpgradeable, Ownab
     function getTokenStake(address lpPair, uint256 amountLP) internal view returns (uint256 amountA, uint256 amountB) {
         if (Farms[lpPair] != Farm(address(0))) {
             uint256 totalSupply = IERC20(lpPair).totalSupply();
-            uint256 totalTokenAAmount = IERC20(Farms[lpPair].tokenA()).balanceOf(lpPair);
-            amountA = amountLP.mul(totalTokenAAmount).div(totalSupply);
-
-            uint256 totalTokenBAmount = IERC20(Farms[lpPair].tokenB()).balanceOf(lpPair);
-            amountB = amountLP.mul(totalTokenBAmount).div(totalSupply);
+            amountA = amountLP * IERC20(Farms[lpPair].tokenA()).balanceOf(lpPair) / totalSupply;
+            amountB = amountLP * IERC20(Farms[lpPair].tokenB()).balanceOf(lpPair) / totalSupply;
         }
     }
 
