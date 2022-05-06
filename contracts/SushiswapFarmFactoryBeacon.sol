@@ -2,7 +2,7 @@
 pragma solidity 0.8.10;
 pragma experimental ABIEncoderV2;
 
-import {SushiswapFarmUpgradeable as Farm, IERC20, IERC20Upgradeable, SafeERC20Upgradeable, IUniswapV2Pair, Initializable} from "./farms/SushiswapFarmUpgradeable.sol"; 
+import {SushiswapFarmUpgradeable as Farm, IERC20, IERC20Upgradeable, SafeERC20Upgradeable, Initializable} from "./farms/SushiswapFarmUpgradeable.sol"; 
  
 import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
@@ -42,10 +42,11 @@ contract SushiswapFarmFactoryBeacon is Initializable, PausableUpgradeable, Ownab
     function initialize(address upgrader) external initializer {
         __Pausable_init();
         __Ownable_init();
+        _transferOwnership(upgrader);
         farmBeacon = address(new UpgradeableBeacon(
             address(new Farm())
         ));
-        transferOwnership(upgrader);
+        UpgradeableBeacon(farmBeacon).transferOwnership(upgrader);
     }
 
     /**
@@ -170,17 +171,6 @@ contract SushiswapFarmFactoryBeacon is Initializable, PausableUpgradeable, Ownab
     function transferDistributor(address newDistributor) external onlyOwner {
         distributor = newDistributor;
         emit DistributorChanged(newDistributor);
-    }
-
-    function transferOwnership(address newOwner) public override onlyOwner {
-        require(newOwner != address(0));
-        _transferOwnership(newOwner);
-        UpgradeableBeacon(farmBeacon).transferOwnership(newOwner);
-    }
-
-    function renounceOwnership() public override onlyOwner {
-        _transferOwnership(address(0));
-        UpgradeableBeacon(farmBeacon).renounceOwnership();
     }
 
     function pause() external onlyOwner {

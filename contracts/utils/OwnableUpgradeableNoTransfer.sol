@@ -36,7 +36,7 @@ abstract contract OwnableUpgradeableNoTransfer is Initializable, ContextUpgradea
     /**
      * @dev Returns the address of the current owner.
      */
-    function owner() public view virtual returns (address) {
+    function owner() internal view virtual returns (address) {
         return _owner;
     }
 

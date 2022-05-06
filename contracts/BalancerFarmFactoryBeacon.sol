@@ -10,7 +10,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeab
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-contract BalancerFarmFactoryBeacon is Initializable, PausableUpgradeable, OwnableUpgradeable{
+contract BalancerFarmFactoryBeacon is Initializable, PausableUpgradeable, OwnableUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     /**
@@ -43,11 +43,12 @@ contract BalancerFarmFactoryBeacon is Initializable, PausableUpgradeable, Ownabl
     function initialize(address upgrader) external initializer {
         __Pausable_init();
         __Ownable_init();
+        _transferOwnership(upgrader);
         UpgradeableBeacon _farmBeacon = new UpgradeableBeacon(
             address(new Farm())
         );
+        _farmBeacon.transferOwnership(upgrader);
         farmBeacon = address(_farmBeacon);
-        transferOwnership(upgrader);
     }
 
     /**
@@ -155,17 +156,6 @@ contract BalancerFarmFactoryBeacon is Initializable, PausableUpgradeable, Ownabl
     function transferDistributor(address newDistributor) external onlyOwner{
         distributor = newDistributor;
         emit DistributorChanged(newDistributor);
-    }
-
-    function transferOwnership(address newOwner) public override onlyOwner {
-        require(newOwner != address(0), "Ownable: new owner is the zero address");
-        _transferOwnership(newOwner);
-        UpgradeableBeacon(farmBeacon).transferOwnership(newOwner);
-    }
-
-    function renounceOwnership() public override onlyOwner {
-        _transferOwnership(address(0));
-        UpgradeableBeacon(farmBeacon).renounceOwnership();
     }
 
     function pause() external onlyOwner {

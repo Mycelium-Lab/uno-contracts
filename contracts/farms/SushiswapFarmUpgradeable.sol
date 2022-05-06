@@ -5,6 +5,7 @@ import "../interfaces/IUniswapV2Pair.sol";
 import "../interfaces/IUniswapV2Router.sol";
 import "../interfaces/IMiniChefV2.sol";
 import "../interfaces/IRewarder.sol";
+import "../interfaces/IMiniChefUtils.sol";
 import "../utils/UniswapV2ERC20.sol"; 
 import "../utils/OwnableUpgradeableNoTransfer.sol";
 import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
@@ -32,11 +33,10 @@ contract SushiswapFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initializa
      * @dev Third Party Contracts:
      * {sushiswapRouter} - The contract that executes swaps.
      * {MiniChef} -The contract that distibutes {rewardToken}.
-     * {ComplexRewarderTime} -The contract that distibutes {rewarderToken}.
      */
     IUniswapV2Router01 private constant sushiswapRouter = IUniswapV2Router01(0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506);
     IMiniChefV2 private constant MiniChef = IMiniChefV2(0x0769fd68dFb93167989C6f7254cd0D766Fb2841F);
-    address private ComplexRewarderTime;
+    IMiniChefUtils private constant MiniChefUtils = IMiniChefUtils(0xBeE6dbb6606bb65953a24c254945cA95aEb22671);
     
     /**
      * @dev Contract Variables:
@@ -44,7 +44,7 @@ contract SushiswapFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initializa
      *
      *
      */
-    uint256 public pid;
+    uint256 private pid;
 
     uint256 private expectedRewardBlock;
     uint256 private expectedReward;
@@ -67,14 +67,11 @@ contract SushiswapFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initializa
     function initialize(address _lpPair) external initializer {
         __Ownable_init();
 
-        pid = getPid(_lpPair);
+        pid = MiniChefUtils.getPid(_lpPair);
 
         rewardToken = MiniChef.SUSHI();
-        ComplexRewarderTime = MiniChef.rewarder(pid);
-        if (ComplexRewarderTime != address(0)) {
-            (IERC20[] memory rewarderTokenArray, ) = IRewarder(ComplexRewarderTime).pendingTokens(pid, address(0), 0);
-            rewarderToken = address(rewarderTokenArray[0]);
-        }
+        (IERC20[] memory rewarderTokenArray, ) = IRewarder(MiniChef.rewarder(pid)).pendingTokens(pid, address(0), 0);
+        rewarderToken = address(rewarderTokenArray[0]);
 
         lpPair = MiniChef.lpToken(pid);
 
@@ -166,18 +163,17 @@ contract SushiswapFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initializa
 
     function _mintLP(uint256 blocksTillReward, uint256 totalExpectedDepositAge, address recipient) internal {
         if (totalSupply == 0) {
-            _mint(recipient, 10**decimals);
+            _mint(recipient, fractionMultiplier);
             return;
         }
         if (balanceOf[recipient] == totalSupply) {
             return;
         }
-        uint256 userExpectedReward = expectedReward * (userDeposit[recipient] * blocksTillReward + userDepositAge[recipient]) / totalExpectedDepositAge;
-        uint256 userNewShare = fractionMultiplier * (userDeposit[recipient] + userExpectedReward) / (totalDeposits + expectedReward);
+        uint256 userNewShare = _calculateUserNewShare(blocksTillReward, totalExpectedDepositAge, recipient);
         _mint(recipient, fractionMultiplier * (userNewShare * totalSupply / fractionMultiplier - balanceOf[recipient]) / (fractionMultiplier - userNewShare));
     }
 
-    function _burnLP(uint256 blocksTillReward, uint256 totalExpectedDepositAge, address origin) internal{
+    function _burnLP(uint256 blocksTillReward, uint256 totalExpectedDepositAge, address origin) internal {
         if(userDeposit[origin] == 0){
             _burn(origin, balanceOf[origin]);
             return;
@@ -185,24 +181,25 @@ contract SushiswapFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initializa
         if (balanceOf[origin] == totalSupply) {
             return;
         }
-        uint256 userExpectedReward = expectedReward * (userDeposit[origin] * blocksTillReward + userDepositAge[origin]) / totalExpectedDepositAge;
-        uint256 userNewShare = fractionMultiplier * (userDeposit[origin] + userExpectedReward) / (totalDeposits + expectedReward);
+        uint256 userNewShare = _calculateUserNewShare(blocksTillReward, totalExpectedDepositAge, origin);
         _burn(origin, fractionMultiplier * (balanceOf[origin] - userNewShare * totalSupply / fractionMultiplier) / (fractionMultiplier - userNewShare));
+    }
+
+    function _calculateUserNewShare (uint256 blocksTillReward, uint256 totalExpectedDepositAge, address _address) internal view returns(uint256) {
+        uint256 userExpectedReward = expectedReward * (userDeposit[_address] * blocksTillReward + userDepositAge[_address]) / totalExpectedDepositAge;
+        return fractionMultiplier * (userDeposit[_address] + userExpectedReward) / (totalDeposits + expectedReward);
     }
 
     function _updateDeposit(address _address) internal {
         if (userDepositChanged[_address][lastRewardBlock]) {
-            // add deposit age from previous deposit age update till now
             userDepositAge[_address] += (block.number - userDALastUpdated[_address]) * userDeposit[_address];
         } else {
             // a reward has been distributed, update user deposit
             userDeposit[_address] = userBalance(_address);
-            // count fresh deposit age from that reward distribution till now
             userDepositAge[_address] = (block.number - lastRewardBlock) * userDeposit[_address];
             userDepositChanged[_address][lastRewardBlock] = true;
         }
 
-        // same with total deposit age
         if (totalDALastUpdated > lastRewardBlock) {
             totalDepositAge += (block.number - totalDALastUpdated) * totalDeposits;
         } else {
@@ -224,18 +221,17 @@ contract SushiswapFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initializa
         require(totalDeposits > 0);
 
         MiniChef.harvest(pid, address(this));
+        uint256 rewarderTokenHalf = IERC20(rewarderToken).balanceOf(address(this)) / 2;
         uint256 rewardTokenHalf = IERC20(rewardToken).balanceOf(address(this)) / 2;
+
         uint256 deadline = block.timestamp + 600;
+        
+        if (tokenA != rewarderToken) {
+            sushiswapRouter.swapExactTokensForTokens(rewarderTokenHalf, 0, rewarderTokenToTokenARoute, address(this), deadline);
+        }
 
-        if (ComplexRewarderTime != address(0)) {
-            uint256 rewarderTokenHalf = IERC20(rewarderToken).balanceOf(address(this)) / 2;
-            if (tokenA != rewarderToken) {
-                sushiswapRouter.swapExactTokensForTokens(rewarderTokenHalf, 0, rewarderTokenToTokenARoute, address(this), deadline);
-            }
-
-            if (tokenB != rewarderToken) {
-                sushiswapRouter.swapExactTokensForTokens(rewarderTokenHalf, 0, rewarderTokenToTokenBRoute, address(this), deadline);
-            }
+        if (tokenB != rewarderToken) {
+            sushiswapRouter.swapExactTokensForTokens(rewarderTokenHalf, 0, rewarderTokenToTokenBRoute, address(this), deadline);
         }
 
         if (tokenA != rewardToken) {
@@ -246,10 +242,7 @@ contract SushiswapFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initializa
             sushiswapRouter.swapExactTokensForTokens(rewardTokenHalf, 0, rewardTokenToTokenBRoute, address(this), deadline);
         }
 
-        uint256 tokenABalance = IERC20(tokenA).balanceOf(address(this));
-        uint256 tokenBBalance = IERC20(tokenB).balanceOf(address(this));
-
-        sushiswapRouter.addLiquidity(tokenA, tokenB, tokenABalance, tokenBBalance, 1, 1, address(this), deadline);
+        sushiswapRouter.addLiquidity(tokenA, tokenB, IERC20(tokenA).balanceOf(address(this)), IERC20(tokenB).balanceOf(address(this)), 1, 1, address(this), deadline);
 
         uint256 reward = IERC20(lpPair).balanceOf(address(this));
         if (reward > 0) {
@@ -263,7 +256,7 @@ contract SushiswapFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initializa
     }
 
     function setExpectedReward(uint256 _amount, uint256 _block) external onlyOwner{
-       _setExpectedReward(_amount, _block);
+        _setExpectedReward(_amount, _block);
     }
 
     function _setExpectedReward(uint256 _amount, uint256 _block) internal {
@@ -283,22 +276,6 @@ contract SushiswapFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initializa
             }
             return totalDeposits * balanceOf[_address] / totalSupply;
         }
-    }
-
-    /**
-     * @dev Get pid by iterating over all pools and comparing pids.
-     */
-    function getPid(address _lpPair) internal view returns (uint256 _pid) {
-        bool poolExists = false;
-        for (uint256 i = 0; i < MiniChef.poolLength(); i++) {
-            if (MiniChef.lpToken(i) == _lpPair) {
-                _pid = i;
-                poolExists = true;
-                break;
-            }
-        }
-        require(poolExists);
-        return _pid;
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {

@@ -151,14 +151,13 @@ contract QuickswapFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initializa
 
     function _mintLP(uint256 blocksTillReward, uint256 totalExpectedDepositAge, address recipient) internal {
         if (totalSupply == 0) {
-            _mint(recipient, 10**decimals);
+            _mint(recipient, fractionMultiplier);
             return;
         }
         if (balanceOf[recipient] == totalSupply) {
             return;
         }
-        uint256 userExpectedReward = expectedReward * (userDeposit[recipient] * blocksTillReward + userDepositAge[recipient]) / totalExpectedDepositAge;
-        uint256 userNewShare = fractionMultiplier * (userDeposit[recipient] + userExpectedReward) / (totalDeposits + expectedReward);
+        uint256 userNewShare = _calculateUserNewShare(blocksTillReward, totalExpectedDepositAge, recipient);
         _mint(recipient, fractionMultiplier * (userNewShare * totalSupply / fractionMultiplier - balanceOf[recipient]) / (fractionMultiplier - userNewShare));
     }
 
@@ -170,24 +169,25 @@ contract QuickswapFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initializa
         if (balanceOf[origin] == totalSupply) {
             return;
         }
-        uint256 userExpectedReward = expectedReward * (userDeposit[origin] * blocksTillReward + userDepositAge[origin]) / totalExpectedDepositAge;
-        uint256 userNewShare = fractionMultiplier * (userDeposit[origin] + userExpectedReward) / (totalDeposits + expectedReward);
+        uint256 userNewShare = _calculateUserNewShare(blocksTillReward, totalExpectedDepositAge, origin);
         _burn(origin, fractionMultiplier * (balanceOf[origin] - userNewShare * totalSupply / fractionMultiplier) / (fractionMultiplier - userNewShare));
+    }
+
+    function _calculateUserNewShare (uint256 blocksTillReward, uint256 totalExpectedDepositAge, address _address) internal view returns(uint256) {
+        uint256 userExpectedReward = expectedReward * (userDeposit[_address] * blocksTillReward + userDepositAge[_address]) / totalExpectedDepositAge;
+        return fractionMultiplier * (userDeposit[_address] + userExpectedReward) / (totalDeposits + expectedReward);
     }
 
     function _updateDeposit(address _address) internal {
         if (userDepositChanged[_address][lastRewardBlock]) {
-            // add deposit age from previous deposit age update till now
             userDepositAge[_address] += (block.number - userDALastUpdated[_address]) * userDeposit[_address];
         } else {
             // a reward has been distributed, update user deposit
             userDeposit[_address] = userBalance(_address);
-            // count fresh deposit age from that reward distribution till now
             userDepositAge[_address] = (block.number - lastRewardBlock) * userDeposit[_address];
             userDepositChanged[_address][lastRewardBlock] = true;
         }
 
-        // same with total deposit age
         if (totalDALastUpdated > lastRewardBlock) {
             totalDepositAge += (block.number - totalDALastUpdated) * totalDeposits;
         } else {
@@ -218,10 +218,7 @@ contract QuickswapFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initializa
             quickswapRouter.swapExactTokensForTokens(rewardTokenHalf, 0, rewardTokenToTokenBRoute, address(this), deadline);
         }
 
-        uint256 tokenABalance = IERC20(tokenA).balanceOf(address(this));
-        uint256 tokenBBalance = IERC20(tokenB).balanceOf(address(this));
-
-        quickswapRouter.addLiquidity(tokenA, tokenB, tokenABalance, tokenBBalance, 1, 1, address(this), deadline);
+        quickswapRouter.addLiquidity(tokenA, tokenB, IERC20(tokenA).balanceOf(address(this)), IERC20(tokenB).balanceOf(address(this)), 1, 1, address(this), deadline);
 
         uint256 reward = IERC20(lpPair).balanceOf(address(this));
         if (reward > 0) {
@@ -235,7 +232,7 @@ contract QuickswapFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initializa
     }
 
     function setExpectedReward(uint256 _amount, uint256 _block) external onlyOwner{
-       _setExpectedReward(_amount, _block);
+        _setExpectedReward(_amount, _block);
     }
 
     function _setExpectedReward(uint256 _amount, uint256 _block) internal {
