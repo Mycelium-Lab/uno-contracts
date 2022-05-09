@@ -232,6 +232,7 @@ contract QuickswapFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initializa
     }
 
     function setExpectedReward(uint256 _amount, uint256 _block) external onlyOwner{
+        require(_block > block.number);
         _setExpectedReward(_amount, _block);
     }
 

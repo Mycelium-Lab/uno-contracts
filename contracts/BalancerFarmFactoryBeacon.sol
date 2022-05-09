@@ -3,6 +3,7 @@ pragma solidity 0.8.10;
 pragma experimental ABIEncoderV2;
 
 import {BalancerFarmUpgradeable as Farm, IERC20, Initializable, MerkleOrchard, IVault, IAsset} from "./farms/BalancerFarmUpgradeable.sol"; 
+
 import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol"; 
 import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
@@ -34,7 +35,7 @@ contract BalancerFarmFactoryBeacon is Initializable, PausableUpgradeable, Ownabl
     event DistributorChanged(address indexed newDistributor);
 
     modifier distributorOnly(){
-        require(msg.sender == distributor, 'Caller is not a distributor');
+        require(msg.sender == distributor);
         _;
     }
 
@@ -44,11 +45,10 @@ contract BalancerFarmFactoryBeacon is Initializable, PausableUpgradeable, Ownabl
         __Pausable_init();
         __Ownable_init();
         _transferOwnership(upgrader);
-        UpgradeableBeacon _farmBeacon = new UpgradeableBeacon(
+        farmBeacon = address(new UpgradeableBeacon(
             address(new Farm())
-        );
-        _farmBeacon.transferOwnership(upgrader);
-        farmBeacon = address(_farmBeacon);
+        ));
+        UpgradeableBeacon(farmBeacon).transferOwnership(upgrader);
     }
 
     /**
@@ -62,7 +62,7 @@ contract BalancerFarmFactoryBeacon is Initializable, PausableUpgradeable, Ownabl
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
     function deposit(uint256[] memory amounts, address[] memory tokens, uint256 amountLP, address lpPair, address recipient) external whenNotPaused returns(uint256 liquidity){
-        require (amounts.length == tokens.length, "Amounts and tokens must have the same length");
+        require (amounts.length == tokens.length);
         if(Farms[lpPair] == Farm(address(0))){
             Farms[lpPair] = Farm(createFarm(lpPair));
             lpPools.push(lpPair);
@@ -89,9 +89,22 @@ contract BalancerFarmFactoryBeacon is Initializable, PausableUpgradeable, Ownabl
      * @param recipient - The address which will recieve tokens.
      */ 
     function withdraw(address lpPair, uint256 amount, bool withdrawLP, address recipient) external whenNotPaused { 
-        require(Farms[lpPair] != Farm(address(0)), 'The given pool doesnt exist'); 
+        require(Farms[lpPair] != Farm(address(0))); 
         Farms[lpPair].withdraw(msg.sender, amount, withdrawLP, recipient); 
         emit Withdraw(msg.sender, lpPair, amount);
+    }
+
+    /**
+     * @dev Sets expected reward amount and block for token distribution calculations.
+     * @param lpStakingPool - LP pool to check total deposits in.
+     * @param expectedReward - New reward amount.
+     * @param expectedRewardBlock - New reward block.
+     *
+     * Note: This function can only be called by the distributor.
+     */  
+    function setExpectedReward(address lpStakingPool, uint256 expectedReward, uint256 expectedRewardBlock) external distributorOnly {
+        require(Farms[lpStakingPool] != Farm(address(0)));
+        Farms[lpStakingPool].setExpectedReward(expectedReward, expectedRewardBlock); 
     }
 
      /**
@@ -115,9 +128,7 @@ contract BalancerFarmFactoryBeacon is Initializable, PausableUpgradeable, Ownabl
         IVault.FundManagement[] memory funds,
         int256[][] memory limits
     )  external distributorOnly whenNotPaused {
-        require(Farms[lpPair] != Farm(address(0)), 'The pool doesnt exist');
-        require((swaps.length == assets.length) && (swaps.length == funds.length) && (swaps.length == limits.length));
-
+        require(Farms[lpPair] != Farm(address(0)));
         Farms[lpPair].distribute(claims, rewardTokens, swaps, assets, funds, limits);
         emit Distribute(lpPair);
     }
@@ -144,7 +155,7 @@ contract BalancerFarmFactoryBeacon is Initializable, PausableUpgradeable, Ownabl
      */ 
     function totalDeposits(address lpPair) external view returns (uint256) {
         if (Farms[lpPair] != Farm(address(0))){
-            return Farms[lpPair].getTotalDeposits();
+            return Farms[lpPair].totalDeposits();
         }
         return 0;
     }

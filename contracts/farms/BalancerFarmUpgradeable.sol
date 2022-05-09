@@ -4,13 +4,12 @@ pragma solidity 0.8.10;
 import "../interfaces/IVault.sol";
 import "../interfaces/MerkleOrchard.sol"; 
 import "../interfaces/IBasePool.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "../utils/UniswapV2ERC20.sol"; 
 import "../utils/OwnableUpgradeableNoTransfer.sol";
 import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-contract BalancerFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgradeableNoTransfer, ReentrancyGuard {
-    using SafeMath for uint256; 
+contract BalancerFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initializable, OwnableUpgradeableNoTransfer, ReentrancyGuard {
 
     /**
      * @dev Third Party Contracts:
@@ -25,19 +24,26 @@ contract BalancerFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgra
      * {lpPair} - The pair and the pool.
      * {poolId} - Bytes32 representation of the {lpPair}.
      * 
-     * The implementation of “Scalable Reward Distribution on the Ethereum Blockchain” paper by B. Batog, L. Boca and N. Johnson.
-     * {totalDeposits} - The sum of all active stake deposits | (T).
-     * {sumOfRewards} - The sum of (rewards)/(totalDeposits) | (S).
-     * {stakes} - All stakes made by users | (stake).
-     * {sumOfRewardsForUser} - A sumOfRewards for users at pool join time | (S0).
+
      */
     address public lpPair;
     bytes32 public poolId;
      
-    uint256 private totalDeposits;
-    uint256 private sumOfRewards;
-    mapping(address => uint256) private stakes;
-    mapping(address => uint256) private sumOfRewardsForUser;
+    uint256 private expectedRewardBlock;
+    uint256 private expectedReward;
+    uint256 private lastRewardBlock;
+    uint256 private lastRewardPeriod;
+
+    mapping(address => uint256) private userDeposit;
+    mapping(address => uint256) private userDepositAge;
+    mapping(address => uint256) private userDALastUpdated;
+    mapping(address => mapping(uint256 => bool)) private userDepositChanged;
+
+    uint256 public totalDeposits;
+    uint256 private totalDepositAge;
+    uint256 private totalDALastUpdated;
+
+    uint256 private constant fractionMultiplier = 10**decimals;
 
     // ============ Methods ============
 
@@ -58,7 +64,7 @@ contract BalancerFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgra
     
         bool joinPool = false;
         for (uint256 i = 0; i < poolTokens.length; i++) {
-            require (IERC20(tokens[i]) == poolTokens[i], "Tokens don't match getPoolTokens()");
+            require (IERC20(tokens[i]) == poolTokens[i]);
             if(amounts[i] > 0){
                 if(!joinPool){
                     joinPool = true;
@@ -75,27 +81,56 @@ contract BalancerFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgra
             }
             uint256 amountAfter = IERC20(lpPair).balanceOf(address(this));
 
-            liquidity = amountAfter.sub(amountBefore).add(amountLP); 
-            require(liquidity > 0, 'The amount provided is 0');
+            liquidity = amountAfter - amountBefore + amountLP; 
+            require (liquidity > 0);
         }
-        
-        stakes[recipient] = liquidity.add(userBalance(recipient));
-        sumOfRewardsForUser[recipient] = sumOfRewards;
-        totalDeposits = totalDeposits.add(liquidity);
+
+        _updateDeposit(recipient);
+
+        uint256 blocksTillReward;
+        if(expectedRewardBlock > block.number){
+            blocksTillReward = expectedRewardBlock - block.number;
+        }else{
+            blocksTillReward = lastRewardPeriod / 2;
+        }
+
+        uint256 totalExpectedDepositAgePrev = totalDeposits * blocksTillReward + totalDepositAge;
+        uint256 totalExpectedDepositAge = liquidity * blocksTillReward + totalExpectedDepositAgePrev;
+        // update deposit amounts
+        userDeposit[recipient] += liquidity;
+        totalDeposits += liquidity;
+        // expected reward will increase proportionally to the increase of total expected deposit age
+        if (totalExpectedDepositAgePrev > 0) {
+            expectedReward = expectedReward * totalExpectedDepositAge / totalExpectedDepositAgePrev;
+        }
+
+        _mintLP(blocksTillReward, totalExpectedDepositAge, recipient);
     }
 
     /**
      * @dev Withdraws funds and sends them to the {recipient}.
      */
     function withdraw(address origin, uint256 amount, bool withdrawLP, address recipient) external onlyOwner nonReentrant{
-        require(stakes[origin] > 0, "The amount staked should be more than 0");
+        require(amount > 0 && userDeposit[origin] > 0);
         
-        uint256 depositAmount = userBalance(origin).sub(amount);
-        totalDeposits = totalDeposits.sub(stakes[origin]).add(depositAmount);
-        stakes[origin] = depositAmount;
-        if(depositAmount > 0) {
-            sumOfRewardsForUser[origin] = sumOfRewards;
+        _updateDeposit(origin);
+
+        uint256 blocksTillReward;
+        if(expectedRewardBlock > block.number){
+            blocksTillReward = expectedRewardBlock - block.number;
+        }else{
+            blocksTillReward = lastRewardPeriod / 2;
         }
+
+        uint256 totalExpectedDepositAgePrev = totalDeposits * blocksTillReward + totalDepositAge;
+        uint256 totalExpectedDepositAge = totalExpectedDepositAgePrev - amount * blocksTillReward;
+        // update deposit amounts
+        userDeposit[origin] -= amount;
+        totalDeposits -= amount;
+        // expected reward will decrease proportionally to the decrease of total expected deposit age
+        expectedReward = expectedReward * totalExpectedDepositAge / totalExpectedDepositAgePrev;
+
+        _burnLP(blocksTillReward, totalExpectedDepositAge, origin);
         
         if(withdrawLP){
             IERC20(lpPair).transfer(recipient, amount);
@@ -104,6 +139,55 @@ contract BalancerFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgra
 
         (, IAsset[] memory assets, uint256[] memory amounts) = getTokens();
         Vault.exitPool(poolId, address(this), payable(recipient), IVault.ExitPoolRequest(assets, amounts, abi.encode(1, amount), false));
+    }
+
+    function _mintLP(uint256 blocksTillReward, uint256 totalExpectedDepositAge, address recipient) internal {
+        if (totalSupply == 0) {
+            _mint(recipient, fractionMultiplier);
+            return;
+        }
+        if (balanceOf[recipient] == totalSupply) {
+            return;
+        }
+        uint256 userNewShare = _calculateUserNewShare(blocksTillReward, totalExpectedDepositAge, recipient);
+        _mint(recipient, fractionMultiplier * (userNewShare * totalSupply / fractionMultiplier - balanceOf[recipient]) / (fractionMultiplier - userNewShare));
+    }
+
+    function _burnLP(uint256 blocksTillReward, uint256 totalExpectedDepositAge, address origin) internal{
+        if(userDeposit[origin] == 0){
+            _burn(origin, balanceOf[origin]);
+            return;
+        }
+        if (balanceOf[origin] == totalSupply) {
+            return;
+        }
+        uint256 userNewShare = _calculateUserNewShare(blocksTillReward, totalExpectedDepositAge, origin);
+        _burn(origin, fractionMultiplier * (balanceOf[origin] - userNewShare * totalSupply / fractionMultiplier) / (fractionMultiplier - userNewShare));
+    }
+
+    function _calculateUserNewShare (uint256 blocksTillReward, uint256 totalExpectedDepositAge, address _address) internal view returns(uint256) {
+        uint256 userExpectedReward = expectedReward * (userDeposit[_address] * blocksTillReward + userDepositAge[_address]) / totalExpectedDepositAge;
+        return fractionMultiplier * (userDeposit[_address] + userExpectedReward) / (totalDeposits + expectedReward);
+    }
+
+    function _updateDeposit(address _address) internal {
+        if (userDepositChanged[_address][lastRewardBlock]) {
+            userDepositAge[_address] += (block.number - userDALastUpdated[_address]) * userDeposit[_address];
+        } else {
+            // a reward has been distributed, update user deposit
+            userDeposit[_address] = userBalance(_address);
+            userDepositAge[_address] = (block.number - lastRewardBlock) * userDeposit[_address];
+            userDepositChanged[_address][lastRewardBlock] = true;
+        }
+
+        if (totalDALastUpdated > lastRewardBlock) {
+            totalDepositAge += (block.number - totalDALastUpdated) * totalDeposits;
+        } else {
+            totalDepositAge = (block.number - lastRewardBlock) * totalDeposits;
+        }
+
+        userDALastUpdated[_address] = block.number;
+        totalDALastUpdated = block.number;
     }
 
     /**
@@ -120,11 +204,11 @@ contract BalancerFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgra
         IVault.FundManagement[] memory funds,
         int256[][] memory limits
     ) external onlyOwner nonReentrant{ 
-        require(totalDeposits > 0, 'There should be some tokens in the pool');
+        require(totalDeposits > 0);
         merkleOrchard.claimDistributions(address(this), claims, rewardTokens);
         for (uint256 i = 0; i < assets.length; i++) {
             for (uint256 j = 0; j < assets[i].length; j++) {
-                require(address(assets[i][j]) != lpPair, 'Cant swap LP token');
+                require(address(assets[i][j]) != lpPair);
             }
             IERC20 startingToken = IERC20(address(assets[i][0]));
             uint256 balance = startingToken.balanceOf(address(this));
@@ -144,23 +228,36 @@ contract BalancerFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgra
         Vault.joinPool(poolId, address(this), address(this), IVault.JoinPoolRequest(joinAssets, joinAmounts, abi.encode(1, joinAmounts, 1), false));
         uint256 amountAfter = IERC20(lpPair).balanceOf(address(this));
 
-        uint256 reward = amountAfter.sub(amountBefore);
-        sumOfRewards = sumOfRewards.add(uint256(1 ether).mul(reward).div(totalDeposits));
+        uint256 reward = amountAfter - amountBefore;
+        totalDeposits += reward;
+
+        lastRewardPeriod = block.number - lastRewardBlock;
+        _setExpectedReward(reward, block.number + lastRewardPeriod);
+        lastRewardBlock = block.number;
+    }
+
+    function setExpectedReward(uint256 _amount, uint256 _block) external onlyOwner{
+        require(_block > block.number);
+        _setExpectedReward(_amount, _block);
+    }
+
+    function _setExpectedReward(uint256 _amount, uint256 _block) internal {
+        expectedReward = _amount;
+        expectedRewardBlock = _block;
     }
 
     /**
      * @dev Returns total funds staked by the {_address}.
      */
     function userBalance(address _address) public view returns (uint256){
-        uint256 reward = stakes[_address].mul(sumOfRewards.sub(sumOfRewardsForUser[_address])).div(uint256(1 ether));
-        return stakes[_address].add(reward);
-    }
-    
-    /**
-     * @dev Returns total amount locked in the pool.
-     */ 
-    function getTotalDeposits() external view returns(uint256){
-       return totalDeposits.add(totalDeposits.mul(sumOfRewards).div(uint256(1 ether)));
+        if (userDepositChanged[_address][lastRewardBlock]) {
+            return userDeposit[_address];
+        } else {
+            if (totalSupply == 0) {
+                return 0;
+            }
+            return totalDeposits * balanceOf[_address] / totalSupply;
+        }
     }
 
     /**
