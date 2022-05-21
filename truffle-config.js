@@ -10,9 +10,11 @@ module.exports = {
         return new HDWalletProvider({
           privateKeys:  [process.env.PRIVATE_KEY],
           providerOrUrl: "wss://speedy-nodes-nyc.moralis.io/001e5f8996373e891a2971f5/polygon/mainnet/ws",
-          chainId: 137
+          chainId: 137,
+          pollingInterval: 30000
         })
       },
+      networkCheckTimeout: 10000,
       gas: 7500000,
       gasPrice: 70000000000,
       network_id: 137,

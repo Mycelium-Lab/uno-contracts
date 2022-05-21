@@ -12,7 +12,6 @@ module.exports = async function (deployer, network, accounts) {
   await deployer.deploy(UnoFarmQuickswap)
   const assetRouter = await deployProxy(
     UnoAssetRouterQuickswap,
-    //[AccessManager.address, FarmFactory.address],
     { deployer, kind: 'uups', initializer: false }
   )
   await deployer.deploy(UnoFarmFactory, UnoFarmQuickswap.address, UnoAccessManager.address, assetRouter.address)

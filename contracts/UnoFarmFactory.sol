@@ -33,7 +33,7 @@ contract UnoFarmFactory{
     }
 
     function createFarm(address pool) external returns (address) {
-        require(Farms[pool] == address(0), 'FARM_NOT_EXISTS');
+        require(Farms[pool] == address(0), 'FARM_EXISTS');
         Farms[pool] = _createFarm(pool);
         pools.push(pool);
         return Farms[pool];
