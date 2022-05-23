@@ -1,0 +1,4 @@
+module.exports =  {
+    distributor:'0x7d3284F1E029b218f96e650Dbc909248A3DA82D7',
+    pauser:'0xA7b7DDF752Ed3A9785F747a3694760bB8994e15F'
+}

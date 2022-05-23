@@ -5,6 +5,7 @@ pragma experimental ABIEncoderV2;
 import {IUnoFarmQuickswap as Farm} from "./interfaces/IUnoFarmQuickswap.sol"; 
 import "../../interfaces/IUnoFarmFactory.sol";
 import "../../interfaces/IUnoAccessManager.sol"; 
+import "../../interfaces/IUniswapV2Pair.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -50,7 +51,7 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
     }
 
     /**
-     * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the lpPair and deposits tokens. Emits a {Deposit} event.
+     * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool} and deposits tokens in it. Emits a {Deposit} event.
      * @param amountA  - Token A amount to deposit.
      * @param amountB -  Token B amount to deposit.
      * @param amountLP - LP Token amount to deposit.
@@ -135,7 +136,7 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
     }
 
     /**
-     * @dev Returns tokens staked by the {_address} for the given {lpPair}.
+     * @dev Returns tokens staked by the {_address} for the given {lpStakingPool}.
      * @param _address - The address to check stakes for.
      * @param lpStakingPool - LP pool to check stakes in.
 
@@ -147,7 +148,8 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
         Farm farm = Farm(farmFactory.Farms(lpStakingPool));
         if (farm != Farm(address(0))) {
             stakeLP = farm.userBalance(_address);
-            (stakeA, stakeB) = getTokenStake(lpStakingPool, stakeLP);
+            address lpPair = farm.lpPair();
+            (stakeA, stakeB) = getTokenStake(lpPair, stakeLP);
         }
     }
 
@@ -163,26 +165,23 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
         Farm farm = Farm(farmFactory.Farms(lpStakingPool));
         if (farm != Farm(address(0))) {
             totalDepositsLP = farm.totalDeposits();
-            (totalDepositsA, totalDepositsB) = getTokenStake(lpStakingPool, totalDepositsLP);
+            address lpPair = farm.lpPair();
+            (totalDepositsA, totalDepositsB) = getTokenStake(lpPair, totalDepositsLP);
         }
     }
 
     /**
      * @dev Converts LP tokens to normal tokens, value(amountA) == value(amountB) == 0.5*amountLP
-     * @param lpStakingPool - LP pool for conversion.
+     * @param lpPair - LP pair for conversion.
      * @param amountLP - Amount of LP tokens to convert.
 
      * @return amountA - Token A amount.
      * @return amountB - Token B amount.
      */ 
-    function getTokenStake(address lpStakingPool, uint256 amountLP) internal view returns (uint256 amountA, uint256 amountB) {
-        Farm farm = Farm(farmFactory.Farms(lpStakingPool));
-        if (farm != Farm(address(0))) {
-            address lpPair = farm.lpPair();
-            uint256 totalSupply = IERC20Upgradeable(lpPair).totalSupply();
-            amountA = amountLP * IERC20Upgradeable(farm.tokenA()).balanceOf(lpPair) / totalSupply;
-            amountB = amountLP * IERC20Upgradeable(farm.tokenB()).balanceOf(lpPair) / totalSupply;
-        }
+    function getTokenStake(address lpPair, uint256 amountLP) internal view returns (uint256 amountA, uint256 amountB) {
+        uint256 totalSupply = IERC20Upgradeable(lpPair).totalSupply();
+        amountA = amountLP * IERC20Upgradeable(IUniswapV2Pair(lpPair).token0()).balanceOf(lpPair) / totalSupply;
+        amountB = amountLP * IERC20Upgradeable(IUniswapV2Pair(lpPair).token1()).balanceOf(lpPair) / totalSupply;
     }
  
     function pause() external onlyPauser {

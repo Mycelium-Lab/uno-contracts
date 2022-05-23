@@ -1,0 +1,202 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.10;
+pragma experimental ABIEncoderV2;
+
+import {IUnoFarmQuickswapDual as Farm} from "./interfaces/IUnoFarmQuickswapDual.sol"; 
+import "../../interfaces/IUnoFarmFactory.sol";
+import "../../interfaces/IUnoAccessManager.sol"; 
+import "../../interfaces/IUniswapV2Pair.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+
+contract UnoAssetRouterQuickswapDual is Initializable, PausableUpgradeable, UUPSUpgradeable {
+    using SafeERC20Upgradeable for IERC20Upgradeable;
+
+    /**
+     * @dev Contract Variables:
+     * farmFactory - The contract that deploys new Farms and links them to {lpStakingPool}s.
+     * accessManager - Role manager contract.
+     */
+    IUnoFarmFactory public farmFactory;
+    IUnoAccessManager public accessManager;
+    bytes32 private constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
+    bytes32 private constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+
+    event Deposit(address indexed lpPool, address indexed from, address indexed recipient, uint256 amount);
+    event Withdraw(address indexed lpPool, address indexed from, address indexed recipient, uint256 amount);
+    event Distribute(address indexed lpPool, uint256 reward);
+
+    modifier onlyDistributor(){
+        require(accessManager.hasRole(DISTRIBUTOR_ROLE, msg.sender), 'CALLER_NOT_DISTRIBUTOR');
+        _;
+    }
+    modifier onlyPauser(){
+        require(accessManager.hasRole(PAUSER_ROLE, msg.sender), 'CALLER_NOT_PAUSER');
+        _;
+    }
+    modifier onlyAdmin(){
+        require(accessManager.hasRole(accessManager.ADMIN_ROLE(), msg.sender), 'CALLER_NOT_ADMIN');
+        _;
+    }
+
+    // ============ Methods ============
+
+    function initialize(address _accessManager, address _farmFactory) external initializer{
+        __Pausable_init();
+        accessManager = IUnoAccessManager(_accessManager);
+        farmFactory = IUnoFarmFactory(_farmFactory);
+    }
+
+    /**
+     * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool} and deposits tokens in it. Emits a {Deposit} event.
+     * @param amountA  - Token A amount to deposit.
+     * @param amountB -  Token B amount to deposit.
+     * @param amountLP - LP Token amount to deposit.
+     * @param lpStakingPool - Address of the pool to deposit tokens in.
+     * @param recipient - Address which will recieve the deposit and leftover tokens.
+     
+     * @return sentA - Token A amount sent to the farm.
+     * @return sentB - Token B amount sent to the farm.
+     * @return liquidity - Total liquidity sent to the farm (in lpTokens).
+     */
+    function deposit(uint256 amountA, uint256 amountB, uint256 amountLP, address lpStakingPool, address recipient) external whenNotPaused returns(uint256 sentA, uint256 sentB, uint256 liquidity){
+        Farm farm = Farm(farmFactory.Farms(lpStakingPool));
+        if(farm == Farm(address(0))){
+            farm = Farm(farmFactory.createFarm(lpStakingPool));
+        }
+
+        if(amountA > 0){
+            IERC20Upgradeable(farm.tokenA()).safeTransferFrom(msg.sender, address(farm), amountA);
+        }
+        if(amountB > 0){
+            IERC20Upgradeable(farm.tokenB()).safeTransferFrom(msg.sender, address(farm), amountB);
+        }
+        if(amountLP > 0){
+            IERC20Upgradeable(farm.lpPair()).safeTransferFrom(msg.sender, address(farm), amountLP);
+        }
+        
+        (sentA, sentB, liquidity) = farm.deposit(amountA, amountB, amountLP, recipient);
+        emit Deposit(lpStakingPool, msg.sender, recipient, liquidity); 
+    }
+
+    /** 
+     * @dev Withdraws tokens from the given pool. Emits a {Withdraw} event.
+     * @param lpStakingPool - LP pool to withdraw from.
+     * @param amount - LP amount to withdraw. 
+     * @param withdrawLP - True: Withdraw in LP tokens, False: Withdraw in normal tokens.
+     * @param recipient - The address which will recieve tokens.
+
+     * @return amountA - Token A amount sent to the {recipient}, 0 if withdrawLP == false.
+     * @return amountB - Token B amount sent to the {recipient}, 0 if withdrawLP == false.
+     */ 
+    function withdraw(address lpStakingPool, uint256 amount, bool withdrawLP, address recipient) external whenNotPaused returns(uint256 amountA, uint256 amountB){
+        Farm farm = Farm(farmFactory.Farms(lpStakingPool));
+        require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
+        
+        (amountA, amountB) = farm.withdraw(msg.sender, amount, withdrawLP, recipient); 
+        emit Withdraw(lpStakingPool, msg.sender, recipient, amount);  
+    }
+
+    /**
+     * @dev Sets expected reward amount and block for token distribution calculations. 
+     * @param lpStakingPool - LP pool to update.
+     * @param expectedReward - New reward amount.
+     * @param expectedRewardBlock - New reward block.
+     *
+     * Note: This function can only be called by the distributor.
+     */  
+    function setExpectedReward(address lpStakingPool, uint256 expectedReward, uint256 expectedRewardBlock) external onlyDistributor {
+        Farm farm = Farm(farmFactory.Farms(lpStakingPool));
+        require(farm != Farm(address(0)), 'FARM_NOT_EXISTS');
+        
+        farm.setExpectedReward(expectedReward, expectedRewardBlock); 
+    }
+
+     /**
+     * @dev Distributes tokens between users.
+     * @param lpStakingPool - LP pool to distribute tokens in.
+     * @param rewardTokenAToTokenARoute An array of token addresses.
+     * @param rewardTokenAToTokenBRoute An array of token addresses.
+     * @param rewardTokenBToTokenARoute An array of token addresses.
+     * @param rewardTokenBToTokenBRoute An array of token addresses.
+     *
+     * Note: This function can only be called by the distributor.
+     */ 
+    function distribute(
+        address lpStakingPool,
+        address[] calldata rewardTokenAToTokenARoute,
+        address[] calldata rewardTokenAToTokenBRoute,
+        address[] calldata rewardTokenBToTokenARoute,
+        address[] calldata rewardTokenBToTokenBRoute
+    ) external whenNotPaused onlyDistributor {
+        Farm farm = Farm(farmFactory.Farms(lpStakingPool));
+        require(farm != Farm(address(0)), 'FARM_NOT_EXISTS');
+
+        uint256 reward = farm.distribute(rewardTokenAToTokenARoute, rewardTokenAToTokenBRoute, rewardTokenBToTokenARoute, rewardTokenBToTokenBRoute);
+        emit Distribute(lpStakingPool, reward);
+    }
+
+    /**
+     * @dev Returns tokens staked by the {_address} for the given {lpStakingPool}.
+     * @param _address - The address to check stakes for.
+     * @param lpStakingPool - LP pool to check stakes in.
+
+     * @return stakeLP - Total user stake(in LP tokens).
+     * @return stakeA - Token A stake.
+     * @return stakeB - Token B stake.
+     */
+    function userStake(address _address, address lpStakingPool) external view returns (uint256 stakeLP, uint256 stakeA, uint256 stakeB) {
+        Farm farm = Farm(farmFactory.Farms(lpStakingPool));
+        if (farm != Farm(address(0))) {
+            stakeLP = farm.userBalance(_address);
+            address lpPair = farm.lpPair();
+            (stakeA, stakeB) = getTokenStake(lpPair, stakeLP);
+        }
+    }
+
+    /**
+     * @dev Returns total amount locked in the pool. Doesn't take pending rewards into account.
+     * @param lpStakingPool - LP pool to check total deposits in.
+
+     * @return totalDepositsLP - Total deposits (in LP tokens).
+     * @return totalDepositsA - Token A deposits.
+     * @return totalDepositsB - Token B deposits.
+     */  
+    function totalDeposits(address lpStakingPool) external view returns (uint256 totalDepositsLP, uint256 totalDepositsA, uint256 totalDepositsB) {
+        Farm farm = Farm(farmFactory.Farms(lpStakingPool));
+        if (farm != Farm(address(0))) {
+            totalDepositsLP = farm.totalDeposits();
+            address lpPair = farm.lpPair();
+            (totalDepositsA, totalDepositsB) = getTokenStake(lpPair, totalDepositsLP);
+        }
+    }
+
+    /**
+     * @dev Converts LP tokens to normal tokens, value(amountA) == value(amountB) == 0.5*amountLP
+     * @param lpPair - LP pair for conversion.
+     * @param amountLP - Amount of LP tokens to convert.
+
+     * @return amountA - Token A amount.
+     * @return amountB - Token B amount.
+     */ 
+    function getTokenStake(address lpPair, uint256 amountLP) internal view returns (uint256 amountA, uint256 amountB) {
+        uint256 totalSupply = IERC20Upgradeable(lpPair).totalSupply();
+        amountA = amountLP * IERC20Upgradeable(IUniswapV2Pair(lpPair).token0()).balanceOf(lpPair) / totalSupply;
+        amountB = amountLP * IERC20Upgradeable(IUniswapV2Pair(lpPair).token1()).balanceOf(lpPair) / totalSupply;
+    }
+ 
+    function pause() external onlyPauser {
+        _pause();
+    }
+
+    function unpause() external onlyPauser {
+        _unpause();
+    }
+
+    function _authorizeUpgrade(address) internal override onlyAdmin {
+
+    }
+}

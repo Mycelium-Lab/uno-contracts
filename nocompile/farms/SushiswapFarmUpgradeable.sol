@@ -36,7 +36,6 @@ contract SushiswapFarmUpgradeable is UniswapV2ERC20, UUPSUpgradeable, Initializa
      */
     IUniswapV2Router01 private constant sushiswapRouter = IUniswapV2Router01(0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506);
     IMiniChefV2 private constant MiniChef = IMiniChefV2(0x0769fd68dFb93167989C6f7254cd0D766Fb2841F);
-    IMiniChefUtils private constant MiniChefUtils = IMiniChefUtils(0xBeE6dbb6606bb65953a24c254945cA95aEb22671);
     
     /**
      * @dev Contract Variables:

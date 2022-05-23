@@ -1,22 +1,26 @@
 const { deployProxy } = require('@openzeppelin/truffle-upgrades')
-const UnoAccessManager = artifacts.require('UnoAccessManager')
-const UnoFarmQuickswap = artifacts.require('UnoFarmQuickswap')
-const UnoFarmFactory = artifacts.require('UnoFarmFactory')
-const UnoAssetRouterQuickswap = artifacts.require('UnoAssetRouterQuickswap')
+const AccessManager = artifacts.require('UnoAccessManager')
+const FarmFactory = artifacts.require('UnoFarmFactory')
 
-const distributor = '0x7d3284F1E029b218f96e650Dbc909248A3DA82D7'
-const pauser = '0xA7b7DDF752Ed3A9785F747a3694760bB8994e15F'
+const {distributor, pauser} = require('./addresses/addresses')
+
+const Farm = artifacts.require('UnoFarmQuickswap')
+const AssetRouter = artifacts.require('UnoAssetRouterQuickswap')
 
 module.exports = async function (deployer, network, accounts) {
-  await deployer.deploy(UnoAccessManager, {overwrite: false, from: accounts[0]})
-  await deployer.deploy(UnoFarmQuickswap)
+  // AccessManager deployment, dont deploy if already deployed on this network
+  await deployer.deploy(AccessManager, {overwrite: false, from: accounts[0]})
+  // Deploy new Farm implementation for factory to deploy
+  await deployer.deploy(Farm)
+  // Deploy AssetRouter
   const assetRouter = await deployProxy(
-    UnoAssetRouterQuickswap,
+    AssetRouter,
     { deployer, kind: 'uups', initializer: false }
   )
-  await deployer.deploy(UnoFarmFactory, UnoFarmQuickswap.address, UnoAccessManager.address, assetRouter.address)
+  // Deploy Factory
+  await deployer.deploy(FarmFactory, Farm.address, AccessManager.address, assetRouter.address)
 
-  const accessManager = await UnoAccessManager.deployed()
+  const accessManager = await AccessManager.deployed()
   //DISTRIBUTOR_ROLE
   const distributorHasRole = await accessManager.hasRole('0xfbd454f36a7e1a388bd6fc3ab10d434aa4578f811acbbcf33afb1c697486313c', distributor)
   if(!distributorHasRole){
@@ -32,4 +36,3 @@ module.exports = async function (deployer, network, accounts) {
 
   console.log('Deployed', assetRouter.address)
 }
-
