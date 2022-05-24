@@ -44,7 +44,7 @@ All contracts are deployed on the Polygon(Matic) Blockchain
 ## Balancer
 
 #### UnoAssetRouterBalancer
-0x941071edC3c443784167333Cb5992c31bc553a95
+0xB26e00802d81B163602bE2374a36107eeF021b5C
 
 #### UnoFarmFactory
 0xaA93113F9666978a8c7869f916c78CD85f351694
