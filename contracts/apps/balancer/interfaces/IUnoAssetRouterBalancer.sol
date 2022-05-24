@@ -4,7 +4,6 @@ pragma experimental ABIEncoderV2;
 
 import '../../../interfaces/IUnoFarmFactory.sol';
 import '../../../interfaces/IUnoAccessManager.sol'; 
-import '../../../interfaces/MerkleOrchard.sol'; 
 import '../../../interfaces/IVault.sol'; 
 
 interface IUnoAssetRouterBalancer {
@@ -21,18 +20,15 @@ interface IUnoAssetRouterBalancer {
     function withdraw(address lpPair, uint256 amount, bool withdrawLP, address recipient) external;
 
     function setExpectedReward(address lpPair, uint256 expectedReward, uint256 expectedRewardBlock) external;
-    function distribute(
+      function distribute(
         address lpPair,
-        MerkleOrchard.Claim[] memory claims,
-        IERC20[] memory rewardTokens,
         IVault.BatchSwapStep[][] memory swaps,
         IAsset[][] memory assets,
-        IVault.FundManagement[] memory funds,
         int256[][] memory limits
     ) external;
 
    
-    function userStake(address _address, address lpPair) external view returns (uint256);
+    function userStake(address _address, address lpPair) external view returns(uint256);
     function totalDeposits(address lpPair) external view returns (uint256);
 
     function paused() external view returns(bool);

@@ -5,7 +5,6 @@ pragma experimental ABIEncoderV2;
 import {IUnoFarmBalancer as Farm} from './interfaces/IUnoFarmBalancer.sol'; 
 import '../../interfaces/IUnoFarmFactory.sol';
 import '../../interfaces/IUnoAccessManager.sol'; 
-import '../../interfaces/MerkleOrchard.sol'; 
 import '../../interfaces/IVault.sol'; 
 import '@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol';
@@ -51,8 +50,8 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
         farmFactory = IUnoFarmFactory(_farmFactory);
     }
 
- /**
-     * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the lpPair and deposits tokens.
+    /**
+     * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpPair} and deposits tokens in it.
      * @param amounts - Amounts of tokens to deposit.
      * @param tokens - Tokens to deposit.
      * @param amountLP - Amounts of LP tokens to deposit.
@@ -115,28 +114,22 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
     /**
      * @dev Distributes tokens between users for a single {Farms[lpPair]}.
      * @param lpPair - The pool to distribute. 
-     * @param claims - Balancer token claims. 
-     * @param rewardTokens - Reward tokens to recieve from the pool.
      * @param swaps - The data used to swap reward tokens for the needed tokens.
      * @param assets - The data used to swap reward tokens for the needed tokens.
-     * @param funds - The data used to swap reward tokens for the needed tokens.
      * @param limits - The data used to swap reward tokens for the needed tokens.
      *
      * Note: This function can only be called by the distributor.
      */
     function distribute(
         address lpPair,
-        MerkleOrchard.Claim[] memory claims,
-        IERC20[] memory rewardTokens,
         IVault.BatchSwapStep[][] memory swaps,
         IAsset[][] memory assets,
-        IVault.FundManagement[] memory funds,
         int256[][] memory limits
     ) external whenNotPaused onlyDistributor {
         Farm farm = Farm(farmFactory.Farms(lpPair));
         require(farm != Farm(address(0)), 'FARM_NOT_EXISTS');
 
-        uint256 reward = farm.distribute(claims, rewardTokens, swaps, assets, funds, limits);
+        uint256 reward = farm.distribute(swaps, assets, limits);
         emit Distribute(lpPair, reward);
     }
 
@@ -168,7 +161,7 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
         }
         return 0;
     }
-
+ 
     function pause() external onlyPauser {
         _pause();
     }

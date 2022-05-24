@@ -146,8 +146,8 @@ contract UnoFarmQuickswap is Initializable, ReentrancyGuardUpgradeable {
     /**
      * @dev Core function of the strat, in charge of updating, collecting and re-investing rewards.
      * 1. It claims rewards from the {lpStakingPool}.
-     * 2. It swaps the {rewardToken} token for {tokenA} & {tokenB}.
-     * 3. It deposits the new LP tokens back to the {lpStakingPool}.
+     * 2. It swaps {rewardToken} token for {tokenA} & {tokenB}.
+     * 3. It deposits new LP tokens back to the {lpStakingPool}.
      */
     function distribute(address[] calldata rewardTokenToTokenARoute, address[] calldata rewardTokenToTokenBRoute) external onlyAssetRouter nonReentrant returns(uint256 reward){
         require(totalDeposits > 0, 'NO_LIQUIDITY');

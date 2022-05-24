@@ -3,19 +3,25 @@ pragma solidity 0.8.10;
  
 import '../../interfaces/IWMATIC.sol';
 import "../../interfaces/IVault.sol";
-import "../../interfaces/MerkleOrchard.sol"; 
 import "../../interfaces/IBasePool.sol";
+import '../../interfaces/IChildChainLiquidityGaugeFactory.sol';
+import "../../interfaces/IRewardsOnlyGauge.sol"; 
+import "../../interfaces/IChildChainStreamer.sol"; 
 import '@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 
 contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
     /**
      * @dev Third Party Contracts:
-     * {Vault} - the main Balancer contract used for pool exits/joins and swaps.
-     * {merkleOrchard} - The contract that distributes reward tokens.
+     * {Vault} - Main Balancer contract used for pool exits/joins and swaps.
+     * {GaugeFactory} - Contract that deploys gauges.
+     * {gauge} - Contract that distributes reward tokens.
+     * {streamer} - Contract reward tokens get sent to from the bridge.
      */   
     IVault constant private Vault = IVault(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
-    MerkleOrchard constant private merkleOrchard = MerkleOrchard(0x0F3e0c4218b7b0108a3643cFe9D3ec0d4F57c54e);
+    IChildChainLiquidityGaugeFactory constant private GaugeFactory = IChildChainLiquidityGaugeFactory(0x3b8cA519122CdD8efb272b0D3085453404B25bD0);
+    IRewardsOnlyGauge private gauge;
+    IChildChainStreamer private streamer;
 
     /**
      * @dev Contract Variables:
@@ -82,13 +88,18 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
 
         lpPair = _lpPair;
         poolId = IBasePool(_lpPair).getPoolId();
-        IERC20(_lpPair).approve(address(Vault), uint256(2**256 - 1));
 
+        gauge = IRewardsOnlyGauge(GaugeFactory.getPoolGauge(_lpPair));
+        streamer = IChildChainStreamer(GaugeFactory.getPoolStreamer(_lpPair));
+
+        IERC20(_lpPair).approve(address(Vault), uint256(2**256 - 1));
+        IERC20(_lpPair).approve(address(gauge), uint256(2**256 - 1));
+        
         lastRewardBlock = block.number;
         lastDistributionPeriod = 1200000; // This is somewhere around 1 month at the time of writing this contract.
     }
 
-   /**
+    /**
      * @dev Function that makes the deposits.
      * Deposits {amounts} of {tokens} from this contract's balance to the {Vault}.
      */
@@ -106,17 +117,18 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
             }
         }
 
-        uint256 amountBefore = IERC20(lpPair).balanceOf(address(this));
         if(joinPool){
             IVault.JoinPoolRequest memory joinPoolRequest = IVault.JoinPoolRequest(assets, amounts, abi.encode(1, amounts, 0), false);
             Vault.joinPool(poolId, address(this), address(this), joinPoolRequest);
         }
-        uint256 amountAfter = IERC20(lpPair).balanceOf(address(this));
+        uint256 addedLiquidity = IERC20(lpPair).balanceOf(address(this));
 
-        liquidity = amountAfter - amountBefore + amountLP; 
+        liquidity = addedLiquidity + amountLP; 
         require (liquidity > 0, 'NO_LIQUIDITY_PROVIDED');
         
         _mint(liquidity, recipient);
+
+        gauge.deposit(liquidity);
     }
 
     /**
@@ -127,6 +139,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
 
         _burn(amount, origin);
 
+        gauge.withdraw(amount);
         if(withdrawLP){
             IERC20(lpPair).transfer(recipient, amount);
             return;
@@ -138,43 +151,51 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
 
     /**
      * @dev Core function of the strat, in charge of updating, collecting and re-investing rewards.
-     * 1. It claims rewards from the {merkleOrchard}.
-     * 2. It swaps the {rewardTokens} token for {assets}.
-     * 3. Then deposits the new tokens back to the {Vault}.
+     * 1. It claims rewards from the {gauge}.
+     * 2. It swaps reward tokens for {tokens}.
+     * 3. It deposits new tokens back to the {gauge}.
      */
-    function distribute( MerkleOrchard.Claim[] memory claims,
-        IERC20[] memory rewardTokens,
+    function distribute(
         IVault.BatchSwapStep[][] memory swaps,
         IAsset[][] memory assets,
-        IVault.FundManagement[] memory funds,
         int256[][] memory limits
     ) external onlyAssetRouter nonReentrant returns(uint256 reward){
         require(totalDeposits > 0, 'NO_LIQUIDITY');
-        merkleOrchard.claimDistributions(address(this), claims, rewardTokens);
-        for (uint256 i = 0; i < assets.length; i++) {
-            for (uint256 j = 0; j < assets[i].length; j++) {
-                require(address(assets[i][j]) != lpPair, 'CANT_SWAP_LP_TOKEN');
-            }
-            IERC20 startingToken = IERC20(address(assets[i][0]));
-            uint256 balance = startingToken.balanceOf(address(this));
-            if (balance > 0) {
-                startingToken.approve(address(Vault), balance);
-                Vault.batchSwap(IVault.SwapKind.GIVEN_IN, swaps[i], assets[i], funds[i], limits[i], uint256(2**256 - 1));
+
+        gauge.claim_rewards();
+
+        for (uint256 i = 0; i < streamer.reward_count(); i++) {
+            IERC20 rewardToken = IERC20(streamer.reward_tokens(i));
+            uint256 rewardTokenBalance = rewardToken.balanceOf(address(this));
+            if (rewardTokenBalance > 0) {
+                swaps[i][0].amount = rewardTokenBalance;
+                rewardToken.approve(address(Vault), rewardTokenBalance);
+                Vault.batchSwap(
+                    IVault.SwapKind.GIVEN_IN,
+                    swaps[i],
+                    assets[i],
+                    IVault.FundManagement({sender: address(this), fromInternalBalance:false, recipient: payable(address(this)), toInternalBalance:false}),
+                    limits[i],
+                    uint256(2**256 - 1)
+                );
             }
         }
 
         (IERC20[] memory tokens, IAsset[] memory joinAssets, uint256[] memory joinAmounts) = getTokens();
         for (uint256 i = 0; i < tokens.length; i++) {
             joinAmounts[i] = tokens[i].balanceOf(address(this));
-            tokens[i].approve(address(Vault), joinAmounts[i]);
+            if (joinAmounts[i] > 0){
+                tokens[i].approve(address(Vault), joinAmounts[i]);
+            }
         }
         
-        uint256 amountBefore = IERC20(lpPair).balanceOf(address(this));
         Vault.joinPool(poolId, address(this), address(this), IVault.JoinPoolRequest(joinAssets, joinAmounts, abi.encode(1, joinAmounts, 1), false));
-        uint256 amountAfter = IERC20(lpPair).balanceOf(address(this));
+        reward = IERC20(lpPair).balanceOf(address(this));
 
-        reward = amountAfter - amountBefore;
-        totalDeposits += reward;
+        if (reward > 0) {
+            totalDeposits += reward;
+            gauge.deposit(reward);
+        }
 
         lastDistributionPeriod = block.number - lastRewardBlock;
         _setExpectedReward(reward, block.number + lastDistributionPeriod);
