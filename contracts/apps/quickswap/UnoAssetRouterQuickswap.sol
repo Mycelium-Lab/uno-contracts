@@ -2,15 +2,15 @@
 pragma solidity 0.8.10;
 pragma experimental ABIEncoderV2;
 
-import {IUnoFarmQuickswap as Farm} from "./interfaces/IUnoFarmQuickswap.sol"; 
-import "../../interfaces/IUnoFarmFactory.sol";
-import "../../interfaces/IUnoAccessManager.sol"; 
-import "../../interfaces/IUniswapV2Pair.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {IUnoFarmQuickswap as Farm} from './interfaces/IUnoFarmQuickswap.sol'; 
+import '../../interfaces/IUnoFarmFactory.sol';
+import '../../interfaces/IUnoAccessManager.sol'; 
+import '../../interfaces/IUniswapV2Pair.sol';
+import '@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol';
+import '@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol';
+import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
+import '@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol';
+import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 
 contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -22,8 +22,8 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
      */
     IUnoFarmFactory public farmFactory;
     IUnoAccessManager public accessManager;
-    bytes32 private constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
-    bytes32 private constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+    bytes32 private constant DISTRIBUTOR_ROLE = keccak256('DISTRIBUTOR_ROLE');
+    bytes32 private constant PAUSER_ROLE = keccak256('PAUSER_ROLE');
 
     event Deposit(address indexed lpPool, address indexed from, address indexed recipient, uint256 amount);
     event Withdraw(address indexed lpPool, address indexed from, address indexed recipient, uint256 amount);

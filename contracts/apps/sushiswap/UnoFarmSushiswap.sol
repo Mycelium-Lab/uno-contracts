@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
  
-import "../../interfaces/IUniswapV2Pair.sol";
-import "../../interfaces/IUniswapV2Router.sol";
-import "../../interfaces/IMiniChefV2.sol";
-import "../../interfaces/IRewarder.sol";
-import "../../interfaces/IWMATIC.sol";
-import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import '../../interfaces/IUniswapV2Pair.sol';
+import '../../interfaces/IUniswapV2Router.sol';
+import '../../interfaces/IMiniChefV2.sol';
+import '../../interfaces/IRewarder.sol';
+import '../../interfaces/IWMATIC.sol';
+import '@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol';
+import '@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol';
+import '@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol';
+import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 
 contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -93,7 +93,7 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
 
     // ============ Methods ============
 
-    function initialize( address _lpPair, address _assetRouter) external initializer {
+    function initialize(address _lpPair, address _assetRouter) external initializer {
         assetRouter = _assetRouter;
 
         pid = getPid(_lpPair);
@@ -128,7 +128,7 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
             (sentA, sentB, addedLiquidity) = sushiswapRouter.addLiquidity(tokenA, tokenB, amountA, amountB, 0, 0, address(this), block.timestamp + 600);
         }
         liquidity = addedLiquidity + amountLP;
-        require(liquidity > 0, "NO_LIQUIDITY_PROVIDED");
+        require(liquidity > 0, 'NO_LIQUIDITY_PROVIDED');
 
         _mint(liquidity, recipient);
             
@@ -141,7 +141,7 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
      * @dev Withdraws funds from {origin} and sends them to the {recipient}.
      */
     function withdraw(address origin, uint256 amount, bool withdrawLP, address recipient) external nonReentrant onlyAssetRouter returns(uint256 amountA, uint256 amountB){
-        require(amount > 0, "INSUFFICIENT_AMOUNT");
+        require(amount > 0, 'INSUFFICIENT_AMOUNT');
 
         _burn(amount, origin);
 
@@ -201,7 +201,7 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
      * @dev Sets {expectedReward} and {expectedRewardBlock} for token distribution calculation.
      */
     function setExpectedReward(uint256 _amount, uint256 _block) external onlyAssetRouter{
-        require(_block > block.number, "WRONG_BLOCK");
+        require(_block > block.number, 'WRONG_BLOCK');
         _setExpectedReward(_amount, _block);
     }
 
@@ -340,7 +340,7 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
                 break;
             }
         }
-        require(poolExists, "PID_NOT_EXISTS");
+        require(poolExists, 'PID_NOT_EXISTS');
         return _pid;
     }
 }

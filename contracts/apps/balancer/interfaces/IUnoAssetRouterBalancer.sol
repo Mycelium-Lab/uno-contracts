@@ -4,8 +4,10 @@ pragma experimental ABIEncoderV2;
 
 import '../../../interfaces/IUnoFarmFactory.sol';
 import '../../../interfaces/IUnoAccessManager.sol'; 
+import '../../../interfaces/MerkleOrchard.sol'; 
+import '../../../interfaces/IVault.sol'; 
 
-interface IUnoAssetRouterSushiswap {
+interface IUnoAssetRouterBalancer {
     event Deposit(address indexed lpPool, address indexed from, address indexed recipient, uint256 amount);
     event Withdraw(address indexed lpPool, address indexed from, address indexed recipient, uint256 amount);
     event Distribute(address indexed lpPool, uint256 reward);
@@ -15,21 +17,23 @@ interface IUnoAssetRouterSushiswap {
 
     function initialize(address _accessManager, address _farmFactory) external;
 
-    function deposit(uint256 amountA, uint256 amountB, uint256 amountLP, address lpPair, address recipient) external returns(uint256 sentA, uint256 sentB, uint256 liquidity);
-    function withdraw(address lpPair, uint256 amount, bool withdrawLP, address recipient) external returns(uint256 amountA, uint256 amountB);
+    function deposit(uint256[] memory amounts, address[] memory tokens, uint256 amountLP, address lpPair, address recipient) external returns(uint256 liquidity);
+    function withdraw(address lpPair, uint256 amount, bool withdrawLP, address recipient) external;
 
     function setExpectedReward(address lpPair, uint256 expectedReward, uint256 expectedRewardBlock) external;
     function distribute(
         address lpPair,
-        address[] calldata rewarderTokenToTokenARoute,
-        address[] calldata rewarderTokenToTokenBRoute,
-        address[] calldata rewardTokenToTokenARoute,
-        address[] calldata rewardTokenToTokenBRoute
+        MerkleOrchard.Claim[] memory claims,
+        IERC20[] memory rewardTokens,
+        IVault.BatchSwapStep[][] memory swaps,
+        IAsset[][] memory assets,
+        IVault.FundManagement[] memory funds,
+        int256[][] memory limits
     ) external;
 
    
-    function userStake(address _address, address lpPair) external view returns (uint256 stakeLP, uint256 stakeA, uint256 stakeB);
-    function totalDeposits(address lpPair) external view returns (uint256 totalDepositsLP, uint256 totalDepositsA, uint256 totalDepositsB);
+    function userStake(address _address, address lpPair) external view returns (uint256);
+    function totalDeposits(address lpPair) external view returns (uint256);
 
     function paused() external view returns(bool);
     function pause() external;
