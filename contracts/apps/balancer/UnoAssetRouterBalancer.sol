@@ -17,7 +17,7 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
 
     /**
      * @dev Contract Variables:
-     * farmFactory - The contract that deploys new Farms and links them to {lpStakingPool}s.
+     * farmFactory - The contract that deploys new Farms and links them to {lpPair}s.
      * accessManager - Role manager contract.
      */
     IUnoFarmFactory public farmFactory;

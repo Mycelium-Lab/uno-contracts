@@ -164,10 +164,16 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
 
         gauge.claim_rewards();
 
-        for (uint256 i = 0; i < streamer.reward_count(); i++) {
+        require((swaps.length == streamer.reward_count()) && (swaps.length == assets.length) && (swaps.length == limits.length), 'PARAMS_LENGTHS_NOT_MATCH_REWARD_COUNT');
+
+        for (uint256 i = 0; i < swaps.length; i++) {
+            require(swaps[i][0].assetInIndex == 0, 'BAD_SWAPS_TOKEN_ORDERING');
+
             IERC20 rewardToken = IERC20(streamer.reward_tokens(i));
+            require(address(assets[i][0]) == address(rewardToken), 'ASSET_NOT_REWARD');
+
             uint256 rewardTokenBalance = rewardToken.balanceOf(address(this));
-            if (rewardTokenBalance > 0) {
+            if (rewardTokenBalance > 0 && (address(assets[i][0]) != address(gauge))) {
                 swaps[i][0].amount = rewardTokenBalance;
                 rewardToken.approve(address(Vault), rewardTokenBalance);
                 Vault.batchSwap(
