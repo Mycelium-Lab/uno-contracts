@@ -14,25 +14,37 @@
 
 All contracts are deployed on the Polygon(Matic) Blockchain
 
-### Helper Contracts
-
-#### UnoInfo
-0xCeF69B937EC25F95b75A6fb7A38E4972E6Dc5051
+### UnoAccessManager
+0xa6248a24DD99f4164E05B529CE06A94842a995ec
 
 ## Quickswap
 
-#### quickswapFarmFactoryBeacon
-0x33Ef8918f8871A5b5b36c3df6Bcaf0FEe39aAAD6
+#### UnoAssetRouterQuickswap
+0xf1795557F0098185de807B39B97Aa52Df9827B8B
 
-#### quickswapDualFarmFactoryBeacon
-0xF635DB454B99057EC340A8DF5f8996662612dBD2
+#### UnoFarmFactory
+0xEa7a2B4051F07618BFAdB68adc4A1870398B4907
+
+## Quickswap Dual
+
+#### UnoAssetRouterQuickswapDual
+0x8aDAcA4a84616301381fe2b998f48514Bcb8aDdE
+
+#### UnoFarmFactory
+0x8c7A4b6B5eB1bb8244295Ad2CDC9B93e1AbF9742
 
 ## Sushiswap
 
-#### sushiFarmFactoryBeacon
-0x3FA2cfdb68a8cC42dc255128370E4A83a1158CB6
+#### UnoAssetRouterSushiswap
+0x8ED101519a8929bf2966C5c59bc5eD97AdFDC818
+
+#### UnoFarmFactory
+0x96589b60b87B33Aa56451296Fb6de8A604453808
 
 ## Balancer
 
-#### balancerFarmFactoryBeacon
+#### UnoAssetRouterBalancer
 0x941071edC3c443784167333Cb5992c31bc553a95
+
+#### UnoFarmFactory
+0xaA93113F9666978a8c7869f916c78CD85f351694
