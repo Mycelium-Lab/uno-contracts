@@ -212,7 +212,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
      * @dev Sets {expectedReward} and {expectedRewardBlock} for token distribution calculation.
      */
     function setExpectedReward(uint256 _amount, uint256 _block) external onlyAssetRouter{
-        require(_block > block.number, 'WRONG_BLOCK');
+        require(_block > block.number, 'BLOCK_TOO_LOW');
         _setExpectedReward(_amount, _block);
     }
 
@@ -258,7 +258,10 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
         // User's new expected deposit age by the end of distribution period.
         uint256 userExpectedDepositAge = userDeposit[_address] * blocksTillReward + userDepositAge[_address];
         // User's expected reward by the end of distribution period.
-        uint256 userExpectedReward = expectedReward * userExpectedDepositAge / totalExpectedDepositAge;
+        uint256 userExpectedReward = 0;
+        if(totalExpectedDepositAge > 0){
+            userExpectedReward = expectedReward * userExpectedDepositAge / totalExpectedDepositAge;
+        }
         // User's estimated share after the next reward.
         uint256 userNewShare = fractionMultiplier * (userDeposit[_address] + userExpectedReward) / (totalDeposits + expectedReward);
         // Amount of shares to mint.
@@ -293,7 +296,10 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
         // User's new expected deposit age by the end of distribution period.
         uint256 userExpectedDepositAge = userDeposit[_address] * blocksTillReward + userDepositAge[_address];
         // User's expected reward by the end of distribution period.
-        uint256 userExpectedReward = expectedReward * userExpectedDepositAge / totalExpectedDepositAge;
+        uint256 userExpectedReward = 0;
+        if(totalExpectedDepositAge > 0){
+            userExpectedReward = expectedReward * userExpectedDepositAge / totalExpectedDepositAge;
+        }
         // User's estimated share after the next reward.
         uint256 userNewShare = fractionMultiplier * (userDeposit[_address] + userExpectedReward) / (totalDeposits + expectedReward);
         // Amount of shares to burn.
@@ -327,7 +333,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
     }
 
     function getBlocksTillReward() internal view returns(uint256 blocksTillReward) {
-        if(expectedRewardBlock > block.number){
+        if(expectedRewardBlock >= block.number){
             blocksTillReward = expectedRewardBlock - block.number;
         } else {
             blocksTillReward = lastDistributionPeriod / 2;

@@ -1,6 +1,8 @@
 const { deployProxy } = require('@openzeppelin/truffle-upgrades')
 const AccessManager = artifacts.require('UnoAccessManager')
 const FarmFactory = artifacts.require('UnoFarmFactory')
+const { promises : fs } = require("fs")
+const path = require("path")
 
 const {distributor, pauser} = require('./addresses/addresses')
 
@@ -19,7 +21,8 @@ module.exports = async function (deployer, network, accounts) {
   )
   // Deploy Factory
   await deployer.deploy(FarmFactory, Farm.address, AccessManager.address, assetRouter.address)
- 
+  await addFactoryAddress(FarmFactory.address)
+
   const accessManager = await AccessManager.deployed()
   //DISTRIBUTOR_ROLE
   const distributorHasRole = await accessManager.hasRole('0xfbd454f36a7e1a388bd6fc3ab10d434aa4578f811acbbcf33afb1c697486313c', distributor)
@@ -35,4 +38,12 @@ module.exports = async function (deployer, network, accounts) {
   }
  
   console.log('Deployed', assetRouter.address)
+}
+
+async function addFactoryAddress(address){
+  const data = await fs.readFile(path.resolve(__dirname, './addresses/factories.json'))
+  var json = JSON.parse(data)
+
+  json.sushiswap = address
+  await fs.writeFile(path.resolve(__dirname, './addresses/factories.json'), JSON.stringify(json))
 }
