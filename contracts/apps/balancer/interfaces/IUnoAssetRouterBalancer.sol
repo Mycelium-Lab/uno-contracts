@@ -19,12 +19,11 @@ interface IUnoAssetRouterBalancer {
     function deposit(uint256[] memory amounts, address[] memory tokens, uint256 amountLP, address lpPair, address recipient) external returns(uint256 liquidity);
     function withdraw(address lpPair, uint256 amount, bool withdrawLP, address recipient) external;
 
-    function setExpectedReward(address lpPair, uint256 expectedReward, uint256 expectedRewardBlock) external;
-      function distribute(
-        address lpPair,
-        IVault.BatchSwapStep[][] memory swaps,
-        IAsset[][] memory assets,
-        int256[][] memory limits
+    function distribute(
+      address lpPair,
+      IVault.BatchSwapStep[][] memory swaps,
+      IAsset[][] memory assets,
+      int256[][] memory limits
     ) external;
 
    

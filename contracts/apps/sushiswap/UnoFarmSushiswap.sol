@@ -13,6 +13,32 @@ import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 
 contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
+    /**
+     * @dev DistributionInfo:
+     * {_block} - Distribution block number.
+     * {rewardPerTotalDepositAge} - Distribution reward divided by {totalDepositAge}. 
+     * {cumulativeRewardAgePerTotalDepositAge} - Sum of {rewardPerTotalDepositAge}s multiplied by distribution interval.
+     */
+    struct DistributionInfo {
+        uint256 _block;
+        uint256 rewardPerTotalDepositAge;
+        uint256 cumulativeRewardAgePerTotalDepositAge;
+    }
+    /**
+     * @dev UserInfo:
+     * {stake} - Amount of LP tokens deposited by the user.
+     * {depositAge} - User deposits multiplied by blocks the deposit has been in. 
+     * {reward} - Amount of LP tokens entitled to the user.
+     * {lastDistribution} - Distribution ID before the last user deposit.
+     * {lastUpdate} - Deposit update block.
+     */
+    struct UserInfo {
+        uint256 stake;
+        uint256 depositAge;
+        uint256 reward;
+        uint32 lastDistribution;
+        uint256 lastUpdate;
+    }
 
     /**
      * @dev Tokens Used:
@@ -39,47 +65,27 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
      * @dev Contract Variables:
      * {pid} - Pool ID.
 
-     * {totalShares} - Total shares.
-     * {sharesOf} - User shares. Represents what share of this pool the user owns.
-
-     * {expectedRewardBlock} - Block on which the next distribution is expected to be called.
-     * {expectedReward} - Expected reward which will be produced by the next distribution.
-     
-     * {lastRewardBlock} - Last reward block. Updates every distribution.
-     * {lastDistributionPeriod} - Last distribution period. Is used to approximate next reward block.
-
-     * {userDeposit} - Deposits made by users.
-     * {userDepositAge} - Deposit multiplied by blocks the deposit has been in. Flushes every reward distribution.
-     * {userDALastUpdated} - Last deposit age calculation block for user.
-     * {userDepositChanged} - 'true' if user has made deposit this distribution period. Flushes every reward distribution.
-     
      * {totalDeposits} - Total deposits made by users.
-     * {totalDepositAge} - Deposits multiplied by blocks the deposit has been in. Flushes every reward distribution.
-     * {totalDALastUpdated} - Last deposit age calculation block.
+     * {totalDepositAge} - Deposits multiplied by blocks the deposit has been in. Flushed every reward distribution.
+     * {totalDepositLastUpdate} - Last {totalDepositAge} update block.
 
-     * {fractionMultiplier} - Used as multiplier to store decimal values.
+     * {distributionID} - Current distribution ID.
+     * {userInfo} - Info on each user.
+     * {distributionInfo} - Info on each distribution.
+
+     * {fractionMultiplier} - Used to store decimal values.
      */
     uint256 public pid;
 
-    uint256 private totalShares;
-    mapping(address => uint256) private sharesOf;
-
-    uint256 private expectedRewardBlock;
-    uint256 private expectedReward;
-
-    uint256 private lastRewardBlock;
-    uint256 private lastDistributionPeriod;
-
-    mapping(address => uint256) private userDeposit;
-    mapping(address => uint256) private userDepositAge;
-    mapping(address => uint256) private userDALastUpdated;
-    mapping(address => mapping(uint256 => bool)) private userDepositChanged;
-
-    uint256 public totalDeposits;
+    uint256 private totalDeposits;
     uint256 private totalDepositAge;
-    uint256 private totalDALastUpdated;
+    uint256 private totalDepositLastUpdate;
 
-    uint256 private constant fractionMultiplier = 10**18;
+    uint32 private distributionID;
+    mapping(address => UserInfo) private userInfo;
+    mapping(uint32 => DistributionInfo) private distributionInfo;
+
+    uint256 private constant fractionMultiplier = uint256(1 ether);
 
     /**
      * @dev Contract Variables:
@@ -106,6 +112,10 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
         tokenA = IUniswapV2Pair(lpPair).token0();
         tokenB = IUniswapV2Pair(lpPair).token1();
 
+        distributionInfo[0] = DistributionInfo(block.number, 0, 0);
+        distributionID = 1;
+        totalDepositLastUpdate = block.number;
+
         uint256 MAX_UINT = uint256(2**256 - 1);
         IERC20(lpPair).approve(address(MiniChef), MAX_UINT);
         IERC20(lpPair).approve(address(sushiswapRouter), MAX_UINT);
@@ -114,8 +124,6 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
         IERC20(tokenA).approve(address(sushiswapRouter), MAX_UINT);
         IERC20(tokenB).approve(address(sushiswapRouter), MAX_UINT);
 
-        lastRewardBlock = block.number;
-        lastDistributionPeriod = 1200000; // This is somewhere around 1 month at the time of writing this contract.
     }
 
     /**
@@ -130,7 +138,9 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
         liquidity = addedLiquidity + amountLP;
         require(liquidity > 0, 'NO_LIQUIDITY_PROVIDED');
 
-        _mint(liquidity, recipient);
+        _updateDeposit(recipient);
+        userInfo[recipient].stake += liquidity;
+        totalDeposits += liquidity;
             
         MiniChef.deposit(pid, liquidity, address(this));
         IERC20Upgradeable(tokenA).safeTransfer(recipient, amountA - sentA);
@@ -143,7 +153,16 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
     function withdraw(address origin, uint256 amount, bool withdrawLP, address recipient) external nonReentrant onlyAssetRouter returns(uint256 amountA, uint256 amountB){
         require(amount > 0, 'INSUFFICIENT_AMOUNT');
 
-        _burn(amount, origin);
+        _updateDeposit(origin);
+        UserInfo storage user = userInfo[origin];
+        // Subtract amount from user.reward first, then subtract remainder from user.stake.
+        if(amount > user.reward){
+            user.stake = user.stake + user.reward - amount;
+            totalDeposits = totalDeposits + user.reward - amount;
+            user.reward = 0;
+        } else {
+            user.reward -= amount;
+        }
 
         MiniChef.withdraw(pid, amount, address(this));
         if(withdrawLP){
@@ -159,173 +178,105 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
      * 2. It swaps {rewardToken} token for {tokenA} & {tokenB}.
      * 3. It deposits new LP tokens back to the {MiniChef}.
      */
-    function distribute(address[] calldata rewarderTokenToTokenARoute, address[] calldata rewarderTokenToTokenBRoute, address[] calldata rewardTokenToTokenARoute, address[] calldata rewardTokenToTokenBRoute) external onlyAssetRouter nonReentrant returns(uint256 reward){
+    function distribute(address[] calldata rewardTokenToTokenARoute, address[] calldata rewardTokenToTokenBRoute, address[] calldata rewarderTokenToTokenARoute, address[] calldata rewarderTokenToTokenBRoute, uint256[4] memory amountsOutMin) external onlyAssetRouter nonReentrant returns(uint256 reward){
         require(totalDeposits > 0, 'NO_LIQUIDITY');
+        require(rewardTokenToTokenARoute[0] == rewardToken && rewardTokenToTokenARoute[rewardTokenToTokenARoute.length - 1] == tokenA, 'BAD_REWARD_TOKEN_A_ROUTE');
+        require(rewardTokenToTokenBRoute[0] == rewardToken && rewardTokenToTokenBRoute[rewardTokenToTokenBRoute.length - 1] == tokenB, 'BAD_REWARD_TOKEN_B_ROUTE');
+        require(rewarderTokenToTokenARoute[0] == rewarderToken && rewarderTokenToTokenARoute[rewarderTokenToTokenARoute.length - 1] == tokenA, 'BAD_REWARDER_TOKEN_A_ROUTE');
+        require(rewarderTokenToTokenBRoute[0] == rewarderToken && rewarderTokenToTokenBRoute[rewarderTokenToTokenBRoute.length - 1] == tokenB, 'BAD_REWARDER_TOKEN_B_ROUTE');
 
         MiniChef.harvest(pid, address(this));
-        uint256 rewarderTokenHalf = IERC20(rewarderToken).balanceOf(address(this)) / 2;
-        uint256 rewardTokenHalf = IERC20(rewardToken).balanceOf(address(this)) / 2;
-
         uint256 deadline = block.timestamp + 600;
-        
-        if (tokenA != rewarderToken) {
-            sushiswapRouter.swapExactTokensForTokens(rewarderTokenHalf, 0, rewarderTokenToTokenARoute, address(this), deadline);
-        }
-
-        if (tokenB != rewarderToken) {
-            sushiswapRouter.swapExactTokensForTokens(rewarderTokenHalf, 0, rewarderTokenToTokenBRoute, address(this), deadline);
-        }
-
+        { // scope to avoid stack too deep errors
+        uint256 rewardTokenHalf = IERC20(rewardToken).balanceOf(address(this)) / 2;
         if (tokenA != rewardToken) {
-            sushiswapRouter.swapExactTokensForTokens(rewardTokenHalf, 0, rewardTokenToTokenARoute, address(this), deadline);
+            sushiswapRouter.swapExactTokensForTokens(rewardTokenHalf, amountsOutMin[0], rewardTokenToTokenARoute, address(this), deadline);
         }
 
         if (tokenB != rewardToken) {
-            sushiswapRouter.swapExactTokensForTokens(rewardTokenHalf, 0, rewardTokenToTokenBRoute, address(this), deadline);
+            sushiswapRouter.swapExactTokensForTokens(rewardTokenHalf, amountsOutMin[1], rewardTokenToTokenBRoute, address(this), deadline);
+        }
         }
 
-        sushiswapRouter.addLiquidity(tokenA, tokenB, IERC20(tokenA).balanceOf(address(this)), IERC20(tokenB).balanceOf(address(this)), 1, 1, address(this), deadline);
-
-        reward = IERC20(lpPair).balanceOf(address(this));
-        if (reward > 0) {
-            totalDeposits += reward;
-            MiniChef.deposit(pid, reward, address(this));
+        { // scope to avoid stack too deep errors
+        uint256 rewarderTokenHalf = IERC20(rewarderToken).balanceOf(address(this)) / 2;
+        if (tokenA != rewarderToken) {
+            sushiswapRouter.swapExactTokensForTokens(rewarderTokenHalf, amountsOutMin[2], rewarderTokenToTokenARoute, address(this), deadline);
         }
 
-        lastDistributionPeriod = block.number - lastRewardBlock;
-        _setExpectedReward(reward, block.number + lastDistributionPeriod);
-        lastRewardBlock = block.number;
-    }
+        if (tokenB != rewarderToken) {
+            sushiswapRouter.swapExactTokensForTokens(rewarderTokenHalf, amountsOutMin[3], rewarderTokenToTokenBRoute, address(this), deadline);
+        }
+        }
 
-    /**
-     * @dev Sets {expectedReward} and {expectedRewardBlock} for token distribution calculation.
-     */
-    function setExpectedReward(uint256 _amount, uint256 _block) external onlyAssetRouter{
-        require(_block > block.number, 'WRONG_BLOCK');
-        _setExpectedReward(_amount, _block);
-    }
+        (,,reward) = sushiswapRouter.addLiquidity(tokenA, tokenB, IERC20(tokenA).balanceOf(address(this)), IERC20(tokenB).balanceOf(address(this)), 1, 1, address(this), deadline);
+        
+        uint256 rewardPerTotalDepositAge = reward * fractionMultiplier / (totalDepositAge + totalDeposits * (block.number - totalDepositLastUpdate));
+        uint256 cumulativeRewardAgePerTotalDepositAge = distributionInfo[distributionID - 1].cumulativeRewardAgePerTotalDepositAge + rewardPerTotalDepositAge * (block.number - distributionInfo[distributionID - 1]._block);
 
+        distributionInfo[distributionID] = DistributionInfo(
+            block.number,
+            rewardPerTotalDepositAge,
+            cumulativeRewardAgePerTotalDepositAge
+        );
+
+        distributionID += 1;
+        totalDepositLastUpdate = block.number;
+        totalDepositAge = 0;
+            
+        MiniChef.deposit(pid, reward, address(this));
+    }
 
     /**
      * @dev Returns total funds staked by the {_address}.
      */
-    function userBalance(address _address) public view returns (uint256) {
-        if (userDepositChanged[_address][lastRewardBlock]) {
-            return userDeposit[_address];
-        } else {
-            if (totalShares == 0) {
-                return 0;
-            }
-            return totalDeposits * sharesOf[_address] / totalShares;
+    function userBalance(address _address) external view returns (uint256) {
+        return userInfo[_address].stake + userReward(_address);
+    }
+
+    /**
+     * @dev Returns total funds locked in the farm.
+     */
+    function getTotalDeposits() external view returns (uint256 _totalDeposits) {
+        if(totalDeposits > 0){
+            (_totalDeposits,) = MiniChef.userInfo(pid, address(this));
         }
     }
     
-    function _mint(uint256 amount, address _address) internal {
-        _updateDeposit(_address);
-        uint256 blocksTillReward = getBlocksTillReward();
-        // Total deposit age we expected by the end of distribution period before this deposit.
-        uint256 totalExpectedDepositAgePrev = totalDeposits * blocksTillReward + totalDepositAge;
-        // New expected total deposit age.
-        uint256 totalExpectedDepositAge = amount * blocksTillReward + totalExpectedDepositAgePrev;
-        // Update deposit amounts.
-        userDeposit[_address] += amount;
-        totalDeposits += amount;
-        // Expected reward will increase proportionally to the increase of total expected deposit age.
-        if (totalExpectedDepositAgePrev > 0) {
-            expectedReward = expectedReward * totalExpectedDepositAge / totalExpectedDepositAgePrev;
-        }
-
-        if (totalShares == 0) {
-            sharesOf[_address] += fractionMultiplier;
-            totalShares += fractionMultiplier;
-            return;
-        }
-        if (sharesOf[_address] == totalShares) {
-            // Don't do anything if the user owns 100% of the pool.
-            return;
-        }
-        // User's new expected deposit age by the end of distribution period.
-        uint256 userExpectedDepositAge = userDeposit[_address] * blocksTillReward + userDepositAge[_address];
-        // User's expected reward by the end of distribution period.
-        uint256 userExpectedReward = expectedReward * userExpectedDepositAge / totalExpectedDepositAge;
-        // User's estimated share after the next reward.
-        uint256 userNewShare = fractionMultiplier * (userDeposit[_address] + userExpectedReward) / (totalDeposits + expectedReward);
-        // Amount of shares to mint.
-        uint256 mintAmount = fractionMultiplier * (userNewShare * totalShares / fractionMultiplier - sharesOf[_address]) / (fractionMultiplier - userNewShare);
-
-        sharesOf[_address] += mintAmount;
-        totalShares += mintAmount;
-    }
-
-    function _burn(uint256 amount, address _address) internal {
-        _updateDeposit(_address);
-        uint256 blocksTillReward = getBlocksTillReward();
-        // Total deposit age we expected by the end of distribution period before this withdrawal.
-        uint256 totalExpectedDepositAgePrev = totalDeposits * blocksTillReward + totalDepositAge;
-        // New expected total deposit age.
-        uint256 totalExpectedDepositAge = totalExpectedDepositAgePrev - amount * blocksTillReward;
-        // Update deposit amounts.
-        userDeposit[_address] -= amount;
-        totalDeposits -= amount;
-        // Expected reward will decrease proportionally to the decrease of total expected deposit age.
-        expectedReward = expectedReward * totalExpectedDepositAge / totalExpectedDepositAgePrev;
-
-        if(userDeposit[_address] == 0){
-            totalShares = totalShares - sharesOf[_address];
-            sharesOf[_address] = 0;
-            return;
-        }
-        if (sharesOf[_address] == totalShares) {
-            // Don't do anything if the user owns 100% of the pool.
-            return;
-        }
-        // User's new expected deposit age by the end of distribution period.
-        uint256 userExpectedDepositAge = userDeposit[_address] * blocksTillReward + userDepositAge[_address];
-        // User's expected reward by the end of distribution period.
-        uint256 userExpectedReward = expectedReward * userExpectedDepositAge / totalExpectedDepositAge;
-        // User's estimated share after the next reward.
-        uint256 userNewShare = fractionMultiplier * (userDeposit[_address] + userExpectedReward) / (totalDeposits + expectedReward);
-        // Amount of shares to burn.
-        uint256 burnAmount = fractionMultiplier * (sharesOf[_address] - userNewShare * totalShares / fractionMultiplier) / (fractionMultiplier - userNewShare);
-        
-        sharesOf[_address] -= burnAmount;
-        totalShares -= burnAmount;
-    }
-
     function _updateDeposit(address _address) internal {
+        UserInfo storage user = userInfo[_address];
         // Accumulate deposit age within the current distribution period.
-        if (userDepositChanged[_address][lastRewardBlock]) {
+        if (user.lastDistribution == distributionID) {
             // Add deposit age from previous deposit age update to now.
-            userDepositAge[_address] += (block.number - userDALastUpdated[_address]) * userDeposit[_address];
+            user.depositAge += user.stake * (block.number - user.lastUpdate);
         } else {
-            // A reward has been distributed, update user deposit.
-            userDeposit[_address] = userBalance(_address);
+            // A reward has been distributed, update user.reward.
+            user.reward = userReward(_address);
             // Count fresh deposit age from previous reward distribution to now.
-            userDepositAge[_address] = (block.number - lastRewardBlock) * userDeposit[_address];
-            userDepositChanged[_address][lastRewardBlock] = true;
+            user.depositAge = user.stake * (block.number - distributionInfo[distributionID - 1]._block);
         }
+
+        user.lastDistribution = distributionID;
+        user.lastUpdate = block.number;
+
         // Same with total deposit age.
-        if (totalDALastUpdated > lastRewardBlock) {
-            totalDepositAge += (block.number - totalDALastUpdated) * totalDeposits;
-        } else {
-            totalDepositAge = (block.number - lastRewardBlock) * totalDeposits;
-        }
-
-        userDALastUpdated[_address] = block.number;
-        totalDALastUpdated = block.number;
+        totalDepositAge += (block.number - totalDepositLastUpdate) * totalDeposits;
+        totalDepositLastUpdate = block.number;
     }
 
-    function getBlocksTillReward() internal view returns(uint256 blocksTillReward) {
-        if(expectedRewardBlock > block.number){
-            blocksTillReward = expectedRewardBlock - block.number;
-        } else {
-            blocksTillReward = lastDistributionPeriod / 2;
+    function userReward(address _address) internal view returns (uint256) {
+        UserInfo memory user = userInfo[_address];
+        if (user.lastDistribution == distributionID) {
+            // Return user.reward if the distribution after the last user deposit did not happen yet.
+            return user.reward;
         }
-    }
-
-    function _setExpectedReward(uint256 _amount, uint256 _block) internal {
-        expectedReward = _amount;
-        expectedRewardBlock = _block;
+        DistributionInfo memory lastUserDistributionInfo = distributionInfo[user.lastDistribution];
+        uint256 userDepositAge = user.depositAge + user.stake * (lastUserDistributionInfo._block - user.lastUpdate);
+        // Calculate reward between the last user deposit and the distribution after that.
+        uint256 rewardBeforeDistibution = userDepositAge * lastUserDistributionInfo.rewardPerTotalDepositAge / fractionMultiplier;
+        // Calculate reward from the distributions that have happened after the last user deposit.
+        uint256 rewardAfterDistribution = user.stake * (distributionInfo[distributionID - 1].cumulativeRewardAgePerTotalDepositAge - lastUserDistributionInfo.cumulativeRewardAgePerTotalDepositAge) / fractionMultiplier;
+        return user.reward + rewardBeforeDistibution + rewardAfterDistribution;
     }
 
     /**

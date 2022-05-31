@@ -16,14 +16,13 @@ interface IUnoFarmSushiswap {
     function withdraw(address origin, uint256 amount, bool withdrawLP, address recipient) external returns(uint256 amountA, uint256 amountB);
 
     function distribute(
+        address[] calldata rewardTokenToTokenARoute,
+        address[] calldata rewardTokenToTokenBRoute, 
         address[] calldata rewarderTokenToTokenARoute,
         address[] calldata rewarderTokenToTokenBRoute,
-        address[] calldata rewardTokenToTokenARoute,
-        address[] calldata rewardTokenToTokenBRoute
+        uint256[4] memory amountsOutMin
     ) external returns(uint256 reward);
-    
-    function setExpectedReward(uint256 _amount, uint256 _block) external;
 
     function userBalance(address _address) external view returns (uint256);
-    function totalDeposits() external view returns (uint256);
+    function getTotalDeposits() external view returns (uint256);
 }

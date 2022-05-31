@@ -101,37 +101,24 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
     }
 
     /**
-     * @dev Sets expected reward amount and block for token distribution calculations. 
-     * @param lpStakingPool - LP pool to update.
-     * @param expectedReward - New reward amount.
-     * @param expectedRewardBlock - New reward block.
-     *
-     * Note: This function can only be called by the distributor.
-     */  
-    function setExpectedReward(address lpStakingPool, uint256 expectedReward, uint256 expectedRewardBlock) external onlyDistributor {
-        Farm farm = Farm(farmFactory.Farms(lpStakingPool));
-        require(farm != Farm(address(0)), 'FARM_NOT_EXISTS');
-        
-        farm.setExpectedReward(expectedReward, expectedRewardBlock); 
-    }
-
-    /**
      * @dev Distributes tokens between users. Emits a {Distribute} event.
      * @param lpStakingPool - LP pool to distribute tokens in.
      * @param rewardTokenToTokenARoute An array of token addresses.
      * @param rewardTokenToTokenBRoute An array of token addresses.
+     * @param amountsOutMin The minimum amount of output tokens that must be received for the transaction not to revert.
      *
      * Note: This function can only be called by the distributor.
      */ 
     function distribute(
         address lpStakingPool,
         address[] calldata rewardTokenToTokenARoute, 
-        address[] calldata rewardTokenToTokenBRoute
+        address[] calldata rewardTokenToTokenBRoute, 
+        uint256[2] memory amountsOutMin
     ) external whenNotPaused onlyDistributor {
         Farm farm = Farm(farmFactory.Farms(lpStakingPool));
         require(farm != Farm(address(0)), 'FARM_NOT_EXISTS');
 
-        uint256 reward = farm.distribute(rewardTokenToTokenARoute, rewardTokenToTokenBRoute);
+        uint256 reward = farm.distribute(rewardTokenToTokenARoute, rewardTokenToTokenBRoute, amountsOutMin);
         emit Distribute(lpStakingPool, reward);
     }
 
@@ -164,7 +151,7 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
     function totalDeposits(address lpStakingPool) external view returns (uint256 totalDepositsLP, uint256 totalDepositsA, uint256 totalDepositsB) {
         Farm farm = Farm(farmFactory.Farms(lpStakingPool));
         if (farm != Farm(address(0))) {
-            totalDepositsLP = farm.totalDeposits();
+            totalDepositsLP = farm.getTotalDeposits();
             address lpPair = farm.lpPair();
             (totalDepositsA, totalDepositsB) = getTokenStake(lpPair, totalDepositsLP);
         }

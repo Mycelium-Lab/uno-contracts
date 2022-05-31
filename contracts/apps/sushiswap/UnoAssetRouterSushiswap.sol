@@ -101,41 +101,28 @@ contract UnoAssetRouterSushiswap is Initializable, PausableUpgradeable, UUPSUpgr
     }
 
     /**
-     * @dev Sets expected reward amount and block for token distribution calculations. 
-     * @param lpPair - LP pool to update.
-     * @param expectedReward - New reward amount.
-     * @param expectedRewardBlock - New reward block.
-     *
-     * Note: This function can only be called by the distributor.
-     */  
-    function setExpectedReward(address lpPair, uint256 expectedReward, uint256 expectedRewardBlock) external onlyDistributor {
-        Farm farm = Farm(farmFactory.Farms(lpPair));
-        require(farm != Farm(address(0)), 'FARM_NOT_EXISTS');
-        
-        farm.setExpectedReward(expectedReward, expectedRewardBlock); 
-    }
-
-    /**
      * @dev Distributes tokens between users.
      * @param lpPair - LP pool to distribute tokens in.
-     * @param rewarderTokenToTokenARoute An array of token addresses.
-     * @param rewarderTokenToTokenBRoute An array of token addresses.
      * @param rewardTokenToTokenARoute An array of token addresses.
      * @param rewardTokenToTokenBRoute An array of token addresses.
+     * @param rewarderTokenToTokenARoute An array of token addresses.
+     * @param rewarderTokenToTokenBRoute An array of token addresses.
+     * @param amountsOutMin The minimum amount of output tokens that must be received for the transaction not to revert.
      *
      * Note: This function can only be called by the distributor.
      */ 
     function distribute(
         address lpPair,
+        address[] calldata rewardTokenToTokenARoute,
+        address[] calldata rewardTokenToTokenBRoute, 
         address[] calldata rewarderTokenToTokenARoute,
         address[] calldata rewarderTokenToTokenBRoute,
-        address[] calldata rewardTokenToTokenARoute,
-        address[] calldata rewardTokenToTokenBRoute
+        uint256[4] memory amountsOutMin
     ) external whenNotPaused onlyDistributor {
         Farm farm = Farm(farmFactory.Farms(lpPair));
         require(farm != Farm(address(0)), 'FARM_NOT_EXISTS');
 
-        uint256 reward = farm.distribute(rewarderTokenToTokenARoute, rewarderTokenToTokenBRoute, rewardTokenToTokenARoute, rewardTokenToTokenBRoute);
+        uint256 reward = farm.distribute(rewardTokenToTokenARoute, rewardTokenToTokenBRoute, rewarderTokenToTokenARoute, rewarderTokenToTokenBRoute, amountsOutMin);
         emit Distribute(lpPair, reward);
     }
 
@@ -167,7 +154,7 @@ contract UnoAssetRouterSushiswap is Initializable, PausableUpgradeable, UUPSUpgr
     function totalDeposits(address lpPair) external view returns (uint256 totalDepositsLP, uint256 totalDepositsA, uint256 totalDepositsB) {
         Farm farm = Farm(farmFactory.Farms(lpPair));
         if (farm != Farm(address(0))) {
-            totalDepositsLP = farm.totalDeposits();
+            totalDepositsLP = farm.getTotalDeposits(); 
             (totalDepositsA, totalDepositsB) = getTokenStake(lpPair, totalDepositsLP);
         }
     }

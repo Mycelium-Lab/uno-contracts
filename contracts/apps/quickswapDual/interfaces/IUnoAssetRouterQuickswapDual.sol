@@ -18,13 +18,13 @@ interface IUnoAssetRouterQuickswapDual {
     function deposit(uint256 amountA, uint256 amountB, uint256 amountLP, address lpStakingPool, address recipient) external returns(uint256 sentA, uint256 sentB, uint256 liquidity);
     function withdraw(address lpStakingPool, uint256 amount, bool withdrawLP, address recipient) external returns(uint256 amountA, uint256 amountB);
 
-    function setExpectedReward(address lpStakingPool, uint256 expectedReward, uint256 expectedRewardBlock) external;
     function distribute(
         address lpStakingPool,
         address[] calldata rewardTokenAToTokenARoute,
         address[] calldata rewardTokenAToTokenBRoute,
         address[] calldata rewardTokenBToTokenARoute,
-        address[] calldata rewardTokenBToTokenBRoute
+        address[] calldata rewardTokenBToTokenBRoute, 
+        uint256[4] memory amountsOutMin
     ) external;
 
    

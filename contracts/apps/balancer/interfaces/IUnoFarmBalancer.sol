@@ -18,10 +18,8 @@ interface IUnoFarmBalancer {
         IAsset[][] memory assets,
         int256[][] memory limits
     ) external returns(uint256 reward);
-    
-    function setExpectedReward(uint256 _amount, uint256 _block) external;
 
     function userBalance(address _address) external view returns (uint256);
-    function totalDeposits() external view returns (uint256);
+    function getTotalDeposits() external view returns (uint256);
 }
 

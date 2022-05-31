@@ -97,21 +97,6 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
     }
 
     /**
-     * @dev Sets expected reward amount and block for token distribution calculations. 
-     * @param lpPair - LP pool to update.
-     * @param expectedReward - New reward amount.
-     * @param expectedRewardBlock - New reward block.
-     *
-     * Note: This function can only be called by the distributor.
-     */  
-    function setExpectedReward(address lpPair, uint256 expectedReward, uint256 expectedRewardBlock) external onlyDistributor {
-        Farm farm = Farm(farmFactory.Farms(lpPair));
-        require(farm != Farm(address(0)), 'FARM_NOT_EXISTS');
-        
-        farm.setExpectedReward(expectedReward, expectedRewardBlock); 
-    }
-
-    /**
      * @dev Distributes tokens between users for a single {Farms[lpPair]}.
      * @param lpPair - The pool to distribute. 
      * @param swaps - The data used to swap reward tokens for the needed tokens.
@@ -157,7 +142,7 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
     function totalDeposits(address lpPair) external view returns (uint256) {
         Farm farm = Farm(farmFactory.Farms(lpPair));
         if (farm != Farm(address(0))) {
-            return farm.totalDeposits();
+            return farm.getTotalDeposits();
         }
         return 0;
     }

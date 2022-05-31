@@ -18,13 +18,13 @@ interface IUnoAssetRouterSushiswap {
     function deposit(uint256 amountA, uint256 amountB, uint256 amountLP, address lpPair, address recipient) external returns(uint256 sentA, uint256 sentB, uint256 liquidity);
     function withdraw(address lpPair, uint256 amount, bool withdrawLP, address recipient) external returns(uint256 amountA, uint256 amountB);
 
-    function setExpectedReward(address lpPair, uint256 expectedReward, uint256 expectedRewardBlock) external;
     function distribute(
         address lpPair,
+        address[] calldata rewardTokenToTokenARoute,
+        address[] calldata rewardTokenToTokenBRoute, 
         address[] calldata rewarderTokenToTokenARoute,
         address[] calldata rewarderTokenToTokenBRoute,
-        address[] calldata rewardTokenToTokenARoute,
-        address[] calldata rewardTokenToTokenBRoute
+        uint256[4] memory amountsOutMin
     ) external;
 
    

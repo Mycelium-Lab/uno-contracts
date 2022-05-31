@@ -18,11 +18,10 @@ interface IUnoFarmQuickswapDual {
         address[] calldata rewardTokenAToTokenARoute,
         address[] calldata rewardTokenAToTokenBRoute,
         address[] calldata rewardTokenBToTokenARoute,
-        address[] calldata rewardTokenBToTokenBRoute
+        address[] calldata rewardTokenBToTokenBRoute,
+        uint256[4] memory amountsOutMin
     ) external returns(uint256 reward);
     
-    function setExpectedReward(uint256 _amount, uint256 _block) external;
-
     function userBalance(address _address) external view returns (uint256);
-    function totalDeposits() external view returns (uint256);
+    function getTotalDeposits() external view returns (uint256);
 }

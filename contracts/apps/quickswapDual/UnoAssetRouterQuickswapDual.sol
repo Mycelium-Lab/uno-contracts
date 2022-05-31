@@ -100,21 +100,6 @@ contract UnoAssetRouterQuickswapDual is Initializable, PausableUpgradeable, UUPS
         emit Withdraw(lpStakingPool, msg.sender, recipient, amount);  
     }
 
-    /**
-     * @dev Sets expected reward amount and block for token distribution calculations. 
-     * @param lpStakingPool - LP pool to update.
-     * @param expectedReward - New reward amount.
-     * @param expectedRewardBlock - New reward block.
-     *
-     * Note: This function can only be called by the distributor.
-     */  
-    function setExpectedReward(address lpStakingPool, uint256 expectedReward, uint256 expectedRewardBlock) external onlyDistributor {
-        Farm farm = Farm(farmFactory.Farms(lpStakingPool));
-        require(farm != Farm(address(0)), 'FARM_NOT_EXISTS');
-        
-        farm.setExpectedReward(expectedReward, expectedRewardBlock); 
-    }
-
      /**
      * @dev Distributes tokens between users.
      * @param lpStakingPool - LP pool to distribute tokens in.
@@ -122,6 +107,7 @@ contract UnoAssetRouterQuickswapDual is Initializable, PausableUpgradeable, UUPS
      * @param rewardTokenAToTokenBRoute An array of token addresses.
      * @param rewardTokenBToTokenARoute An array of token addresses.
      * @param rewardTokenBToTokenBRoute An array of token addresses.
+     * @param amountsOutMin The minimum amount of output tokens that must be received for the transaction not to revert.
      *
      * Note: This function can only be called by the distributor.
      */ 
@@ -130,12 +116,13 @@ contract UnoAssetRouterQuickswapDual is Initializable, PausableUpgradeable, UUPS
         address[] calldata rewardTokenAToTokenARoute,
         address[] calldata rewardTokenAToTokenBRoute,
         address[] calldata rewardTokenBToTokenARoute,
-        address[] calldata rewardTokenBToTokenBRoute
+        address[] calldata rewardTokenBToTokenBRoute, 
+        uint256[4] memory amountsOutMin
     ) external whenNotPaused onlyDistributor {
         Farm farm = Farm(farmFactory.Farms(lpStakingPool));
         require(farm != Farm(address(0)), 'FARM_NOT_EXISTS');
 
-        uint256 reward = farm.distribute(rewardTokenAToTokenARoute, rewardTokenAToTokenBRoute, rewardTokenBToTokenARoute, rewardTokenBToTokenBRoute);
+        uint256 reward = farm.distribute(rewardTokenAToTokenARoute, rewardTokenAToTokenBRoute, rewardTokenBToTokenARoute, rewardTokenBToTokenBRoute, amountsOutMin);
         emit Distribute(lpStakingPool, reward);
     }
 
@@ -168,7 +155,7 @@ contract UnoAssetRouterQuickswapDual is Initializable, PausableUpgradeable, UUPS
     function totalDeposits(address lpStakingPool) external view returns (uint256 totalDepositsLP, uint256 totalDepositsA, uint256 totalDepositsB) {
         Farm farm = Farm(farmFactory.Farms(lpStakingPool));
         if (farm != Farm(address(0))) {
-            totalDepositsLP = farm.totalDeposits();
+            totalDepositsLP = farm.getTotalDeposits();
             address lpPair = farm.lpPair();
             (totalDepositsA, totalDepositsB) = getTokenStake(lpPair, totalDepositsLP);
         }
