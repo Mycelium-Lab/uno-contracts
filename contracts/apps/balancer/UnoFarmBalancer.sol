@@ -125,13 +125,14 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
             }
         }
 
+        uint256 amountBefore = IERC20(lpPair).balanceOf(address(this));
         if(joinPool){
             IVault.JoinPoolRequest memory joinPoolRequest = IVault.JoinPoolRequest(assets, amounts, abi.encode(1, amounts, 0), false);
             Vault.joinPool(poolId, address(this), address(this), joinPoolRequest);
         }
-        uint256 addedLiquidity = IERC20(lpPair).balanceOf(address(this));
+        uint256 amountAfter = IERC20(lpPair).balanceOf(address(this));
 
-        liquidity = addedLiquidity + amountLP; 
+        liquidity = amountAfter - amountBefore + amountLP;
         require (liquidity > 0, 'NO_LIQUIDITY_PROVIDED');
         
         _updateDeposit(recipient);

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
-pragma experimental ABIEncoderV2;
 
 import {IUnoFarmBalancer as Farm} from './interfaces/IUnoFarmBalancer.sol'; 
 import '../../interfaces/IUnoFarmFactory.sol';
@@ -77,7 +76,7 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
             IERC20Upgradeable(lpPair).safeTransferFrom(msg.sender, address(farm), amountLP);
         }
         
-        liquidity =  farm.deposit(amounts, tokens, amountLP, recipient);
+        liquidity = farm.deposit(amounts, tokens, amountLP, recipient);
         emit Deposit(lpPair, msg.sender, recipient, liquidity); 
     }
 

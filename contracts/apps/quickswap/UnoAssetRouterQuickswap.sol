@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
-pragma experimental ABIEncoderV2;
 
 import {IUnoFarmQuickswap as Farm} from './interfaces/IUnoFarmQuickswap.sol'; 
 import '../../interfaces/IUnoFarmFactory.sol';

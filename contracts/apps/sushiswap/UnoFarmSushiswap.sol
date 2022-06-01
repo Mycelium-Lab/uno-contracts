@@ -133,7 +133,7 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
     function deposit(uint256 amountA, uint256 amountB, uint256 amountLP, address recipient) external nonReentrant onlyAssetRouter returns(uint256 sentA, uint256 sentB, uint256 liquidity){
         uint256 addedLiquidity;
         if(amountA > 0 && amountB > 0){
-            (sentA, sentB, addedLiquidity) = sushiswapRouter.addLiquidity(tokenA, tokenB, amountA, amountB, 0, 0, address(this), block.timestamp + 600);
+            (sentA, sentB, addedLiquidity) = sushiswapRouter.addLiquidity(tokenA, tokenB, amountA, amountB, 0, 0, address(this), block.timestamp);
         }
         liquidity = addedLiquidity + amountLP;
         require(liquidity > 0, 'NO_LIQUIDITY_PROVIDED');
@@ -169,7 +169,7 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
             IERC20Upgradeable(lpPair).safeTransfer(recipient, amount);
             return (0, 0);
         }
-        (amountA, amountB) = sushiswapRouter.removeLiquidity(tokenA, tokenB, amount, 0, 0, recipient, block.timestamp + 600);
+        (amountA, amountB) = sushiswapRouter.removeLiquidity(tokenA, tokenB, amount, 0, 0, recipient, block.timestamp);
     }
 
     /**
@@ -186,30 +186,29 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
         require(rewarderTokenToTokenBRoute[0] == rewarderToken && rewarderTokenToTokenBRoute[rewarderTokenToTokenBRoute.length - 1] == tokenB, 'BAD_REWARDER_TOKEN_B_ROUTE');
 
         MiniChef.harvest(pid, address(this));
-        uint256 deadline = block.timestamp + 600;
         { // scope to avoid stack too deep errors
         uint256 rewardTokenHalf = IERC20(rewardToken).balanceOf(address(this)) / 2;
         if (tokenA != rewardToken) {
-            sushiswapRouter.swapExactTokensForTokens(rewardTokenHalf, amountsOutMin[0], rewardTokenToTokenARoute, address(this), deadline);
+            sushiswapRouter.swapExactTokensForTokens(rewardTokenHalf, amountsOutMin[0], rewardTokenToTokenARoute, address(this), block.timestamp);
         }
 
         if (tokenB != rewardToken) {
-            sushiswapRouter.swapExactTokensForTokens(rewardTokenHalf, amountsOutMin[1], rewardTokenToTokenBRoute, address(this), deadline);
+            sushiswapRouter.swapExactTokensForTokens(rewardTokenHalf, amountsOutMin[1], rewardTokenToTokenBRoute, address(this), block.timestamp);
         }
         }
 
         { // scope to avoid stack too deep errors
         uint256 rewarderTokenHalf = IERC20(rewarderToken).balanceOf(address(this)) / 2;
         if (tokenA != rewarderToken) {
-            sushiswapRouter.swapExactTokensForTokens(rewarderTokenHalf, amountsOutMin[2], rewarderTokenToTokenARoute, address(this), deadline);
+            sushiswapRouter.swapExactTokensForTokens(rewarderTokenHalf, amountsOutMin[2], rewarderTokenToTokenARoute, address(this), block.timestamp);
         }
 
         if (tokenB != rewarderToken) {
-            sushiswapRouter.swapExactTokensForTokens(rewarderTokenHalf, amountsOutMin[3], rewarderTokenToTokenBRoute, address(this), deadline);
+            sushiswapRouter.swapExactTokensForTokens(rewarderTokenHalf, amountsOutMin[3], rewarderTokenToTokenBRoute, address(this), block.timestamp);
         }
         }
 
-        (,,reward) = sushiswapRouter.addLiquidity(tokenA, tokenB, IERC20(tokenA).balanceOf(address(this)), IERC20(tokenB).balanceOf(address(this)), 1, 1, address(this), deadline);
+        (,,reward) = sushiswapRouter.addLiquidity(tokenA, tokenB, IERC20(tokenA).balanceOf(address(this)), IERC20(tokenB).balanceOf(address(this)), 1, 1, address(this), block.timestamp);
         
         uint256 rewardPerTotalDepositAge = reward * fractionMultiplier / (totalDepositAge + totalDeposits * (block.number - totalDepositLastUpdate));
         uint256 cumulativeRewardAgePerTotalDepositAge = distributionInfo[distributionID - 1].cumulativeRewardAgePerTotalDepositAge + rewardPerTotalDepositAge * (block.number - distributionInfo[distributionID - 1]._block);
