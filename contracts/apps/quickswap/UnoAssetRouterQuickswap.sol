@@ -55,7 +55,7 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
      * @param amountB -  Token B amount to deposit.
      * @param amountLP - LP Token amount to deposit.
      * @param lpStakingPool - Address of the pool to deposit tokens in.
-     * @param recipient - Address which will recieve the deposit and leftover tokens.
+     * @param recipient - Address which will recieve the deposit.
      
      * @return sentA - Token A amount sent to the farm.
      * @return sentB - Token B amount sent to the farm.
@@ -77,7 +77,7 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
             IERC20Upgradeable(farm.lpPair()).safeTransferFrom(msg.sender, address(farm), amountLP);
         }
         
-        (sentA, sentB, liquidity) = farm.deposit(amountA, amountB, amountLP, recipient);
+        (sentA, sentB, liquidity) = farm.deposit( amountA, amountB, amountLP, msg.sender, recipient);
         emit Deposit(lpStakingPool, msg.sender, recipient, liquidity); 
     }
 
