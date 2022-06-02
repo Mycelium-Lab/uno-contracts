@@ -109,13 +109,12 @@ contract UnoFarmQuickswapDual is Initializable, ReentrancyGuardUpgradeable {
         distributionID = 1;
         totalDepositLastUpdate = block.number;
 
-        uint256 MAX_UINT = uint256(2**256 - 1);
-        IERC20(lpPair).approve(_lpStakingPool, MAX_UINT);
-        IERC20(lpPair).approve(address(quickswapRouter), MAX_UINT);
-        IERC20(rewardTokenA).approve(address(quickswapRouter), MAX_UINT);
-        IERC20(rewardTokenB).approve(address(quickswapRouter), MAX_UINT);
-        IERC20(tokenA).approve(address(quickswapRouter), MAX_UINT);
-        IERC20(tokenB).approve(address(quickswapRouter), MAX_UINT);
+        IERC20(lpPair).approve(_lpStakingPool, type(uint256).max);
+        IERC20(lpPair).approve(address(quickswapRouter), type(uint256).max);
+        IERC20(rewardTokenA).approve(address(quickswapRouter), type(uint256).max);
+        IERC20(rewardTokenB).approve(address(quickswapRouter), type(uint256).max);
+        IERC20(tokenA).approve(address(quickswapRouter), type(uint256).max);
+        IERC20(tokenB).approve(address(quickswapRouter), type(uint256).max);
     }
 
     /**

@@ -116,13 +116,12 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
         distributionID = 1;
         totalDepositLastUpdate = block.number;
 
-        uint256 MAX_UINT = uint256(2**256 - 1);
-        IERC20(lpPair).approve(address(MiniChef), MAX_UINT);
-        IERC20(lpPair).approve(address(sushiswapRouter), MAX_UINT);
-        IERC20(rewardToken).approve(address(sushiswapRouter), MAX_UINT);
-        IERC20(rewarderToken).approve(address(sushiswapRouter), MAX_UINT);
-        IERC20(tokenA).approve(address(sushiswapRouter), MAX_UINT);
-        IERC20(tokenB).approve(address(sushiswapRouter), MAX_UINT);
+        IERC20(lpPair).approve(address(MiniChef), type(uint256).max);
+        IERC20(lpPair).approve(address(sushiswapRouter), type(uint256).max);
+        IERC20(rewardToken).approve(address(sushiswapRouter), type(uint256).max);
+        IERC20(rewarderToken).approve(address(sushiswapRouter), type(uint256).max);
+        IERC20(tokenA).approve(address(sushiswapRouter), type(uint256).max);
+        IERC20(tokenB).approve(address(sushiswapRouter), type(uint256).max);
 
     }
 

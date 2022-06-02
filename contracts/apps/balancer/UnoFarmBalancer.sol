@@ -103,8 +103,8 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
         distributionID = 1;
         totalDepositLastUpdate = block.number;
 
-        IERC20(_lpPair).approve(address(Vault), uint256(2**256 - 1));
-        IERC20(_lpPair).approve(address(gauge), uint256(2**256 - 1));
+        IERC20(_lpPair).approve(address(Vault), type(uint256).max);
+        IERC20(_lpPair).approve(address(gauge), type(uint256).max);
     }
 
     /**
@@ -200,7 +200,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
                     assets[i],
                     IVault.FundManagement({sender: address(this), fromInternalBalance:false, recipient: payable(address(this)), toInternalBalance:false}),
                     limits[i],
-                    uint256(2**256 - 1)
+                    type(uint256).max
                 );
             }
         }
