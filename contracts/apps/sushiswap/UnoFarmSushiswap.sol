@@ -130,10 +130,10 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
      * @dev Function that makes the deposits.
      * Deposits provided tokens in the Liquidity Pool, then stakes generated LP tokens in the {MiniChef}.
      */
-    function deposit(uint256 amountA, uint256 amountB, uint256 amountLP, address origin, address recipient) external nonReentrant onlyAssetRouter returns(uint256 sentA, uint256 sentB, uint256 liquidity){
+    function deposit(uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin, uint256 amountLP, address origin, address recipient) external nonReentrant onlyAssetRouter returns(uint256 sentA, uint256 sentB, uint256 liquidity){
         uint256 addedLiquidity;
         if(amountA > 0 && amountB > 0){
-            (sentA, sentB, addedLiquidity) = sushiswapRouter.addLiquidity(tokenA, tokenB, amountA, amountB, 0, 0, address(this), block.timestamp);
+            (sentA, sentB, addedLiquidity) = sushiswapRouter.addLiquidity(tokenA, tokenB, amountA, amountB, amountAMin, amountBMin, address(this), block.timestamp);
         }
         liquidity = addedLiquidity + amountLP;
         require(liquidity > 0, 'NO_LIQUIDITY_PROVIDED');
@@ -150,7 +150,7 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
     /**
      * @dev Withdraws funds from {origin} and sends them to the {recipient}.
      */
-    function withdraw(address origin, uint256 amount, bool withdrawLP, address recipient) external nonReentrant onlyAssetRouter returns(uint256 amountA, uint256 amountB){
+    function withdraw(address origin, uint256 amount, uint256 amountAMin, uint256 amountBMin, bool withdrawLP, address recipient) external nonReentrant onlyAssetRouter returns(uint256 amountA, uint256 amountB){
         require(amount > 0, 'INSUFFICIENT_AMOUNT');
 
         _updateDeposit(origin);
@@ -169,7 +169,7 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
             IERC20Upgradeable(lpPair).safeTransfer(recipient, amount);
             return (0, 0);
         }
-        (amountA, amountB) = sushiswapRouter.removeLiquidity(tokenA, tokenB, amount, 0, 0, recipient, block.timestamp);
+        (amountA, amountB) = sushiswapRouter.removeLiquidity(tokenA, tokenB, amount, amountAMin, amountBMin, recipient, block.timestamp);
     }
 
     /**

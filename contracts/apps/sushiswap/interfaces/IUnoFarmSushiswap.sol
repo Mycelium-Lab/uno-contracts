@@ -12,8 +12,8 @@ interface IUnoFarmSushiswap {
 
     function initialize( address _lpPair, address _assetRouter) external;
 
-    function deposit(uint256 amountA, uint256 amountB, uint256 amountLP, address origin, address recipient) external returns(uint256 sentA, uint256 sentB, uint256 liquidity);
-    function withdraw(address origin, uint256 amount, bool withdrawLP, address recipient) external returns(uint256 amountA, uint256 amountB);
+    function deposit(uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin, uint256 amountLP, address origin, address recipient) external returns(uint256 sentA, uint256 sentB, uint256 liquidity);
+    function withdraw(address origin, uint256 amount, uint256 amountAMin, uint256 amountBMin, bool withdrawLP, address recipient) external returns(uint256 amountA, uint256 amountB);
 
     function distribute(
         address[] calldata rewardTokenToTokenARoute,

@@ -53,6 +53,8 @@ contract UnoAssetRouterQuickswapDual is Initializable, PausableUpgradeable, UUPS
      * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool} and deposits tokens in it. Emits a {Deposit} event.
      * @param amountA  - Token A amount to deposit.
      * @param amountB -  Token B amount to deposit.
+     * @param amountAMin - Bounds the extent to which the B/A price can go up before the transaction reverts.
+     * @param amountBMin - Bounds the extent to which the A/B price can go up before the transaction reverts.
      * @param amountLP - LP Token amount to deposit.
      * @param lpStakingPool - Address of the pool to deposit tokens in.
      * @param recipient - Address which will recieve the deposit.
@@ -61,7 +63,7 @@ contract UnoAssetRouterQuickswapDual is Initializable, PausableUpgradeable, UUPS
      * @return sentB - Token B amount sent to the farm.
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
-    function deposit(uint256 amountA, uint256 amountB, uint256 amountLP, address lpStakingPool, address recipient) external whenNotPaused returns(uint256 sentA, uint256 sentB, uint256 liquidity){
+    function deposit(uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin, uint256 amountLP, address lpStakingPool, address recipient) external whenNotPaused returns(uint256 sentA, uint256 sentB, uint256 liquidity){
         Farm farm = Farm(farmFactory.Farms(lpStakingPool));
         if(farm == Farm(address(0))){
             farm = Farm(farmFactory.createFarm(lpStakingPool));
@@ -77,7 +79,7 @@ contract UnoAssetRouterQuickswapDual is Initializable, PausableUpgradeable, UUPS
             IERC20Upgradeable(farm.lpPair()).safeTransferFrom(msg.sender, address(farm), amountLP);
         }
         
-        (sentA, sentB, liquidity) = farm.deposit(amountA, amountB, amountLP, msg.sender, recipient);
+        (sentA, sentB, liquidity) = farm.deposit(amountA, amountB, amountAMin, amountBMin, amountLP, msg.sender, recipient);
         emit Deposit(lpStakingPool, msg.sender, recipient, liquidity); 
     }
 
@@ -85,17 +87,19 @@ contract UnoAssetRouterQuickswapDual is Initializable, PausableUpgradeable, UUPS
      * @dev Withdraws tokens from the given pool. Emits a {Withdraw} event.
      * @param lpStakingPool - LP pool to withdraw from.
      * @param amount - LP amount to withdraw. 
+     * @param amountAMin - The minimum amount of tokenA that must be received for the transaction not to revert.
+     * @param amountBMin - The minimum amount of tokenB that must be received for the transaction not to revert.
      * @param withdrawLP - True: Withdraw in LP tokens, False: Withdraw in normal tokens.
      * @param recipient - The address which will recieve tokens.
 
      * @return amountA - Token A amount sent to the {recipient}, 0 if withdrawLP == false.
      * @return amountB - Token B amount sent to the {recipient}, 0 if withdrawLP == false.
      */ 
-    function withdraw(address lpStakingPool, uint256 amount, bool withdrawLP, address recipient) external whenNotPaused returns(uint256 amountA, uint256 amountB){
+    function withdraw(address lpStakingPool, uint256 amount, uint256 amountAMin, uint256 amountBMin, bool withdrawLP, address recipient) external whenNotPaused returns(uint256 amountA, uint256 amountB){
         Farm farm = Farm(farmFactory.Farms(lpStakingPool));
         require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
         
-        (amountA, amountB) = farm.withdraw(msg.sender, amount, withdrawLP, recipient); 
+        (amountA, amountB) = farm.withdraw(msg.sender, amount, amountAMin, amountBMin, withdrawLP, recipient); 
         emit Withdraw(lpStakingPool, msg.sender, recipient, amount);  
     }
 
