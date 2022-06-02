@@ -14,7 +14,7 @@ interface IUnoAssetRouterSushiswap {
 
     function initialize(address _accessManager, address _farmFactory) external;
 
-    function deposit(uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin, uint256 amountLP, address lpPair, address recipient) external returns(uint256 sentA, uint256 sentB, uint256 liquidity);
+    function deposit(address lpPair, uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin, uint256 amountLP, address recipient) external returns(uint256 sentA, uint256 sentB, uint256 liquidity);
     function withdraw(address lpPair, uint256 amount, uint256 amountAMin, uint256 amountBMin, bool withdrawLP, address recipient) external returns(uint256 amountA, uint256 amountB);
 
     function distribute(

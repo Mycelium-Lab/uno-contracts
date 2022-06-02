@@ -51,15 +51,15 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
 
     /**
      * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpPair} and deposits tokens in it.
+     * @param lpPair - Address of the pool to deposit tokens in.
      * @param amounts - Amounts of tokens to deposit.
      * @param tokens - Tokens to deposit.
      * @param amountLP - Amounts of LP tokens to deposit.
-     * @param lpPair - Address of the pool to deposit tokens in.
      * @param recipient - Address which will recieve the deposit.
 
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
-    function deposit(uint256[] memory amounts, address[] memory tokens, uint256 amountLP, address lpPair, address recipient) external whenNotPaused returns(uint256 liquidity){
+    function deposit(address lpPair, uint256[] memory amounts, address[] memory tokens, uint256 amountLP, address recipient) external whenNotPaused returns(uint256 liquidity){
         require (amounts.length == tokens.length, 'AMOUNTS_AND_TOKENS_LENGTHS_NOT_MATCH');
 
         Farm farm = Farm(farmFactory.Farms(lpPair));
@@ -91,7 +91,7 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
         Farm farm = Farm(farmFactory.Farms(lpPair));
         require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
         
-        farm.withdraw(msg.sender, amount, withdrawLP, recipient); 
+        farm.withdraw(amount, withdrawLP, msg.sender, recipient); 
         emit Withdraw(lpPair, msg.sender, recipient, amount);  
     }
 

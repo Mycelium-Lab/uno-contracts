@@ -150,7 +150,7 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
     /**
      * @dev Withdraws funds from {origin} and sends them to the {recipient}.
      */
-    function withdraw(address origin, uint256 amount, uint256 amountAMin, uint256 amountBMin, bool withdrawLP, address recipient) external nonReentrant onlyAssetRouter returns(uint256 amountA, uint256 amountB){
+    function withdraw(uint256 amount, uint256 amountAMin, uint256 amountBMin, bool withdrawLP, address origin, address recipient) external nonReentrant onlyAssetRouter returns(uint256 amountA, uint256 amountB){
         require(amount > 0, 'INSUFFICIENT_AMOUNT');
 
         _updateDeposit(origin);

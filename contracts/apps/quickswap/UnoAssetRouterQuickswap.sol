@@ -51,19 +51,19 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
 
     /**
      * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool} and deposits tokens in it. Emits a {Deposit} event.
+     * @param lpStakingPool - Address of the pool to deposit tokens in.
      * @param amountA  - Token A amount to deposit.
      * @param amountB - Token B amount to deposit.
      * @param amountAMin - Bounds the extent to which the B/A price can go up before the transaction reverts.
      * @param amountBMin - Bounds the extent to which the A/B price can go up before the transaction reverts.
      * @param amountLP - LP Token amount to deposit.
-     * @param lpStakingPool - Address of the pool to deposit tokens in.
      * @param recipient - Address which will recieve the deposit.
      
      * @return sentA - Token A amount sent to the farm.
      * @return sentB - Token B amount sent to the farm.
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
-    function deposit(uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin, uint256 amountLP, address lpStakingPool, address recipient) external whenNotPaused returns(uint256 sentA, uint256 sentB, uint256 liquidity){
+    function deposit(address lpStakingPool, uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin, uint256 amountLP, address recipient) external whenNotPaused returns(uint256 sentA, uint256 sentB, uint256 liquidity){
         Farm farm = Farm(farmFactory.Farms(lpStakingPool));
         if(farm == Farm(address(0))){
             farm = Farm(farmFactory.createFarm(lpStakingPool));
@@ -99,7 +99,7 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
         Farm farm = Farm(farmFactory.Farms(lpStakingPool));
         require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
         
-        (amountA, amountB) = farm.withdraw(msg.sender, amount, amountAMin, amountBMin, withdrawLP, recipient); 
+        (amountA, amountB) = farm.withdraw(amount, amountAMin, amountBMin, withdrawLP, msg.sender, recipient); 
         emit Withdraw(lpStakingPool, msg.sender, recipient, amount);  
     }
 

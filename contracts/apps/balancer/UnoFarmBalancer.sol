@@ -145,7 +145,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
     /**
      * @dev Withdraws funds from {origin} and sends them to the {recipient}.
      */
-    function withdraw(address origin, uint256 amount, bool withdrawLP, address recipient) external nonReentrant onlyAssetRouter{
+    function withdraw( uint256 amount, bool withdrawLP, address origin, address recipient) external nonReentrant onlyAssetRouter{
         require(amount > 0, 'INSUFFICIENT_AMOUNT');
 
         _updateDeposit(origin);
