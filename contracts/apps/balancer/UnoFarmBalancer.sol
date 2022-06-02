@@ -52,8 +52,8 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
 
     /**
      * @dev Contract Variables:
-     * {lpPair} - Pair / pool.
-     * {poolId} - Bytes32 representation of the {lpPair}.
+     * {lpPool} - Pool.
+     * {poolId} - Bytes32 representation of the {lpPool}.
 
      * {totalDeposits} - Total deposits made by users.
      * {totalDepositAge} - Deposits multiplied by blocks the deposit has been in. Flushed every reward distribution.
@@ -65,7 +65,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
 
      * {fractionMultiplier} - Used to store decimal values.
      */
-    address public lpPair;
+    address public lpPool;
     bytes32 public poolId;
 
     uint256 private totalDeposits;
@@ -90,21 +90,21 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
 
     // ============ Methods ============
 
-    function initialize(address _lpPair, address _assetRouter) external initializer {
+    function initialize(address _lpPool, address _assetRouter) external initializer {
         assetRouter = _assetRouter;
 
-        lpPair = _lpPair;
-        poolId = IBasePool(_lpPair).getPoolId();
+        lpPool = _lpPool;
+        poolId = IBasePool(_lpPool).getPoolId();
 
-        gauge = IRewardsOnlyGauge(GaugeFactory.getPoolGauge(_lpPair));
-        streamer = IChildChainStreamer(GaugeFactory.getPoolStreamer(_lpPair));
+        gauge = IRewardsOnlyGauge(GaugeFactory.getPoolGauge(_lpPool));
+        streamer = IChildChainStreamer(GaugeFactory.getPoolStreamer(_lpPool));
 
         distributionInfo[0] = DistributionInfo(block.number, 0, 0);
         distributionID = 1;
         totalDepositLastUpdate = block.number;
 
-        IERC20(_lpPair).approve(address(Vault), type(uint256).max);
-        IERC20(_lpPair).approve(address(gauge), type(uint256).max);
+        IERC20(_lpPool).approve(address(Vault), type(uint256).max);
+        IERC20(_lpPool).approve(address(gauge), type(uint256).max);
     }
 
     /**
@@ -125,12 +125,12 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
             }
         }
 
-        uint256 amountBefore = IERC20(lpPair).balanceOf(address(this));
+        uint256 amountBefore = IERC20(lpPool).balanceOf(address(this));
         if(joinPool){
             IVault.JoinPoolRequest memory joinPoolRequest = IVault.JoinPoolRequest(assets, amounts, abi.encode(1, amounts, 0), false);
             Vault.joinPool(poolId, address(this), address(this), joinPoolRequest);
         }
-        uint256 amountAfter = IERC20(lpPair).balanceOf(address(this));
+        uint256 amountAfter = IERC20(lpPool).balanceOf(address(this));
 
         liquidity = amountAfter - amountBefore + amountLP;
         require (liquidity > 0, 'NO_LIQUIDITY_PROVIDED');
@@ -161,7 +161,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
 
         gauge.withdraw(amount);
         if(withdrawLP){
-            IERC20(lpPair).transfer(recipient, amount);
+            IERC20(lpPool).transfer(recipient, amount);
             return;
         }
 
@@ -214,7 +214,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
         }
         
         Vault.joinPool(poolId, address(this), address(this), IVault.JoinPoolRequest(joinAssets, joinAmounts, abi.encode(1, joinAmounts, 1), false));
-        reward = IERC20(lpPair).balanceOf(address(this));
+        reward = IERC20(lpPool).balanceOf(address(this));
 
         uint256 rewardPerTotalDepositAge = reward * fractionMultiplier / (totalDepositAge + totalDeposits * (block.number - totalDepositLastUpdate));
         uint256 cumulativeRewardAgePerTotalDepositAge = distributionInfo[distributionID - 1].cumulativeRewardAgePerTotalDepositAge + rewardPerTotalDepositAge * (block.number - distributionInfo[distributionID - 1]._block);

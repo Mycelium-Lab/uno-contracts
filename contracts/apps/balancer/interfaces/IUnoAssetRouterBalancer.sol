@@ -15,19 +15,19 @@ interface IUnoAssetRouterBalancer {
 
     function initialize(address _accessManager, address _farmFactory) external;
 
-    function deposit(address lpPair, uint256[] memory amounts, address[] memory tokens, uint256 amountLP, address recipient) external returns(uint256 liquidity);
-    function withdraw(address lpPair, uint256 amount, bool withdrawLP, address recipient) external;
+    function deposit(address lpPool, uint256[] memory amounts, address[] memory tokens, uint256 amountLP, address recipient) external returns(uint256 liquidity);
+    function withdraw(address lpPool, uint256 amount, bool withdrawLP, address recipient) external;
 
     function distribute(
-      address lpPair,
+      address lpPool,
       IVault.BatchSwapStep[][] memory swaps,
       IAsset[][] memory assets,
       int256[][] memory limits
     ) external;
 
    
-    function userStake(address _address, address lpPair) external view returns(uint256);
-    function totalDeposits(address lpPair) external view returns (uint256);
+    function userStake(address _address, address lpPool) external view returns(uint256);
+    function totalDeposits(address lpPool) external view returns (uint256);
 
     function paused() external view returns(bool);
     function pause() external;

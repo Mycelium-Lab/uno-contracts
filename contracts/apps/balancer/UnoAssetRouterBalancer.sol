@@ -16,7 +16,7 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
 
     /**
      * @dev Contract Variables:
-     * farmFactory - The contract that deploys new Farms and links them to {lpPair}s.
+     * farmFactory - The contract that deploys new Farms and links them to {lpPool}s.
      * accessManager - Role manager contract.
      */
     IUnoFarmFactory public farmFactory;
@@ -50,8 +50,8 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
     }
 
     /**
-     * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpPair} and deposits tokens in it.
-     * @param lpPair - Address of the pool to deposit tokens in.
+     * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpPool} and deposits tokens in it.
+     * @param lpPool - Address of the pool to deposit tokens in.
      * @param amounts - Amounts of tokens to deposit.
      * @param tokens - Tokens to deposit.
      * @param amountLP - Amounts of LP tokens to deposit.
@@ -59,12 +59,12 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
 
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
-    function deposit(address lpPair, uint256[] memory amounts, address[] memory tokens, uint256 amountLP, address recipient) external whenNotPaused returns(uint256 liquidity){
+    function deposit(address lpPool, uint256[] memory amounts, address[] memory tokens, uint256 amountLP, address recipient) external whenNotPaused returns(uint256 liquidity){
         require (amounts.length == tokens.length, 'AMOUNTS_AND_TOKENS_LENGTHS_NOT_MATCH');
 
-        Farm farm = Farm(farmFactory.Farms(lpPair));
+        Farm farm = Farm(farmFactory.Farms(lpPool));
         if(farm == Farm(address(0))){
-            farm = Farm(farmFactory.createFarm(lpPair));
+            farm = Farm(farmFactory.createFarm(lpPool));
         }
 
         for (uint256 i = 0; i < tokens.length; i++) {
@@ -73,31 +73,31 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
             }
         }
         if(amountLP > 0){
-            IERC20Upgradeable(lpPair).safeTransferFrom(msg.sender, address(farm), amountLP);
+            IERC20Upgradeable(lpPool).safeTransferFrom(msg.sender, address(farm), amountLP);
         }
         
         liquidity = farm.deposit(amounts, tokens, amountLP, recipient);
-        emit Deposit(lpPair, msg.sender, recipient, liquidity); 
+        emit Deposit(lpPool, msg.sender, recipient, liquidity); 
     }
 
     /** 
      * @dev Withdraws tokens from the given pool. 
-     * @param lpPair - LP pool to withdraw from.
+     * @param lpPool - LP pool to withdraw from.
      * @param amount - LP amount to withdraw. 
      * @param withdrawLP - True: Withdraw in LP tokens, False: Withdraw in normal tokens.
      * @param recipient - The address which will recieve tokens.
      */ 
-    function withdraw(address lpPair, uint256 amount, bool withdrawLP, address recipient) external whenNotPaused { 
-        Farm farm = Farm(farmFactory.Farms(lpPair));
+    function withdraw(address lpPool, uint256 amount, bool withdrawLP, address recipient) external whenNotPaused { 
+        Farm farm = Farm(farmFactory.Farms(lpPool));
         require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
         
         farm.withdraw(amount, withdrawLP, msg.sender, recipient); 
-        emit Withdraw(lpPair, msg.sender, recipient, amount);  
+        emit Withdraw(lpPool, msg.sender, recipient, amount);  
     }
 
     /**
-     * @dev Distributes tokens between users for a single {Farms[lpPair]}.
-     * @param lpPair - The pool to distribute. 
+     * @dev Distributes tokens between users for a single {Farms[lpPool]}.
+     * @param lpPool - The pool to distribute. 
      * @param swaps - The data used to swap reward tokens for the needed tokens.
      * @param assets - The data used to swap reward tokens for the needed tokens.
      * @param limits - The data used to swap reward tokens for the needed tokens.
@@ -105,27 +105,27 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
      * Note: This function can only be called by the distributor.
      */
     function distribute(
-        address lpPair,
+        address lpPool,
         IVault.BatchSwapStep[][] memory swaps,
         IAsset[][] memory assets,
         int256[][] memory limits
     ) external whenNotPaused onlyDistributor {
-        Farm farm = Farm(farmFactory.Farms(lpPair));
+        Farm farm = Farm(farmFactory.Farms(lpPool));
         require(farm != Farm(address(0)), 'FARM_NOT_EXISTS');
 
         uint256 reward = farm.distribute(swaps, assets, limits);
-        emit Distribute(lpPair, reward);
+        emit Distribute(lpPool, reward);
     }
 
     /**
-     * @dev Returns LP tokens staked by the {_address} for the given {lpPair}.
+     * @dev Returns LP tokens staked by the {_address} for the given {lpPool}.
      * @param _address - The address to check stakes for.
-     * @param lpPair - LP pool to check stakes in.
+     * @param lpPool - LP pool to check stakes in.
 
      * @return Total user stake(in LP tokens).
      */
-   function userStake(address _address, address lpPair) external view returns(uint256){
-        Farm farm = Farm(farmFactory.Farms(lpPair));
+   function userStake(address _address, address lpPool) external view returns(uint256){
+        Farm farm = Farm(farmFactory.Farms(lpPool));
         if (farm != Farm(address(0))) {
             return farm.userBalance(_address);
         }
@@ -134,12 +134,12 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
 
     /**
      * @dev Returns total amount locked in the pool. Doesn't take pending rewards into account.
-     * @param lpPair - LP pool to check total deposits in.
+     * @param lpPool - LP pool to check total deposits in.
 
      * @return Total deposits (in LP tokens).
      */
-    function totalDeposits(address lpPair) external view returns (uint256) {
-        Farm farm = Farm(farmFactory.Farms(lpPair));
+    function totalDeposits(address lpPool) external view returns (uint256) {
+        Farm farm = Farm(farmFactory.Farms(lpPool));
         if (farm != Farm(address(0))) {
             return farm.getTotalDeposits();
         }
