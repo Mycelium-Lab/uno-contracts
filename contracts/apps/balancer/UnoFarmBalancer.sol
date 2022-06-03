@@ -111,7 +111,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
      * @dev Function that makes the deposits.
      * Deposits {amounts} of {tokens} from this contract's balance to the {Vault}.
      */
-    function deposit(uint256[] memory amounts, address[] memory tokens, uint256 amountLP, address recipient) external nonReentrant onlyAssetRouter returns(uint256 liquidity){
+    function deposit(uint256[] memory amounts, address[] memory tokens, uint256 minAmountLP, uint256 amountLP,  address recipient) external nonReentrant onlyAssetRouter returns(uint256 liquidity){
         (IERC20[] memory poolTokens, IAsset[] memory assets,) = getTokens();
 
         bool joinPool = false;
@@ -127,7 +127,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
 
         uint256 amountBefore = IERC20(lpPool).balanceOf(address(this));
         if(joinPool){
-            IVault.JoinPoolRequest memory joinPoolRequest = IVault.JoinPoolRequest(assets, amounts, abi.encode(1, amounts, 0), false);
+            IVault.JoinPoolRequest memory joinPoolRequest = IVault.JoinPoolRequest(assets, amounts, abi.encode(1, amounts, minAmountLP), false);
             Vault.joinPool(poolId, address(this), address(this), joinPoolRequest);
         }
         uint256 amountAfter = IERC20(lpPool).balanceOf(address(this));
@@ -145,7 +145,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
     /**
      * @dev Withdraws funds from {origin} and sends them to the {recipient}.
      */
-    function withdraw( uint256 amount, bool withdrawLP, address origin, address recipient) external nonReentrant onlyAssetRouter{
+    function withdraw(uint256 amount, uint256[] calldata minAmountsOut, bool withdrawLP, address origin, address recipient) external nonReentrant onlyAssetRouter{
         require(amount > 0, 'INSUFFICIENT_AMOUNT');
 
         _updateDeposit(origin);
@@ -165,8 +165,9 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
             return;
         }
 
-        (, IAsset[] memory assets, uint256[] memory amounts) = getTokens();
-        Vault.exitPool(poolId, address(this), payable(recipient), IVault.ExitPoolRequest(assets, amounts, abi.encode(1, amount), false));
+        (, IAsset[] memory assets, ) = getTokens();
+        require (minAmountsOut.length == assets.length, 'MIN_AMOUNTS_OUT_BAD_LENGTH');
+        Vault.exitPool(poolId, address(this), payable(recipient), IVault.ExitPoolRequest(assets, minAmountsOut, abi.encode(1, amount), false));
     }
 
     /**

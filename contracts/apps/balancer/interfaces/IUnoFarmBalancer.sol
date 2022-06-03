@@ -10,8 +10,8 @@ interface IUnoFarmBalancer {
 
     function initialize( address _lpPool, address _assetRouter) external;
 
-    function deposit(uint256[] memory amounts, address[] memory tokens, uint256 amountLP, address recipient) external returns(uint256 liquidity);
-    function withdraw(uint256 amount, bool withdrawLP, address origin, address recipient) external;
+    function deposit(uint256[] memory amounts, address[] memory tokens, uint256 minAmountLP, uint256 amountLP, address recipient) external returns(uint256 liquidity);
+    function withdraw(uint256 amount, uint256[] calldata minAmountsOut, bool withdrawLP, address origin, address recipient) external;
 
     function distribute(
         IVault.BatchSwapStep[][] memory swaps,

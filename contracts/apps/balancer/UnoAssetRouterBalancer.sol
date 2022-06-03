@@ -54,12 +54,13 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
      * @param lpPool - Address of the pool to deposit tokens in.
      * @param amounts - Amounts of tokens to deposit.
      * @param tokens - Tokens to deposit.
-     * @param amountLP - Amounts of LP tokens to deposit.
+     * @param minAmountLP - Minimum LP the user will receive from {{tokens}} deposit.
+     * @param amountLP - Additional amount of LP tokens to deposit.
      * @param recipient - Address which will recieve the deposit.
 
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
-    function deposit(address lpPool, uint256[] memory amounts, address[] memory tokens, uint256 amountLP, address recipient) external whenNotPaused returns(uint256 liquidity){
+    function deposit(address lpPool, uint256[] memory amounts, address[] memory tokens, uint256 minAmountLP, uint256 amountLP, address recipient) external whenNotPaused returns(uint256 liquidity){
         require (amounts.length == tokens.length, 'AMOUNTS_AND_TOKENS_LENGTHS_NOT_MATCH');
 
         Farm farm = Farm(farmFactory.Farms(lpPool));
@@ -76,7 +77,7 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
             IERC20Upgradeable(lpPool).safeTransferFrom(msg.sender, address(farm), amountLP);
         }
         
-        liquidity = farm.deposit(amounts, tokens, amountLP, recipient);
+        liquidity = farm.deposit(amounts, tokens, minAmountLP, amountLP, recipient);
         emit Deposit(lpPool, msg.sender, recipient, liquidity); 
     }
 
@@ -84,14 +85,15 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
      * @dev Withdraws tokens from the given pool. 
      * @param lpPool - LP pool to withdraw from.
      * @param amount - LP amount to withdraw. 
+     * @param minAmountsOut - Minimum token amounts the user will recieve.
      * @param withdrawLP - True: Withdraw in LP tokens, False: Withdraw in normal tokens.
      * @param recipient - The address which will recieve tokens.
      */ 
-    function withdraw(address lpPool, uint256 amount, bool withdrawLP, address recipient) external whenNotPaused { 
+    function withdraw(address lpPool, uint256 amount, uint256[] calldata minAmountsOut, bool withdrawLP, address recipient) external whenNotPaused { 
         Farm farm = Farm(farmFactory.Farms(lpPool));
         require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
         
-        farm.withdraw(amount, withdrawLP, msg.sender, recipient); 
+        farm.withdraw(amount, minAmountsOut, withdrawLP, msg.sender, recipient); 
         emit Withdraw(lpPool, msg.sender, recipient, amount);  
     }
 
@@ -149,7 +151,7 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
     function pause() external onlyPauser {
         _pause();
     }
-
+ 
     function unpause() external onlyPauser {
         _unpause();
     }

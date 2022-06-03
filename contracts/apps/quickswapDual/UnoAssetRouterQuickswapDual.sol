@@ -56,7 +56,7 @@ contract UnoAssetRouterQuickswapDual is Initializable, PausableUpgradeable, UUPS
      * @param amountB -  Token B amount to deposit.
      * @param amountAMin - Bounds the extent to which the B/A price can go up before the transaction reverts.
      * @param amountBMin - Bounds the extent to which the A/B price can go up before the transaction reverts.
-     * @param amountLP - LP Token amount to deposit.
+     * @param amountLP - Additional LP Token amount to deposit.
      * @param recipient - Address which will recieve the deposit.
      
      * @return sentA - Token A amount sent to the farm.

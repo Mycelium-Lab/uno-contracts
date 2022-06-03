@@ -15,8 +15,8 @@ interface IUnoAssetRouterBalancer {
 
     function initialize(address _accessManager, address _farmFactory) external;
 
-    function deposit(address lpPool, uint256[] memory amounts, address[] memory tokens, uint256 amountLP, address recipient) external returns(uint256 liquidity);
-    function withdraw(address lpPool, uint256 amount, bool withdrawLP, address recipient) external;
+    function deposit(address lpPool, uint256[] memory amounts, address[] memory tokens, uint256 minAmountLP, uint256 amountLP, address recipient) external returns(uint256 liquidity);
+    function withdraw(address lpPool, uint256 amount, uint256[] calldata minAmountsOut, bool withdrawLP, address recipient) external;
 
     function distribute(
       address lpPool,
