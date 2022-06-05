@@ -14,13 +14,13 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
     /**
      * @dev DistributionInfo:
      * {_block} - Distribution block number.
-     * {rewardPerTotalDepositAge} - Distribution reward divided by {totalDepositAge}. 
-     * {cumulativeRewardAgePerTotalDepositAge} - Sum of {rewardPerTotalDepositAge}s multiplied by distribution interval.
+     * {rewardPerDepositAge} - Distribution reward divided by {totalDepositAge}. 
+     * {cumulativeRewardAgePerDepositAge} - Sum of {rewardPerDepositAge}s multiplied by distribution interval.
      */
     struct DistributionInfo {
         uint256 _block;
-        uint256 rewardPerTotalDepositAge;
-        uint256 cumulativeRewardAgePerTotalDepositAge;
+        uint256 rewardPerDepositAge;
+        uint256 cumulativeRewardAgePerDepositAge;
     }
     /**
      * @dev UserInfo:
@@ -217,13 +217,13 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
         Vault.joinPool(poolId, address(this), address(this), IVault.JoinPoolRequest(joinAssets, joinAmounts, abi.encode(1, joinAmounts, 1), false));
         reward = IERC20(lpPool).balanceOf(address(this));
 
-        uint256 rewardPerTotalDepositAge = reward * fractionMultiplier / (totalDepositAge + totalDeposits * (block.number - totalDepositLastUpdate));
-        uint256 cumulativeRewardAgePerTotalDepositAge = distributionInfo[distributionID - 1].cumulativeRewardAgePerTotalDepositAge + rewardPerTotalDepositAge * (block.number - distributionInfo[distributionID - 1]._block);
+        uint256 rewardPerDepositAge = reward * fractionMultiplier / (totalDepositAge + totalDeposits * (block.number - totalDepositLastUpdate));
+        uint256 cumulativeRewardAgePerDepositAge = distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge + rewardPerDepositAge * (block.number - distributionInfo[distributionID - 1]._block);
 
         distributionInfo[distributionID] = DistributionInfo(
             block.number,
-            rewardPerTotalDepositAge,
-            cumulativeRewardAgePerTotalDepositAge
+            rewardPerDepositAge,
+            cumulativeRewardAgePerDepositAge
         );
 
         distributionID += 1;
@@ -279,9 +279,9 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
         DistributionInfo memory lastUserDistributionInfo = distributionInfo[user.lastDistribution];
         uint256 userDepositAge = user.depositAge + user.stake * (lastUserDistributionInfo._block - user.lastUpdate);
         // Calculate reward between the last user deposit and the distribution after that.
-        uint256 rewardBeforeDistibution = userDepositAge * lastUserDistributionInfo.rewardPerTotalDepositAge / fractionMultiplier;
+        uint256 rewardBeforeDistibution = userDepositAge * lastUserDistributionInfo.rewardPerDepositAge / fractionMultiplier;
         // Calculate reward from the distributions that have happened after the last user deposit.
-        uint256 rewardAfterDistribution = user.stake * (distributionInfo[distributionID - 1].cumulativeRewardAgePerTotalDepositAge - lastUserDistributionInfo.cumulativeRewardAgePerTotalDepositAge) / fractionMultiplier;
+        uint256 rewardAfterDistribution = user.stake * (distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge - lastUserDistributionInfo.cumulativeRewardAgePerDepositAge) / fractionMultiplier;
         return user.reward + rewardBeforeDistibution + rewardAfterDistribution;
     }
 
