@@ -10,6 +10,9 @@ import './interfaces/IUnoAssetRouter.sol';
 contract UnoFarmFactory{
     /**
      * @dev Contract Variables:
+     * accessManager - Role manager contract.
+     * assetRouter -  UnoAssetRouter contract. Is given permission to call functions on farms. 
+     
      * farmBeacon - Farm contract implementation.
      * Farms - links {lpPools} to the deployed Farm contract.
      * lpPools - list of pools that have corresponding deployed Farm contract.
@@ -32,6 +35,9 @@ contract UnoFarmFactory{
         IUnoAssetRouter(_assetRouter).initialize(_accessManager, address(this)); 
     }
 
+    /**
+     * @dev Creates new farm.
+     */
     function createFarm(address pool) external returns (address) {
         require(Farms[pool] == address(0), 'FARM_EXISTS');
         Farms[pool] = _createFarm(pool);
@@ -39,6 +45,9 @@ contract UnoFarmFactory{
         return Farms[pool];
     }
 
+    /**
+     * @dev Upgrades all farms deployed by this factory using beacon proxy. Only available to the admin.
+     */
     function upgradeFarms(address newImplementation) external {
         require(accessManager.hasRole(accessManager.ADMIN_ROLE(), msg.sender), 'CALLER_NOT_ADMIN');
         UpgradeableBeacon(farmBeacon).upgradeTo(newImplementation);
