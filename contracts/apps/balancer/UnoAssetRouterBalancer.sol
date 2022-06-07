@@ -5,6 +5,7 @@ import {IUnoFarmBalancer as Farm} from './interfaces/IUnoFarmBalancer.sol';
 import '../../interfaces/IUnoFarmFactory.sol';
 import '../../interfaces/IUnoAccessManager.sol'; 
 import '../../interfaces/IVault.sol'; 
+import "../../interfaces/IBasePool.sol";
 import '@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
@@ -23,6 +24,7 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
     IUnoAccessManager public accessManager;
     bytes32 private constant DISTRIBUTOR_ROLE = keccak256('DISTRIBUTOR_ROLE');
     bytes32 private constant PAUSER_ROLE = keccak256('PAUSER_ROLE');
+    IVault constant private Vault = IVault(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
 
     event Deposit(address indexed lpPool, address indexed from, address indexed recipient, uint256 amount);
     event Withdraw(address indexed lpPool, address indexed from, address indexed recipient, uint256 amount);
@@ -146,6 +148,17 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
             return farm.getTotalDeposits();
         }
         return 0;
+    }
+
+    /**
+     * @dev Returns addresses of tokens in {lpPool}.
+     * @param lpPool - LP pool to check tokens in.
+
+     * @return tokens - Token address.
+     */  
+    function getTokens(address lpPool) external view returns(IERC20[] memory tokens){
+        bytes32 poolId = IBasePool(lpPool).getPoolId();
+        (tokens, , ) = Vault.getPoolTokens(poolId);
     }
  
     function pause() external onlyPauser {

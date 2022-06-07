@@ -27,6 +27,7 @@ interface IUnoAssetRouterQuickswap {
    
     function userStake(address _address, address lpStakingPool) external view returns (uint256 stakeLP, uint256 stakeA, uint256 stakeB);
     function totalDeposits(address lpStakingPool) external view returns (uint256 totalDepositsLP, uint256 totalDepositsA, uint256 totalDepositsB);
+    function getTokens(address lpStakingPool) external view returns(address tokenA, address tokenB);
 
     function paused() external view returns(bool);
     function pause() external;

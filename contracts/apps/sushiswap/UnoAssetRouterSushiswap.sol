@@ -163,6 +163,18 @@ contract UnoAssetRouterSushiswap is Initializable, PausableUpgradeable, UUPSUpgr
     }
 
     /**
+     * @dev Returns addresses of tokens in {lpPair}.
+     * @param lpPair - LP pair to check tokens in.
+
+     * @return tokenA - Token A address.
+     * @return tokenB - Token B address.
+     */  
+    function getTokens(address lpPair) external view returns(address tokenA, address tokenB){
+        tokenA = IUniswapV2Pair(lpPair).token0();
+        tokenB = IUniswapV2Pair(lpPair).token1();
+    }
+
+    /**
      * @dev Converts LP tokens to normal tokens, value(amountA) == value(amountB) == 0.5*amountLP
      * @param lpPair - LP pair for conversion.
      * @param amountLP - Amount of LP tokens to convert.

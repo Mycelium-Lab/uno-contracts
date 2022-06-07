@@ -5,6 +5,7 @@ import {IUnoFarmQuickswapDual as Farm} from './interfaces/IUnoFarmQuickswapDual.
 import '../../interfaces/IUnoFarmFactory.sol';
 import '../../interfaces/IUnoAccessManager.sol'; 
 import '../../interfaces/IUniswapV2Pair.sol';
+import '../../interfaces/IStakingDualRewards.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
@@ -162,6 +163,19 @@ contract UnoAssetRouterQuickswapDual is Initializable, PausableUpgradeable, UUPS
             address lpPair = farm.lpPair();
             (totalDepositsA, totalDepositsB) = getTokenStake(lpPair, totalDepositsLP);
         }
+    }
+
+    /**
+     * @dev Returns addresses of pair of tokens in {lpStakingPool}.
+     * @param lpStakingPool - LP pool to check tokens in.
+
+     * @return tokenA - Token A address.
+     * @return tokenB - Token B address.
+     */  
+    function getTokens(address lpStakingPool) external view returns(address tokenA, address tokenB){
+        IUniswapV2Pair stakingToken = IUniswapV2Pair(address(IStakingDualRewards(lpStakingPool).stakingToken()));
+        tokenA = stakingToken.token0();
+        tokenB = stakingToken.token1();
     }
 
     /**

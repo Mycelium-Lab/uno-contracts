@@ -28,6 +28,7 @@ interface IUnoAssetRouterBalancer {
    
     function userStake(address _address, address lpPool) external view returns(uint256);
     function totalDeposits(address lpPool) external view returns (uint256);
+    function getTokens(address lpPool) external view returns(IERC20[] memory tokens);
 
     function paused() external view returns(bool);
     function pause() external;
