@@ -168,6 +168,7 @@ contract UnoFarmQuickswap is Initializable, ReentrancyGuardUpgradeable {
      */
     function distribute(address[] calldata rewardTokenToTokenARoute, address[] calldata rewardTokenToTokenBRoute, uint256[2] memory amountsOutMin) external onlyAssetRouter nonReentrant returns(uint256 reward){
         require(totalDeposits > 0, 'NO_LIQUIDITY');
+        require(distributionInfo[distributionID - 1]._block != block.number, 'CANT_CALL_ON_THE_SAME_BLOCK');
         require(rewardTokenToTokenARoute[0] == rewardToken && rewardTokenToTokenARoute[rewardTokenToTokenARoute.length - 1] == tokenA, 'BAD_REWARD_TOKEN_A_ROUTE');
         require(rewardTokenToTokenBRoute[0] == rewardToken && rewardTokenToTokenBRoute[rewardTokenToTokenBRoute.length - 1] == tokenB, 'BAD_REWARD_TOKEN_B_ROUTE');
 

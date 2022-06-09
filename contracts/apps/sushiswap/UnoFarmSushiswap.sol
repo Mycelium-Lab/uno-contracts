@@ -179,6 +179,7 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
      */
     function distribute(address[] calldata rewardTokenToTokenARoute, address[] calldata rewardTokenToTokenBRoute, address[] calldata rewarderTokenToTokenARoute, address[] calldata rewarderTokenToTokenBRoute, uint256[4] memory amountsOutMin) external onlyAssetRouter nonReentrant returns(uint256 reward){
         require(totalDeposits > 0, 'NO_LIQUIDITY');
+        require(distributionInfo[distributionID - 1]._block != block.number, 'CANT_CALL_ON_THE_SAME_BLOCK');
         require(rewardTokenToTokenARoute[0] == rewardToken && rewardTokenToTokenARoute[rewardTokenToTokenARoute.length - 1] == tokenA, 'BAD_REWARD_TOKEN_A_ROUTE');
         require(rewardTokenToTokenBRoute[0] == rewardToken && rewardTokenToTokenBRoute[rewardTokenToTokenBRoute.length - 1] == tokenB, 'BAD_REWARD_TOKEN_B_ROUTE');
         require(rewarderTokenToTokenARoute[0] == rewarderToken && rewarderTokenToTokenARoute[rewarderTokenToTokenARoute.length - 1] == tokenA, 'BAD_REWARDER_TOKEN_A_ROUTE');
