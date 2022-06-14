@@ -94,6 +94,7 @@ contract UnoFarmQuickswapDual is Initializable, ReentrancyGuardUpgradeable {
     // ============ Methods ============
 
     function initialize(address _lpStakingPool, address _assetRouter) external initializer {
+        __ReentrancyGuard_init();
         assetRouter = _assetRouter;
 
         lpStakingPool = IStakingDualRewards(_lpStakingPool);

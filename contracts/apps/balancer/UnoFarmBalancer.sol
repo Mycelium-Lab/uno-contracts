@@ -91,6 +91,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
     // ============ Methods ============
 
     function initialize(address _lpPool, address _assetRouter) external initializer {
+        __ReentrancyGuard_init();
         assetRouter = _assetRouter;
 
         lpPool = _lpPool;
