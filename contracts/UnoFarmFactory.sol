@@ -54,7 +54,7 @@ contract UnoFarmFactory{
     }
 
     /**
-     * @dev Deploys new Farm contract and calls initialize on it. Emits a {FarmDeployed} event.
+     * @dev Deploys new Farm contract and calls initialize on it. Emits {FarmDeployed} event.
      */
     function _createFarm(address _pool) internal returns (address) {
         BeaconProxy proxy = new BeaconProxy(
