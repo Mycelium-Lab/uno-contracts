@@ -100,6 +100,7 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
     // ============ Methods ============
 
     function initialize(address _lpPair, address _assetRouter) external initializer {
+        __ReentrancyGuard_init();
         assetRouter = _assetRouter;
 
         pid = getPid(_lpPair);
