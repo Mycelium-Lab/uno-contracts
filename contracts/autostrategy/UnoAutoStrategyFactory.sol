@@ -23,7 +23,7 @@ contract UnoAutoStrategyFactory is Pausable {
      
      * accessManager - Role manager contract.
      * autoStrategyBeacon - AutoStrategy contract implementation.
-     * autoStrategies - list of deployed AutoStrategy contracts.
+     * autoStrategies - List of deployed AutoStrategy contracts.
      */
     mapping(address => bool) public assetRouterApproved;
 

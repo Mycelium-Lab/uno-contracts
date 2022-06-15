@@ -17,6 +17,9 @@ All contracts are deployed on the Polygon(Matic) Blockchain
 ### UnoAccessManager
 0xbCc48E7aF0100ca3DFf680dE995d4C2726F81b71
 
+## UnoAutoStrategyFactory
+0xE7CD521516a7dd24Be307E25C921Df8e07032d1B
+
 ## Quickswap
 
 #### UnoAssetRouterQuickswap
