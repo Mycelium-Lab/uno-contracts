@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
-pragma experimental ABIEncoderV2;
 
 import {QuickswapDualFarmUpgradeable as Farm, SafeMath, IERC20, IERC20Upgradeable, SafeERC20Upgradeable, IUniswapV2Pair, Initializable} from "./farms/QuickswapDualFarmUpgradeable.sol"; 
 
 import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
+import "./interfaces/IUnoAssetRouterQuickswapDual.sol";
 
 contract QuickswapDualFarmFactoryBeacon is Initializable{
     using SafeMath for uint256; 
@@ -24,6 +24,7 @@ contract QuickswapDualFarmFactoryBeacon is Initializable{
     mapping(address => Farm) public Farms;
     address[] public lpPools;
     address public distributor;
+    address constant public UnoV2Router = 0xFf6d5909e81F7B764E58E0Af78eB9E938f187721;
 
     event FarmDeployed(address indexed farmAddress);
     event Deposit(address indexed sender, address indexed lpPool, uint256 amount);
@@ -95,6 +96,23 @@ contract QuickswapDualFarmFactoryBeacon is Initializable{
         require(Farms[lpStakingPool] != Farm(address(0)), 'The given pool doesnt exist');
         (amountA, amountB) = Farms[lpStakingPool].withdraw(msg.sender, amount, withdrawLP, recipient); 
         emit Withdraw(msg.sender, lpStakingPool, amount); 
+    }
+
+    /** 
+     * @dev Performs a migration to a new Uno contract. 
+     * @param lpStakingPool - LP pool to migrate.
+     */ 
+    function migrate(address lpStakingPool) external {
+        require(Farms[lpStakingPool] != Farm(address(0)), 'The given pool doesnt exist');
+
+        uint256 amount = Farms[lpStakingPool].userBalance(msg.sender);
+        Farms[lpStakingPool].withdraw(msg.sender, amount, true, address(this)); 
+
+        IERC20Upgradeable lpPair = IERC20Upgradeable(Farms[lpStakingPool].lpPair()); 
+        lpPair.approve(UnoV2Router, amount);
+        IUnoAssetRouterQuickswapDual(UnoV2Router).deposit(lpStakingPool, 0, 0, 0, 0, amount, msg.sender);
+
+        emit Withdraw(msg.sender, lpStakingPool, amount);  
     }
 
     /**

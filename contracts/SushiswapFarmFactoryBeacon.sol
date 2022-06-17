@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
-pragma experimental ABIEncoderV2;
 
 import {SushiswapFarmUpgradeable as Farm, SafeMath, IERC20, IERC20Upgradeable, SafeERC20Upgradeable, IUniswapV2Pair, Initializable} from "./farms/SushiswapFarmUpgradeable.sol"; 
  
 import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
+import "./interfaces/IUnoAssetRouterSushiswap.sol";
 
 contract SushiswapFarmFactoryBeacon is Initializable{
     using SafeMath for uint256; 
@@ -24,6 +24,8 @@ contract SushiswapFarmFactoryBeacon is Initializable{
     mapping(address => Farm) public Farms;
     address[] public lpPools;
     address public distributor;
+
+    address constant public UnoV2Router = 0xa5eb4E95a92b74f48f8eb118c4675095DcCDe3f8; 
 
     event FarmDeployed(address indexed farmAddress);
     event Deposit(address indexed sender, address indexed lpPool, uint256 amount);
@@ -94,6 +96,22 @@ contract SushiswapFarmFactoryBeacon is Initializable{
         require(Farms[lpPair] != Farm(address(0)), 'The given pool doesnt exist');
         (amountA, amountB) = Farms[lpPair].withdraw(msg.sender, amount, withdrawLP, recipient);
         emit Withdraw(msg.sender, lpPair, amount);
+    }
+
+    /** 
+     * @dev Performs a migration to a new Uno contract. 
+     * @param lpPair - LP pool to migrate.
+     */ 
+    function migrate(address lpPair) external {
+        require(Farms[lpPair] != Farm(address(0)), 'The given pool doesnt exist');
+
+        uint256 amount = Farms[lpPair].userBalance(msg.sender);
+        Farms[lpPair].withdraw(msg.sender, amount, true, address(this)); 
+
+        IERC20Upgradeable(lpPair).approve(UnoV2Router, amount);
+        IUnoAssetRouterSushiswap(UnoV2Router).deposit(lpPair, 0, 0, 0, 0, amount, msg.sender);
+
+        emit Withdraw(msg.sender, lpPair, amount);  
     }
 
     /**

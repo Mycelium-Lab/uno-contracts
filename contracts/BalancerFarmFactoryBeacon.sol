@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
-pragma experimental ABIEncoderV2;
 
 import {BalancerFarmUpgradeable as Farm, IERC20, Initializable, MerkleOrchard, IVault, IAsset} from "./farms/BalancerFarmUpgradeable.sol"; 
 import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol"; 
 import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol"; 
+import "./interfaces/IUnoAssetRouterBalancer.sol";
 
 contract BalancerFarmFactoryBeacon is Initializable{
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -24,6 +24,9 @@ contract BalancerFarmFactoryBeacon is Initializable{
     address public distributor;
     mapping(address => Farm) public Farms;
     address[] public lpPools;
+
+    IVault constant public Vault = IVault(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
+    address constant public UnoV2Router = 0xa9877C4cbd6b4c38604ee44a11948Aa4716D5b37;
 
     event FarmDeployed(address indexed farmAddress);
     event Deposit(address indexed sender, address indexed lpPool, uint256 amount);
@@ -90,32 +93,23 @@ contract BalancerFarmFactoryBeacon is Initializable{
         emit Withdraw(msg.sender, lpPair, amount);
     }
 
-     /**
-     * @dev Distributes tokens between users for a single {Farms[lpPair]}.
-     * @param lpPair - The pool to distribute. 
-     * @param claims - Balancer token claims. 
-     * @param rewardTokens - Reward tokens to recieve from the pool.
-     * @param swaps - The data used to swap reward tokens for the needed tokens.
-     * @param assets - The data used to swap reward tokens for the needed tokens.
-     * @param funds - The data used to swap reward tokens for the needed tokens.
-     * @param limits - The data used to swap reward tokens for the needed tokens.
-     *
-     * Note: This function can only be called by the distributor.
-     */
-    function distribute(
-        address lpPair,
-        MerkleOrchard.Claim[] memory claims,
-        IERC20[] memory rewardTokens,
-        IVault.BatchSwapStep[][] memory swaps,
-        IAsset[][] memory assets,
-        IVault.FundManagement[] memory funds,
-        int256[][] memory limits
-    ) external distributorOnly {
-        require(Farms[lpPair] != Farm(address(0)), 'The pool doesnt exist');
-        require((swaps.length == assets.length) && (swaps.length == funds.length) && (swaps.length == limits.length));
+    /** 
+     * @dev Performs a migration to a new Uno contract. 
+     * @param lpPair - LP pool to migrate.
+     */ 
+    function migrate(address lpPair) external {
+        require(Farms[lpPair] != Farm(address(0)), 'The given pool doesnt exist');
 
-        Farms[lpPair].distribute(claims, rewardTokens, swaps, assets, funds, limits);
-        emit Distribute(lpPair);
+        uint256 amount = Farms[lpPair].userBalance(msg.sender);
+        Farms[lpPair].withdraw(msg.sender, amount, true, address(this)); 
+
+        (IERC20[] memory tokens, , ) = Vault.getPoolTokens(Farms[lpPair].poolId()); 
+        uint256[] memory amounts = new uint256[](tokens.length);
+
+        IERC20Upgradeable(lpPair).approve(UnoV2Router, amount);
+        IUnoAssetRouterBalancer(UnoV2Router).deposit(lpPair, amounts, tokens, 0, amount, msg.sender); 
+
+        emit Withdraw(msg.sender, lpPair, amount);  
     }
 
     function transferDistributor(address newDistributor) external distributorOnly {

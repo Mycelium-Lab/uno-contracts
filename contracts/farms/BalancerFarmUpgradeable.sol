@@ -110,48 +110,6 @@ contract BalancerFarmUpgradeable is UUPSUpgradeable, Initializable, OwnableUpgra
     }
 
     /**
-     * @dev Core function of the strat, in charge of updating, collecting and re-investing rewards.
-     * 1. It claims rewards from the {merkleOrchard}.
-     * 2. It swaps the {rewardTokens} token for {assets}.
-     * 3. Then deposits the new tokens back to the {Vault}.
-     */
-    function distribute(
-        MerkleOrchard.Claim[] memory claims,
-        IERC20[] memory rewardTokens,
-        IVault.BatchSwapStep[][] memory swaps,
-        IAsset[][] memory assets,
-        IVault.FundManagement[] memory funds,
-        int256[][] memory limits
-    ) external onlyOwner nonReentrant{ 
-        require(totalDeposits > 0, 'There should be some tokens in the pool');
-        merkleOrchard.claimDistributions(address(this), claims, rewardTokens);
-        for (uint256 i = 0; i < assets.length; i++) {
-            for (uint256 j = 0; j < assets[i].length; j++) {
-                require(address(assets[i][j]) != lpPair, 'Cant swap LP token');
-            }
-            IERC20 startingToken = IERC20(address(assets[i][0]));
-            uint256 balance = startingToken.balanceOf(address(this));
-            if (balance > 0) {
-                startingToken.approve(address(Vault), balance);
-                Vault.batchSwap(IVault.SwapKind.GIVEN_IN, swaps[i], assets[i], funds[i], limits[i], uint256(2**256 - 1));
-            }
-        }
-
-        (IERC20[] memory tokens, IAsset[] memory joinAssets, uint256[] memory joinAmounts) = getTokens();
-        for (uint256 i = 0; i < tokens.length; i++) {
-            joinAmounts[i] = tokens[i].balanceOf(address(this));
-            tokens[i].approve(address(Vault), joinAmounts[i]);
-        }
-        
-        uint256 amountBefore = IERC20(lpPair).balanceOf(address(this));
-        Vault.joinPool(poolId, address(this), address(this), IVault.JoinPoolRequest(joinAssets, joinAmounts, abi.encode(1, joinAmounts, 1), false));
-        uint256 amountAfter = IERC20(lpPair).balanceOf(address(this));
-
-        uint256 reward = amountAfter.sub(amountBefore);
-        sumOfRewards = sumOfRewards.add(uint256(1 ether).mul(reward).div(totalDeposits));
-    }
-
-    /**
      * @dev Returns total funds staked by the {_address}.
      */
     function userBalance(address _address) public view returns (uint256){

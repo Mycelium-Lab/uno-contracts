@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
-pragma experimental ABIEncoderV2;
 
 import {QuickswapFarmUpgradeable as Farm, SafeMath, IERC20, IERC20Upgradeable, SafeERC20Upgradeable, IUniswapV2Pair, Initializable} from "./farms/QuickswapFarmUpgradeable.sol";
 
 import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
+import "./interfaces/IUnoAssetRouterQuickswap.sol";
 
 contract QuickswapFarmFactoryBeacon is Initializable{
     using SafeMath for uint256; 
@@ -24,6 +24,7 @@ contract QuickswapFarmFactoryBeacon is Initializable{
     mapping(address => Farm) public Farms;
     address[] public lpPools;
     address public distributor;
+    address constant public UnoV2Router = 0xF5AE5c5151aE25019be8b328603C18153d669461;
 
     event FarmDeployed(address indexed farmAddress);
     event Deposit(address indexed sender, address indexed lpPool, uint256 amount);
@@ -97,6 +98,23 @@ contract QuickswapFarmFactoryBeacon is Initializable{
         emit Withdraw(msg.sender, lpStakingPool, amount);  
     }
 
+    /** 
+     * @dev Performs a migration to a new Uno contract. 
+     * @param lpStakingPool - LP pool to migrate.
+     */ 
+    function migrate(address lpStakingPool) external {
+        require(Farms[lpStakingPool] != Farm(address(0)), 'The given pool doesnt exist');
+
+        uint256 amount = Farms[lpStakingPool].userBalance(msg.sender);
+        Farms[lpStakingPool].withdraw(msg.sender, amount, true, address(this)); 
+
+        IERC20Upgradeable lpPair = IERC20Upgradeable(Farms[lpStakingPool].lpPair()); 
+        lpPair.approve(UnoV2Router, amount);
+        IUnoAssetRouterQuickswap(UnoV2Router).deposit(lpStakingPool, 0, 0, 0, 0, amount, msg.sender);
+
+        emit Withdraw(msg.sender, lpStakingPool, amount);  
+    }
+
     /**
      * @dev Distributes tokens between users.
      * @param lpStakingPool - LP pool to distribute tokens in.
@@ -127,7 +145,7 @@ contract QuickswapFarmFactoryBeacon is Initializable{
      */
     function userStake(address _address, address lpStakingPool) external view returns (uint256 stakeLP, uint256 stakeA, uint256 stakeB) {
         if (Farms[lpStakingPool] != Farm(address(0))) {
-            stakeLP =  Farms[lpStakingPool].userBalance(_address);
+            stakeLP = Farms[lpStakingPool].userBalance(_address);
             (stakeA, stakeB) = getTokenStake(lpStakingPool, stakeLP);
         }
     }
