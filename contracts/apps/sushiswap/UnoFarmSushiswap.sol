@@ -189,23 +189,27 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
         MiniChef.harvest(pid, address(this));
         { // scope to avoid stack too deep errors
         uint256 rewardTokenHalf = IERC20(rewardToken).balanceOf(address(this)) / 2;
-        if (tokenA != rewardToken) {
-            sushiswapRouter.swapExactTokensForTokens(rewardTokenHalf, amountsOutMin[0], rewardTokenToTokenARoute, address(this), block.timestamp);
-        }
+        if (rewardTokenHalf > 0) {
+            if (tokenA != rewardToken) {
+                sushiswapRouter.swapExactTokensForTokens(rewardTokenHalf, amountsOutMin[0], rewardTokenToTokenARoute, address(this), block.timestamp);
+            }
 
-        if (tokenB != rewardToken) {
-            sushiswapRouter.swapExactTokensForTokens(rewardTokenHalf, amountsOutMin[1], rewardTokenToTokenBRoute, address(this), block.timestamp);
+            if (tokenB != rewardToken) {
+                sushiswapRouter.swapExactTokensForTokens(rewardTokenHalf, amountsOutMin[1], rewardTokenToTokenBRoute, address(this), block.timestamp);
+            }
         }
         }
 
         { // scope to avoid stack too deep errors
         uint256 rewarderTokenHalf = IERC20(rewarderToken).balanceOf(address(this)) / 2;
-        if (tokenA != rewarderToken) {
-            sushiswapRouter.swapExactTokensForTokens(rewarderTokenHalf, amountsOutMin[2], rewarderTokenToTokenARoute, address(this), block.timestamp);
-        }
+        if (rewarderTokenHalf > 0) {
+            if (tokenA != rewarderToken) {
+                sushiswapRouter.swapExactTokensForTokens(rewarderTokenHalf, amountsOutMin[2], rewarderTokenToTokenARoute, address(this), block.timestamp);
+            }
 
-        if (tokenB != rewarderToken) {
-            sushiswapRouter.swapExactTokensForTokens(rewarderTokenHalf, amountsOutMin[3], rewarderTokenToTokenBRoute, address(this), block.timestamp);
+            if (tokenB != rewarderToken) {
+                sushiswapRouter.swapExactTokensForTokens(rewarderTokenHalf, amountsOutMin[3], rewarderTokenToTokenBRoute, address(this), block.timestamp);
+            }
         }
         }
 
