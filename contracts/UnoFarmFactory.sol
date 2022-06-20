@@ -2,12 +2,12 @@
 pragma solidity 0.8.10;
 pragma experimental ABIEncoderV2;
 
-import '@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol';
-import '@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol';
-import './interfaces/IUnoAccessManager.sol'; 
-import './interfaces/IUnoAssetRouter.sol';
+import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
+import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
+import "./interfaces/IUnoAccessManager.sol";
+import "./interfaces/IUnoAssetRouter.sol";
 
-contract UnoFarmFactory{
+contract UnoFarmFactory {
     /**
      * @dev Contract Variables:
      * accessManager - Role manager contract.
@@ -22,24 +22,29 @@ contract UnoFarmFactory{
 
     address public farmBeacon;
     mapping(address => address) public Farms;
+
     address[] public pools;
 
     event FarmDeployed(address indexed farmAddress);
 
     // ============ Methods ============
 
-    constructor (address _implementation, address _accessManager, address _assetRouter) {
+    constructor(
+        address _implementation,
+        address _accessManager,
+        address _assetRouter
+    ) {
         farmBeacon = address(new UpgradeableBeacon(_implementation));
         accessManager = IUnoAccessManager(_accessManager);
         assetRouter = _assetRouter;
-        IUnoAssetRouter(_assetRouter).initialize(_accessManager, address(this)); 
+        IUnoAssetRouter(_assetRouter).initialize(_accessManager, address(this));
     }
 
     /**
      * @dev Creates new farm.
      */
     function createFarm(address pool) external returns (address) {
-        require(Farms[pool] == address(0), 'FARM_EXISTS');
+        require(Farms[pool] == address(0), "FARM_EXISTS");
         Farms[pool] = _createFarm(pool);
         pools.push(pool);
         return Farms[pool];
@@ -49,7 +54,7 @@ contract UnoFarmFactory{
      * @dev Upgrades all farms deployed by this factory using beacon proxy. Only available to the admin.
      */
     function upgradeFarms(address newImplementation) external {
-        require(accessManager.hasRole(accessManager.ADMIN_ROLE(), msg.sender), 'CALLER_NOT_ADMIN');
+        require(accessManager.hasRole(accessManager.ADMIN_ROLE(), msg.sender), "CALLER_NOT_ADMIN");
         UpgradeableBeacon(farmBeacon).upgradeTo(newImplementation);
     }
 
@@ -57,14 +62,7 @@ contract UnoFarmFactory{
      * @dev Deploys new Farm contract and calls initialize on it. Emits {FarmDeployed} event.
      */
     function _createFarm(address _pool) internal returns (address) {
-        BeaconProxy proxy = new BeaconProxy(
-            farmBeacon,
-            abi.encodeWithSelector(
-                bytes4(keccak256('initialize(address,address)')),
-                _pool,
-                assetRouter
-            )
-        );
+        BeaconProxy proxy = new BeaconProxy(farmBeacon, abi.encodeWithSelector(bytes4(keccak256("initialize(address,address)")), _pool, assetRouter));
         emit FarmDeployed(address(proxy));
         return address(proxy);
     }

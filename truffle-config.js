@@ -1,32 +1,47 @@
-require('dotenv').config()
+require("dotenv").config();
 const HDWalletProvider = require("@truffle/hdwallet-provider");
+
+const fs = require("fs");
+const mnemonic = fs.readFileSync(".secret").toString().trim();
+
+require("dotenv").config();
+
+const setupWallet = url => {
+  return new HDWalletProvider({
+    mnemonic: mnemonic,
+    providerOrUrl: url,
+    numberOfAddresses: 1,
+  });
+};
 
 module.exports = {
   contracts_build_directory: "./build",
 
   networks: {
-    polygon: {
-      provider: () => {
-        return new HDWalletProvider({
-          privateKeys:  [process.env.PRIVATE_KEY],
-          providerOrUrl: "wss://speedy-nodes-nyc.moralis.io/001e5f8996373e891a2971f5/polygon/mainnet/ws",
-          chainId: 137,
-          pollingInterval: 30000
-        })
-      },
-      networkCheckTimeout: 10000,
+    aurora: {
+      networkCheckTimeout: 100000,
+      timeoutBlocks: 2000,
+      provider: () => new HDWalletProvider(mnemonic, "https://mainnet.aurora.dev"),
+      // provider: () => new HDWalletProvider(mnemonic, "https://aurora-mainnet.infura.io/v3/125bc41c3c54485d8a57568bc1a83829"),
+      network_id: 0x4e454152,
       gas: 7500000,
-      gasPrice: 70000000000,
-      network_id: 137,
-      addressIndex: 0
+      gasPrice: 30000000,
+      from: "0x173c35e1D60f061F2Fd4a0C4a881119d39D51E7a",
     },
-    test: {
-      host: '127.0.0.1',
-      port: 8545,
-      gas: 7500000,
-      gasPrice: 1,
-      network_id: 137
-    }
+    // aurora: {
+    //   networkCheckTimeout: 10000,
+    //   provider: () => setupWallet("wss://mainnet.aurora.dev"),
+    //   network_id: 0x4e454152, // 0x4e454152
+    //   gas: 10000000,
+    //   from: "0x173c35e1D60f061F2Fd4a0C4a881119d39D51E7a",
+    // },
+
+    auroraTestnet: {
+      provider: () => setupWallet("wss://testnet.aurora.dev"),
+      network_id: 0x4e454153,
+      gas: 10000000,
+      from: "0x173c35e1D60f061F2Fd4a0C4a881119d39D51E7a",
+    },
   },
   plugins: ["truffle-contract-size"],
   compilers: {
@@ -35,13 +50,13 @@ module.exports = {
       settings: {
         optimizer: {
           enabled: true,
-          runs: 200
+          runs: 200,
         },
-      }
-    }
+      },
+    },
   },
 
   db: {
-    enabled: false
-  }
+    enabled: false,
+  },
 };
