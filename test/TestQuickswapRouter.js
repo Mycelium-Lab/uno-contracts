@@ -26,8 +26,8 @@ approxeq = function(bn1, bn2, epsilon, message) {
 }
 
 contract('UnoAssetRouterQuickswap', accounts => {
-    accounts[0] = "0xA4d07c23F28A1eb1ae471e530c3f5e0038d282F2"//"0xEa6E311c23
-    accounts[1] = "0x4AF7f964fb155cc2d59fcD8cA6f2E956d995cBDE"//"0xA7b7DDF752
+    accounts[0] = "0xA4d07c23F28A1eb1ae471e530c3f5e0038d282F2"
+    accounts[1] = "0x4AF7f964fb155cc2d59fcD8cA6f2E956d995cBDE"
 
     let accessManager
     let assetRouter 
@@ -36,6 +36,9 @@ contract('UnoAssetRouterQuickswap', accounts => {
     let stakingRewards
     let stakingToken
     let snapshotId
+
+    let tokenA
+    let tokenB
 
     before(async () => {
         const snapshot = await timeMachine.takeSnapshot()
@@ -57,6 +60,12 @@ contract('UnoAssetRouterQuickswap', accounts => {
         stakingRewards = await IStakingRewards.at(pool)
         const stakingTokenAddress = await stakingRewards.stakingToken()
         stakingToken = await IUniswapV2Pair.at(stakingTokenAddress)
+
+        const tokenAAddress = await stakingToken.token0()
+        const tokenBAddress = await stakingToken.token1()
+
+        tokenA = await IUniswapV2Pair.at(tokenAAddress)
+        tokenB = await IUniswapV2Pair.at(tokenBAddress)
     })
 
     describe("Can't call multiple initializations", () => {
@@ -248,35 +257,29 @@ contract('UnoAssetRouterQuickswap', accounts => {
         describe('deposit normal tokens', () => {
             let balanceAbefore
             let balanceBbefore
+            let stakeABefore
+            let stakeBBefore
             
             let amountA
             let amountB
 
-            let tokenAContract
-            let tokenBContract
-
             let receipt
 
             before(async () => {
-                const tokenA = await stakingToken.token0()
-                const tokenB = await stakingToken.token1()
-
-                tokenAContract = await IUniswapV2Pair.at(tokenA)
-                tokenBContract = await IUniswapV2Pair.at(tokenB)
-
                 const routerContract = await IUniswapV2Router01.at(quickswapRouter)
                 await stakingToken.approve(quickswapRouter, amounts[4], {from: accounts[0]})
-                const tx = await routerContract.removeLiquidity(tokenA, tokenB, amounts[4], 1, 1, accounts[0], '16415710000', {from: accounts[0]})
+                const tx = await routerContract.removeLiquidity(tokenA.address, tokenB.address, amounts[4], 1, 1, accounts[0], '16415710000', {from: accounts[0]})
                 const event = tx.receipt.rawLogs.find(l => { return l.topics[0] == '0xdccd412f0b1252819cb1fd330b93224ca42612892bb3f4f789976e6d81936496' })
 
                 amountA = web3.utils.hexToNumberString(event.data.substring(0,66))
                 amountB = web3.utils.hexToNumberString('0x' + event.data.substring(66,130))
 
-                balanceAbefore = await tokenAContract.balanceOf(accounts[0])
-                balanceBbefore = await tokenBContract.balanceOf(accounts[0])
+                balanceAbefore = await tokenA.balanceOf(accounts[0])
+                balanceBbefore = await tokenB.balanceOf(accounts[0]);
+                ({stakeLP, stakeA:stakeABefore, stakeB:stakeBBefore} = await assetRouter.userStake(accounts[0], pool));
 
-                await tokenAContract.approve(assetRouter.address, amountA, {from: accounts[0]})
-                await tokenBContract.approve(assetRouter.address, amountB, {from: accounts[0]})
+                await tokenA.approve(assetRouter.address, amountA, {from: accounts[0]})
+                await tokenB.approve(assetRouter.address, amountB, {from: accounts[0]})
             })
             it('reverts if minAmountA > amountA || minAmountB > amountB', async () => {
                 await expectRevert(
@@ -293,23 +296,23 @@ contract('UnoAssetRouterQuickswap', accounts => {
                 expectEvent(receipt, 'Deposit', {lpPool:pool, from: accounts[0], recipient: accounts[0]})
             })
             it('withdraws tokens from balance', async () => {
-                const balanceAafter = await tokenAContract.balanceOf(accounts[0])
-                approxeq(balanceAbefore.sub(balanceAafter), new BN(amountA), new BN(10), 'Token A amount is not close enough to the LP amount sent')
+                const {stakeA, stakeB} = await assetRouter.userStake(accounts[0], pool)
+                const balanceAafter = await tokenA.balanceOf(accounts[0])
+                const balanceBafter = await tokenB.balanceOf(accounts[0])
 
-                const balanceBafter = await tokenBContract.balanceOf(accounts[0])
-                approxeq(balanceBbefore.sub(balanceBafter), new BN(amountB), new BN(10), 'Token B amount is not close enough to the LP amount sent')
+                approxeq(stakeA.sub(stakeABefore), balanceAbefore.sub(balanceAafter), new BN(1), "StakeA is not correct")
+                approxeq(stakeB.sub(stakeBBefore), balanceBbefore.sub(balanceBafter), new BN(1), "StakeB is not correct")
             })
             it('updates stakes' ,async () => {
                 const {stakeLP} = await assetRouter.userStake(accounts[0], pool)
-
-                approxeq(stakeLP, amounts[0].add(amounts[1]).add(amounts[4]), new BN(10), "LP Amount sent doesn't equal userStake")//add to stake
+                approxeq(stakeLP, amounts[0].add(amounts[1]).add(amounts[4]), new BN(10), "LP Amount sent doesn't equal userStake")
             })
             it('updates totalDeposits', async () => {
                 const { totalDepositsLP } = await assetRouter.totalDeposits(pool)
-                approxeq(totalDepositsLP, amounts[0].add(amounts[1]).add(amounts[2]).add(amounts[3]).add(amounts[4]), new BN(10), "Total amount sent doesn't equal totalDeposits")//add to stake
+                approxeq(totalDepositsLP, amounts[0].add(amounts[1]).add(amounts[2]).add(amounts[3]).add(amounts[4]), new BN(10), "Total amount sent doesn't equal totalDeposits")
             })
             it('stakes tokens in StakingRewards contract', async () => {
-                approxeq(await stakingRewards.balanceOf(farm.address), amounts[0].add(amounts[1]).add(amounts[2]).add(amounts[3]).add(amounts[4]), new BN(10), "Total amount sent doesn't equal totalDeposits")//add to stake
+                approxeq(await stakingRewards.balanceOf(farm.address), amounts[0].add(amounts[1]).add(amounts[2]).add(amounts[3]).add(amounts[4]), new BN(10), "Total amount sent doesn't equal totalDeposits")
             })
         })
     })
@@ -360,7 +363,7 @@ contract('UnoAssetRouterQuickswap', accounts => {
                 expectEvent(receipt2, 'Withdraw', {lpPool:pool, from: accounts[1], recipient: accounts[1], amount:amounts[2]})
             })
         
-            it('sets userStake rightly for account accounts[0]', async () => {
+            it('correctly updates userStake for accounts[0]', async () => {
                 const {stakeLP} = await assetRouter.userStake(accounts[0], pool)
                 assert.equal(
                     stakeLP.toString(),
@@ -368,7 +371,7 @@ contract('UnoAssetRouterQuickswap', accounts => {
                     "Stake is not zero for accounts[0]"
                 )
             })
-            it('sets userStake rightly for account accounts[1]', async () => {
+            it('correctly updates userStake for accounts[1]', async () => {
                 const {stakeLP} = await assetRouter.userStake(accounts[1], pool)
                 assert.equal(
                     stakeLP.toString(),
@@ -376,7 +379,7 @@ contract('UnoAssetRouterQuickswap', accounts => {
                     "Stake is not right for accounts[1]"
                 )
             })
-            it('sets totalDeposits correctly', async () => {
+            it('correctly updates totalDeposits', async () => {
                 const { totalDepositsLP } = await assetRouter.totalDeposits(pool)
                 assert.equal(
                     totalDepositsLP.toString(),
@@ -399,96 +402,83 @@ contract('UnoAssetRouterQuickswap', accounts => {
                 )
             })
         })
-        /*describe('withdraws for different acc', () => {
+        describe('withdraws for different acc', () => {
             let balance1before
             let balance2before
+
+            let stake1before
+            let stake2before
+
             let receipt
-            const amount = lpTokensSent[0].amount
-            const withdrawAmount = amount.sub(new BN(100000))
             before(async () => {
-                await stakingTokenContract.approve(farmFactory.address, amount, {from: accounts[0]})
-                await farmFactory.deposit(0, 0, amount, pool, accounts[0], {from: accounts[0]})
+                balance1before = await stakingToken.balanceOf(accounts[0]);
+                balance2before = await stakingToken.balanceOf(accounts[1]);
+
+                ({stakeLP:stake1before} = await assetRouter.userStake(accounts[0], pool));
+                ({stakeLP:stake2before} = await assetRouter.userStake(accounts[1], pool));
             
-                balance1before = await stakingTokenContract.balanceOf(accounts[0])
-                balance2before = await stakingTokenContract.balanceOf(accounts[1])
-            
-                receipt = await farmFactory.withdraw(pool, withdrawAmount, true, false, accounts[1], {from: accounts[0]})
+                receipt = await assetRouter.withdraw(pool, amounts[1], 0, 0, true, accounts[1], {from: accounts[0]})
             })
             it('fires events', async () => {
-                expectEvent(receipt, 'Withdraw', {sender: accounts[0], lpPool:pool, amount:withdrawAmount})
+                expectEvent(receipt, 'Withdraw', {lpPool:pool, from: accounts[0], recipient: accounts[1], amount:amounts[1]})
             })
-            it('sets userStake rightly for account accounts[0]', async () => {
-                const {stakeLP} = await farmFactory.userStake(accounts[0], pool)
+            it('correctly changes userStake for accounts[0]', async () => {
+                const {stakeLP} = await assetRouter.userStake(accounts[0], pool)
                 assert.equal(
                     stakeLP.toString(),
-                    (amount.sub(withdrawAmount)).toString(),
+                    (stake1before.sub(amounts[1])).toString(),
                     "Stake is not right for accounts[0]"
                 )
             })
             it('doesnt change stake for accounts[1]', async () => {
-                const {stakeLP} = await farmFactory.userStake(accounts[1], pool)
+                const {stakeLP} = await assetRouter.userStake(accounts[1], pool)
                 assert.equal(
                     stakeLP.toString(),
-                    '0',
+                    stake2before.toString(),
                     "Stake is not right for accounts[1]"
                 )
             })
             it('transfers tokens to accounts[1]', async ()=>{
-                const balance1after = await stakingTokenContract.balanceOf(accounts[0])
+                const balance1after = await stakingToken.balanceOf(accounts[0])
                 assert.equal(
                     (balance1after.sub(balance1before)).toString(),
                     '0',
                     "Tokens were withdrawn for accounts[0]"
                 )
-                const balance2after = await stakingTokenContract.balanceOf(accounts[1])
+                const balance2after = await stakingToken.balanceOf(accounts[1])
                 assert.equal(
-                    (balance2after.sub(balance2before)),
-                    withdrawAmount.toString(),
+                    (balance2after.sub(balance2before)).toString(),
+                    amounts[1].toString(),
                     "Tokens withdrawn for accounts[1] do not equal provided in the withdraw function"
                 )
             })
         })
-        describe('withdraws in normal tokens', () => {
+        describe('withdraws normal tokens', () => {
             let balanceAbefore
             let balanceBbefore
             let receipt
-            const amount = lpTokensSent[0].amount
 
-            let amountA
-            let amountB
-            let tokenAContract
-            let tokenBContract
+            let stakeLP1
+            let stakeA1
+            let stakeB1
+
+            let stakeLP2
+            let stakeA2
+            let stakeB2
+
             before(async () => {
+                balanceAbefore = await tokenA.balanceOf(accounts[0])
+                balanceBbefore = await tokenB.balanceOf(accounts[0]);
 
-                const tokenA = await stakingTokenContract.token0()
-                const tokenB = await stakingTokenContract.token1()
-
-                tokenAContract = await IUniswapV2Pair.at(tokenA)
-                tokenBContract = await IUniswapV2Pair.at(tokenB)
-                const routerContract = await IUniswapV2Router01.at(quickswapRouter)
- 
-                await stakingTokenContract.approve(quickswapRouter, amount, {from: accounts[0]})
-                const tx = await routerContract.removeLiquidity(tokenA, tokenB, amount, 1, 1, accounts[0], '16415710000', {from: accounts[0]})
-                const event = tx.receipt.rawLogs.find(l => { return l.topics[0] == '0xdccd412f0b1252819cb1fd330b93224ca42612892bb3f4f789976e6d81936496' })
-
-                amountA = Web3Utils.hexToNumberString(event.data.substring(0,66))
-                amountB = Web3Utils.hexToNumberString('0x' + event.data.substring(66,130))
-
-
-                await tokenAContract.approve(farmFactory.address, amountA, {from: accounts[0]})
-                await tokenBContract.approve(farmFactory.address, amountB, {from: accounts[0]})
-    
-                await farmFactory.deposit(amountA, amountB, 0, pool, accounts[0], {from: accounts[0]})
-                const {stakeLP} = await farmFactory.userStake(accounts[0], pool)
-                balanceAbefore = await tokenAContract.balanceOf(accounts[0])
-                balanceBbefore = await tokenBContract.balanceOf(accounts[0])
-                receipt = await farmFactory.withdraw(pool, stakeLP, false, false, accounts[0], {from: accounts[0]})
+                ({stakeLP:stakeLP1, stakeA:stakeA1, stakeB:stakeB1} = await assetRouter.userStake(accounts[0], pool));
+                ({stakeLP:stakeLP2, stakeA:stakeA2, stakeB:stakeB2} = await assetRouter.userStake(accounts[1], pool));
+                receipt = await assetRouter.withdraw(pool, stakeLP1, 0, 0, false, accounts[0], {from: accounts[0]})
             })
             it('fires events', async () => {
-                expectEvent(receipt, 'Withdraw', {sender: accounts[0], lpPool:pool})
+                expectEvent(receipt, 'Withdraw', {lpPool:pool, from: accounts[0], recipient: accounts[0], amount:stakeLP1})
             })
-            it('sets userStake rightly', async () => {
-                const {stakeLP, stakeA, stakeB} = await farmFactory.userStake(accounts[0], pool)
+            it('correctly updates accounts[0] stake', async () => {
+                const {stakeLP, stakeA, stakeB} = await assetRouter.userStake(accounts[0], pool)
                 assert.equal(
                     stakeLP.toString(),
                     '0',
@@ -505,32 +495,114 @@ contract('UnoAssetRouterQuickswap', accounts => {
                     "stakeB is wrong"
                 )
             })
-            it('sets totalDeposits rightly', async () => {
-                const { totalDepositsLP, totalDepositsA, totalDepositsB } = await farmFactory.totalDeposits(pool)
+            it('doesnt update accounts[1] stake', async () => {
+                const {stakeLP, stakeA, stakeB} = await assetRouter.userStake(accounts[1], pool)
                 assert.equal(
-                    totalDepositsLP.toString(),
-                    '0',
-                    "totalDepositsLP are wrong"
+                    stakeLP.toString(),
+                    stakeLP2,
+                    "stakeLP is wrong"
                 )
                 assert.equal(
-                    totalDepositsA.toString(),
-                    '0',
-                    "totalDepositsA are wrong"
+                    stakeA.toString(),
+                    stakeA2,
+                    "stakeA is wrong"
                 )
                 assert.equal(
-                    totalDepositsB.toString(),
-                    '0',
-                    "totalDepositsB are wrong"
+                    stakeB.toString(),
+                    stakeB2,
+                    "stakeB is wrong"
                 )
             })
             it('transfers tokens to user', async ()=>{
-                const balanceAafter = await tokenAContract.balanceOf(accounts[0])
-                approxeq(balanceAafter.sub(balanceAbefore), new BN(amountA), new BN(10), "TokensA withdrawn do not equal deposited")
+                const balanceAafter = await tokenA.balanceOf(accounts[0])
+                assert.equal(
+                    (balanceAafter.sub(balanceAbefore)).toString(),
+                    stakeA1.toString(),
+                    "TokensA withdrawn do not equal deposited"
+                )
 
-                const balanceBafter = await tokenBContract.balanceOf(accounts[0])
-                approxeq(balanceBafter.sub(balanceBbefore), new BN(amountB), new BN(10), "TokensB withdrawn do not equal deposited")
+                const balanceBafter = await tokenB.balanceOf(accounts[0])
+                assert.equal(
+                    (balanceBafter.sub(balanceBbefore)).toString(),
+                    stakeB1.toString(),
+                    "TokensB withdrawn do not equal deposited"
+                )
             })
-        })*/
+        })
+        describe('withdraws normal tokens for a different user', () => {
+            let balanceAbefore
+            let balanceBbefore
+            let receipt
+
+            let stakeLP2
+            let stakeA2
+            let stakeB2
+            let stakeLP1
+            let stakeA1
+            let stakeB1
+            before(async () => {
+                balanceAbefore = await tokenA.balanceOf(accounts[0])
+                balanceBbefore = await tokenB.balanceOf(accounts[0]);
+
+                ({stakeLP:stakeLP1, stakeA:stakeA1, stakeB:stakeB1 } = await assetRouter.userStake(accounts[0], pool));
+                ({stakeLP:stakeLP2, stakeA:stakeA2, stakeB:stakeB2 } = await assetRouter.userStake(accounts[1], pool));
+                receipt = await assetRouter.withdraw(pool, stakeLP2, 0, 0, false, accounts[0], {from: accounts[1]})
+            })
+            it('fires events', async () => {
+                expectEvent(receipt, 'Withdraw', {lpPool:pool, from: accounts[1], recipient: accounts[0], amount:stakeLP2})
+            })
+            it('correctly updates accounts[1] stake', async () => {
+                const {stakeLP, stakeA, stakeB} = await assetRouter.userStake(accounts[1], pool)
+                assert.equal(
+                    stakeLP.toString(),
+                    '0',
+                    "stakeLP is wrong"
+                )
+                assert.equal(
+                    stakeA.toString(),
+                    '0',
+                    "stakeA is wrong"
+                )
+                assert.equal(
+                    stakeB.toString(),
+                    '0',
+                    "stakeB is wrong"
+                )
+            })
+            it('doesnt update accounts[0] stake', async () => {
+                const {stakeLP, stakeA, stakeB} = await assetRouter.userStake(accounts[0], pool)
+                assert.equal(
+                    stakeLP.toString(),
+                    stakeLP1,
+                    "stakeLP is wrong"
+                )
+                assert.equal(
+                    stakeA.toString(),
+                    stakeA1,
+                    "stakeA is wrong"
+                )
+                assert.equal(
+                    stakeB.toString(),
+                    stakeB1,
+                    "stakeB is wrong"
+                )
+            })
+            it('transfers tokens to correct user', async ()=>{
+                const balanceAafter = await tokenA.balanceOf(accounts[0])
+                assert.equal(
+                    (balanceAafter.sub(balanceAbefore)).toString(),
+                    stakeA2.toString(),
+                    "TokensA withdrawn do not equal deposited"
+                )
+
+                const balanceBafter = await tokenB.balanceOf(accounts[0])
+                assert.equal(
+                    (balanceBafter.sub(balanceBbefore)).toString(),
+                    stakeB2.toString(),
+                    "TokensB withdrawn do not equal deposited"
+                )
+            })
+        })
     })
     /*describe('onlyDistributor, onlyPauser, onlyAdmin', () => {
 
@@ -538,6 +610,7 @@ contract('UnoAssetRouterQuickswap', accounts => {
     after(async () => {
         await timeMachine.revertToSnapshot(snapshotId)
     })
+    //check getTokens
     //pausable - only for pausers, prevents functions from beeng called
     //router upgradeability
 })
