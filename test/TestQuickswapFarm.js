@@ -1,4 +1,4 @@
-const { expectRevert } = require('@openzeppelin/test-helpers')
+const { expectEvent, expectRevert, BN } = require('@openzeppelin/test-helpers')
 const IStakingRewards = artifacts.require('IStakingRewards')
 const IUniswapV2Pair = artifacts.require('IUniswapV2Pair')
 
@@ -10,17 +10,24 @@ contract('UnoFarmQuickswap', accounts => {
     let assetRouter = accounts[0]
 
     let implementation
-    let stakingRewards
-    let stakingToken
+    let stakingRewards, stakingToken
+
+    let receipt
 
     before(async () => {
         implementation = await Farm.new({from: accounts[0]})
 
-        await implementation.initialize(pool, assetRouter, {from: accounts[0]})
+        receipt = await implementation.initialize(pool, assetRouter, {from: accounts[0]})
 
         stakingRewards = await IStakingRewards.at(pool)
         const stakingTokenAddress = await stakingRewards.stakingToken()
         stakingToken = await IUniswapV2Pair.at(stakingTokenAddress)
+    })
+
+    describe("Emits initialize event", () => {
+        it('fires events', async () => {
+            expectEvent(receipt, 'Initialized', { version: new BN(1) })
+        })
     })
 
     describe("Can't call multiple initializations", () => {
