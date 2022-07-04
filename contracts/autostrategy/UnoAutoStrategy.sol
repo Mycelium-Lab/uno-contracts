@@ -12,44 +12,76 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      * @dev PoolInfo:
      * {assetRouter} - UnoAssetRouter contract.
      * {pool} - Pool address. 
+     * {tokenA} - Pool's first token address.
+     * {tokenB} - Pool's second token address.
      */
+    struct _PoolInfo {
+        IUnoAssetRouter assetRouter;
+        address pool;
+    }
+
     struct PoolInfo {
         IUnoAssetRouter assetRouter;
         address pool;
+        IERC20Upgradeable tokenA;
+        IERC20Upgradeable tokenB;
+    }
+
+    /**
+     * @dev MoveLiquidityInfo:
+     * {leftoverA} - TokenA leftovers after MoveLiquidity() call.
+     * {leftoverB} - TokenB leftovers after MoveLiquidity() call. 
+     * {totalSupply} - totalSupply after MoveLiquidity() call.
+     * {block} - MoveLiquidity() call block.
+     */
+    struct MoveLiquidityInfo {
+        uint256 leftoverA;
+        uint256 leftoverB;
+        uint256 totalSupply;
+        uint256 block;
+    }
+    
+    /**
+     * @dev inputToken, outputToken - structs used in OdosRouter contract.
+     */
+    struct inputToken {
+      address tokenAddress;
+      uint256 amountIn;
+      address receiver;
+      bytes permit;
+    }
+
+    struct outputToken {
+      address tokenAddress;
+      uint256 relativeValue;
+      address receiver;
     }
     
     /**
      * @dev Contract Variables:
-     * {tokenA, tokenB} - Token pair that the strategy uses.
+     * {OdosRouter} - Contract that executes swaps.
 
-     * {currentPoolID} - Current pool the strategy uses ({pools} index).
-     * {pools} - Pools the strategy can use and move liquidity to.
+     * {poolID} - Current pool the strategy uses ({pools} index).
+     * {pools} - Pools this strategy can use and move liquidity to.
 
      * {reserveLP} - LP token reserve.
-     * {leftoverA, leftoverB} - Token leftovers at the {lastMoveLiquidity} block.
-     * {lastMoveLiquidity} - Last moveLiquidity() call block.
-
-     * {blockedLiquidty} - Prevents user from stealing leftover tokens by depositing and exiting before moveLiquidity() has occured.
-     * {lastTotalSupply} - {totalSupply} at the {lastMoveLiquidity} block.
+     * {lastMoveInfo} - Info on last MoveLiquidity() block.
+     * {blockedLiquidty} - User's blocked LP tokens. Prevents user from stealing leftover tokens by depositing and exiting before moveLiquidity() has been called.
 
      * {accessManager} - Role manager contract.
      * {factory} - The address of AutoStrategyFactory this contract was deployed by.
 
      * {MINIMUM_LIQUIDITY} - Ameliorates rounding errors.
      */
-    address public tokenA;
-    address public tokenB;
 
-    uint256 public currentPoolID;
+    address private constant OdosRouter = 0xa32EE1C40594249eb3183c10792BcF573D4Da47C;
+
+    uint256 public poolID;
     PoolInfo[] public pools;
 
     uint256 private reserveLP;
-    uint256 private leftoverA;
-    uint256 private leftoverB;
-    uint256 private lastMoveLiquidity;
-
+    MoveLiquidityInfo private lastMoveInfo;
     mapping(address =>  mapping(uint256 => uint256)) private blockedLiquidty;
-    uint256 private lastTotalSupply;
 
     IUnoAccessManager public accessManager;
     IUnoAutoStrategyFactory public factory;
@@ -57,9 +89,9 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
     uint256 private constant MINIMUM_LIQUIDITY = 10**3;
     bytes32 private constant LIQUIDITY_MANAGER_ROLE = keccak256('LIQUIDITY_MANAGER_ROLE');
 
-    event Deposit(address indexed from, address indexed recipient, uint256 amountA, uint256 amountB);
-    event Withdraw(address indexed from, address indexed recipient, uint256 amountA, uint256 amountB);
-    event MoveLiquidity(uint256 indexed previousPoolID, uint256 indexed newPoolID);
+    event Deposit(uint256 indexed poolID, address indexed from, address indexed recipient, uint256 amountA, uint256 amountB);
+    event Withdraw(uint256 indexed poolID, address indexed from, address indexed recipient, uint256 amountA, uint256 amountB);
+    event MoveLiquidity(uint256 indexed previousPoolID, uint256 indexed nextPoolID);
 
     modifier onlyLiquidityManager(){
         require(accessManager.hasRole(LIQUIDITY_MANAGER_ROLE, msg.sender), 'CALLER_NOT_LIQUIDITY_MANAGER');
@@ -73,31 +105,40 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
 
     // ============ Methods ============
 
-    function initialize(PoolInfo[] calldata poolInfos, string calldata _name, string calldata _symbol, IUnoAccessManager _accessManager) external initializer {
+    function initialize(_PoolInfo[] calldata poolInfos, string calldata _name, string calldata _symbol, IUnoAccessManager _accessManager) external initializer {
         require (poolInfos.length >= 2, 'NOT_ENOUGH_POOLS_PROVIDED');
-        (tokenA, tokenB) = poolInfos[0].assetRouter.getTokens(poolInfos[0].pool);
         
         for (uint256 i = 0; i < poolInfos.length; i++) {
-            if (i != 0) {
-                (address _tokenA, address _tokenB) = poolInfos[i].assetRouter.getTokens(poolInfos[i].pool);
-                require(((_tokenA == tokenA) && (_tokenB == tokenB)) || ((_tokenA == tokenB) && (_tokenB == tokenA)), 'WRONG_POOL_TOKENS');
-            }
+            (address _tokenA, address _tokenB) = poolInfos[i].assetRouter.getTokens(poolInfos[i].pool);
+            PoolInfo memory pool = PoolInfo({
+                assetRouter: poolInfos[i].assetRouter,
+                pool: poolInfos[i].pool,
+                tokenA: IERC20Upgradeable(_tokenA),
+                tokenB: IERC20Upgradeable(_tokenB)
+            });
+            pools.push(pool);
 
-            pools.push(poolInfos[i]);
-            IERC20Upgradeable(tokenA).approve(address(poolInfos[i].assetRouter), type(uint256).max);
-            IERC20Upgradeable(tokenB).approve(address(poolInfos[i].assetRouter), type(uint256).max);
+            if (pool.tokenA.allowance(address(this), address(pool.assetRouter)) == 0) {
+                pool.tokenA.approve(OdosRouter, type(uint256).max);
+                pool.tokenA.approve(address(pool.assetRouter), type(uint256).max);
+            }
+            if (pool.tokenB.allowance(address(this), address(pool.assetRouter)) == 0) {
+                pool.tokenB.approve(OdosRouter, type(uint256).max);
+                pool.tokenB.approve(address(pool.assetRouter), type(uint256).max);
+            }
         }
 
         __ERC20_init(_name, _symbol);
         __ReentrancyGuard_init();
         accessManager = _accessManager;
 
-        lastMoveLiquidity = block.number;
+        lastMoveInfo.block = block.number;
         factory = IUnoAutoStrategyFactory(msg.sender);
     }
 
     /**
-     * @dev Deposits tokens in the pools[currentPoolID] pool. Mints tokens representing user share. Emits {Deposit} event.
+     * @dev Deposits tokens in the pools[poolID] pool. Mints tokens representing user share. Emits {Deposit} event.
+     * @param pid - Current poolID. Throws revert if moveLiquidity() has been called before the transaction has been mined.
      * @param amountA - Token A amount to deposit.
      * @param amountB  - Token B amount to deposit.
      * @param amountAMin - Bounds the extent to which the B/A price can go up before the transaction reverts.
@@ -108,23 +149,25 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      * @return sentB - Deposited token B amount.
      * @return liquidity - Total liquidity minted for the {recipient}.
      */
-    function deposit(uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin, address recipient) whenNotPaused nonReentrant external returns (uint256 sentA, uint256 sentB, uint256 liquidity) {
-        require (amountA > 0 && amountB > 0, 'NO_LIQUIDITY_PROVIDED');
+    function deposit(uint256 pid, uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin, address recipient) whenNotPaused nonReentrant external returns (uint256 sentA, uint256 sentB, uint256 liquidity) {
+        require (pid == poolID, 'BAD_POOL_ID');
+        PoolInfo memory pool = pools[poolID];
 
-        IERC20Upgradeable(tokenA).safeTransferFrom(msg.sender, address(this), amountA);
-        IERC20Upgradeable(tokenB).safeTransferFrom(msg.sender, address(this), amountB);
+        pool.tokenA.safeTransferFrom(msg.sender, address(this), amountA);
+        pool.tokenB.safeTransferFrom(msg.sender, address(this), amountB);
 
-        (sentA, sentB,) = _deposit(amountA, amountB, amountAMin, amountBMin);
+        (sentA, sentB,) = pool.assetRouter.deposit(pool.pool, amountA, amountB, amountAMin, amountBMin, 0, address(this));
         liquidity = mint(recipient);
 
-        IERC20Upgradeable(tokenA).safeTransfer(msg.sender, amountA - sentA);
-        IERC20Upgradeable(tokenB).safeTransfer(msg.sender, amountB - sentB);
+        pool.tokenA.safeTransfer(msg.sender, amountA - sentA);
+        pool.tokenB.safeTransfer(msg.sender, amountB - sentB);
 
-        emit Deposit(msg.sender, recipient, sentA, sentB); 
+        emit Deposit(poolID, msg.sender, recipient, sentA, sentB); 
     }
 
     /**
-     * @dev Withdraws tokens from the {pools[currentPoolID]} pool and sends them to the recipient. Burns tokens representing user share. Emits {Withdraw} event.
+     * @dev Withdraws tokens from the {pools[poolID]} pool and sends them to the recipient. Burns tokens representing user share. Emits {Withdraw} event.
+     * @param pid - Current poolID. Throws revert if moveLiquidity() has been called before the transaction has been mined.
      * @param liquidity - Liquidity to burn from this user.
      * @param amountAMin - The minimum amount of tokenA that must be received for the transaction not to revert.
      * @param amountBMin - The minimum amount of tokenB that must be received for the transaction not to revert.
@@ -133,54 +176,85 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      * @return amountA - Token A amount sent to the {recipient}.
      * @return amountB - Token B amount sent to the {recipient}.
      */
-    function withdraw(uint256 liquidity, uint256 amountAMin, uint256 amountBMin, address recipient) whenNotPaused nonReentrant external returns (uint256 amountA, uint256 amountB) {
-        require((liquidity != 0) && (liquidity <= balanceOf(msg.sender)), 'INSUFFICIENT_LIQUIDITY');
+    function withdraw(uint256 pid, uint256 liquidity, uint256 amountAMin, uint256 amountBMin, address recipient) whenNotPaused nonReentrant external returns (uint256 amountA, uint256 amountB) {
+        require (pid == poolID, 'BAD_POOL_ID');
+        PoolInfo memory pool = pools[poolID];
 
         uint256 _leftoverA;
         uint256 _leftoverB;
         // Transfer lefover tokens to recipient.
-        if((liquidity > blockedLiquidty[msg.sender][lastMoveLiquidity]) && (lastTotalSupply != 0)){
-            uint256 leftoverLiquidity = liquidity - blockedLiquidty[msg.sender][lastMoveLiquidity];
-            _leftoverA = leftoverLiquidity * leftoverA / lastTotalSupply;
-            _leftoverB = leftoverLiquidity * leftoverB / lastTotalSupply;
-            IERC20Upgradeable(tokenA).safeTransfer(recipient, _leftoverA);
-            IERC20Upgradeable(tokenB).safeTransfer(recipient, _leftoverB);
+        if((liquidity > blockedLiquidty[msg.sender][lastMoveInfo.block]) && (lastMoveInfo.totalSupply != 0)){
+            uint256 leftoverLiquidity = liquidity - blockedLiquidty[msg.sender][lastMoveInfo.block];
+            _leftoverA = leftoverLiquidity * lastMoveInfo.leftoverA / lastMoveInfo.totalSupply;
+            _leftoverB = leftoverLiquidity * lastMoveInfo.leftoverB / lastMoveInfo.totalSupply;
+            pool.tokenA.safeTransfer(recipient, _leftoverA);
+            pool.tokenB.safeTransfer(recipient, _leftoverB);
         }
 
         uint256 amountLP = burn(liquidity);
-        (amountA, amountB) = _withdraw(amountLP, amountAMin, amountBMin, recipient);
+        (amountA, amountB) = pool.assetRouter.withdraw(pool.pool, amountLP, amountAMin, amountBMin, false, recipient);
 
         amountA += _leftoverA;
         amountB += _leftoverB;
 
-        emit Withdraw(msg.sender, recipient, amountA, amountB); 
+        emit Withdraw(poolID, msg.sender, recipient, amountA, amountB); 
     }
 
     /**
-     * @dev Moves liquidity from {pools[currentPoolID]} to {pools[newPoolID]}. Emits {MoveLiquidity} event.
-     * @param newPoolID - Pool ID to move liquidity to.
-     * @param amountAMin - The minimum amount of tokenA that must be moved for the transaction not to revert.
-     * @param amountBMin - The minimum amount of tokenB that must be moved for the transaction not to revert.
+     * @dev Moves liquidity from {pools[poolID]} to {pools[_poolID]}. Emits {MoveLiquidity} event.
+     * @param _poolID - Pool ID to move liquidity to.
+     * @param swapAData - Data for tokenA swap.
+     * @param swapBData - Data for tokenB swap.
+     * @param amountAMin - The minimum amount of tokenA that must be deposited in {pools[_poolID]} for the transaction not to revert.
+     * @param amountBMin - The minimum amount of tokenB that must be deposited in {pools[_poolID]} for the transaction not to revert.
+     *
+     * Note: This function can only be called by LiquidityManager.
      */
-    function moveLiquidity(uint256 newPoolID, uint256 amountAMin, uint256 amountBMin) whenNotPaused nonReentrant external onlyLiquidityManager {
-        require(lastMoveLiquidity != block.number, 'CANT_CALL_ON_THE_SAME_BLOCK');
+    function moveLiquidity(uint256 _poolID, bytes calldata swapAData, bytes calldata swapBData, uint256 amountAMin, uint256 amountBMin) whenNotPaused nonReentrant external onlyLiquidityManager {
         require(totalSupply() != 0, 'NO_LIQUIDITY');
-        require((newPoolID < pools.length) && (newPoolID != currentPoolID), 'BAD_POOL_ID');
+        require(lastMoveInfo.block != block.number, 'CANT_CALL_ON_THE_SAME_BLOCK');
+        require((_poolID < pools.length) && (_poolID != poolID), 'BAD_POOL_ID');
 
-        emit MoveLiquidity(currentPoolID, newPoolID); 
+        PoolInfo memory currentPool = pools[poolID];
+        PoolInfo memory newPool = pools[_poolID];
 
-        PoolInfo memory pool = pools[currentPoolID];
-        (uint256 totalDeposits,,) = pool.assetRouter.userStake(address(this), pool.pool);
-        _withdraw(totalDeposits, amountAMin, amountBMin, address(this));
+        (inputToken[] memory inputATokens, outputToken[] memory outputATokens,,,,) = abi.decode(swapAData, (inputToken[],outputToken[],uint256,uint256,address,bytes));
+        (inputToken[] memory inputBTokens, outputToken[] memory outputBTokens,,,,) = abi.decode(swapBData, (inputToken[],outputToken[],uint256,uint256,address,bytes));
+
+        require((inputATokens.length == 1) && (inputBTokens.length == 1), 'BAD_SWAP_INPUT_LENGTH');
+        require((outputATokens.length == 1) && (outputBTokens.length == 1), 'BAD_SWAP_OUTPUT_LENGTH');
+
+        require(inputATokens[0].tokenAddress == address(currentPool.tokenA), 'WRONG_SWAP_A_OUTPUT_TOKEN');
+        require(outputATokens[0].tokenAddress == address(newPool.tokenA), 'WRONG_SWAP_A_OUTPUT_TOKEN');
+
+        require(inputBTokens[0].tokenAddress == address(currentPool.tokenB), 'WRONG_SWAP_B_OUTPUT_TOKEN');
+        require(outputBTokens[0].tokenAddress == address(newPool.tokenB), 'WRONG_SWAP_B_OUTPUT_TOKEN');
+
+        (uint256 totalDeposits,,) = currentPool.assetRouter.userStake(address(this), currentPool.pool);
+        currentPool.assetRouter.withdraw(currentPool.pool, totalDeposits, 0, 0, false, address(this));
+
+        if(currentPool.tokenA != newPool.tokenA){
+            (bool successA,) = OdosRouter.call(swapAData);
+            require(successA, 'SWAP_A_FAILED');
+        }
+
+        if(currentPool.tokenB != newPool.tokenB){
+            (bool successB,) = OdosRouter.call(swapBData);
+            require(successB, 'SWAP_B_FAILED');
+        }
         
-        currentPoolID = newPoolID;
-        (,,reserveLP) = _deposit(IERC20Upgradeable(tokenA).balanceOf(address(this)), IERC20Upgradeable(tokenB).balanceOf(address(this)), amountAMin, amountBMin);
-
+        (,,reserveLP) = newPool.assetRouter.deposit(newPool.pool, newPool.tokenA.balanceOf(address(this)), newPool.tokenB.balanceOf(address(this)), amountAMin, amountBMin, 0, address(this));
+       
         // Set variables for leftover token share calculations.
-        leftoverA = IERC20Upgradeable(tokenA).balanceOf(address(this));
-        leftoverB = IERC20Upgradeable(tokenB).balanceOf(address(this));
-        lastTotalSupply = totalSupply();
-        lastMoveLiquidity = block.number;
+        lastMoveInfo = MoveLiquidityInfo({
+            leftoverA: newPool.tokenA.balanceOf(address(this)),
+            leftoverB: newPool.tokenB.balanceOf(address(this)),
+            totalSupply: totalSupply(),
+            block: block.number
+        });
+
+        emit MoveLiquidity(poolID, _poolID); 
+        poolID = _poolID;
     }
 
     /**
@@ -191,16 +265,8 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      * @return stakeB - Token B stake.
      */
     function userStake(address _address) external view returns (uint256 stakeA, uint256 stakeB) {
-        PoolInfo memory pool = pools[currentPoolID];
-
-        uint256 balanceA;
-        uint256 balanceB;
-        (address _tokenA,) = pool.assetRouter.getTokens(pool.pool);
-        if(tokenA == _tokenA){
-            (, balanceA, balanceB) = pool.assetRouter.userStake(address(this), pool.pool);
-        }else{
-            (, balanceB, balanceA) = pool.assetRouter.userStake(address(this), pool.pool);
-        }
+        PoolInfo memory pool = pools[poolID];
+        (, uint256 balanceA, uint256 balanceB) = pool.assetRouter.userStake(address(this), pool.pool);
 
         uint256 _balance = balanceOf(_address);
         if(_balance != 0){
@@ -208,9 +274,9 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
             stakeA = _balance * balanceA / _totalSupply; 
             stakeB = _balance * balanceB / _totalSupply; 
             // Add leftover tokens.
-            if(lastTotalSupply != 0){
-                stakeA += (_balance - blockedLiquidty[_address][lastMoveLiquidity]) * leftoverA / lastTotalSupply;
-                stakeB += (_balance - blockedLiquidty[_address][lastMoveLiquidity]) * leftoverB / lastTotalSupply;
+            if(lastMoveInfo.totalSupply != 0){
+                stakeA += (_balance - blockedLiquidty[_address][lastMoveInfo.block]) * lastMoveInfo.leftoverA / lastMoveInfo.totalSupply;
+                stakeB += (_balance - blockedLiquidty[_address][lastMoveInfo.block]) * lastMoveInfo.leftoverB / lastMoveInfo.totalSupply;
             }
         }
     }
@@ -221,22 +287,16 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      * @return totalDepositsB - Token B deposits.
      */     
     function getTotalDeposits() external view returns(uint256 totalDepositsA, uint256 totalDepositsB){
-        PoolInfo memory pool = pools[currentPoolID];
-
-        (address _tokenA,) = pool.assetRouter.getTokens(pool.pool);
-        if(tokenA == _tokenA){
-            (, totalDepositsA, totalDepositsB) = pool.assetRouter.userStake(address(this), pool.pool);
-        }else{
-            (, totalDepositsB, totalDepositsA) = pool.assetRouter.userStake(address(this), pool.pool);
-        }
+        PoolInfo memory pool = pools[poolID];
+        (, totalDepositsA, totalDepositsB) = pool.assetRouter.userStake(address(this), pool.pool);
 
         // Add leftover tokens.
-        totalDepositsA += IERC20Upgradeable(tokenA).balanceOf(address(this));
-        totalDepositsB += IERC20Upgradeable(tokenB).balanceOf(address(this));
+        totalDepositsA += pool.tokenA.balanceOf(address(this));
+        totalDepositsB += pool.tokenB.balanceOf(address(this));
     }
 
     function mint(address to) internal returns (uint256 liquidity){
-        PoolInfo memory pool = pools[currentPoolID];
+        PoolInfo memory pool = pools[poolID];
         (uint256 balanceLP,,) = pool.assetRouter.userStake(address(this), pool.pool);
         uint256 amountLP = balanceLP - reserveLP;
 
@@ -255,7 +315,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
     }
 
     function burn(uint256 liquidity) internal returns (uint256 amountLP) {
-        PoolInfo memory pool = pools[currentPoolID];
+        PoolInfo memory pool = pools[poolID];
         (uint256 balanceLP,,) = pool.assetRouter.userStake(address(this), pool.pool);
 
         amountLP = liquidity * balanceLP / totalSupply(); 
@@ -265,36 +325,16 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         reserveLP = balanceLP - amountLP;
     }
 
-    function _deposit(uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin) internal returns (uint256 sentA, uint256 sentB, uint256 liquidity){
-        PoolInfo memory pool = pools[currentPoolID];
-        (address _tokenA,) = pool.assetRouter.getTokens(pool.pool);
-        if(tokenA == _tokenA){
-            (sentA, sentB, liquidity) = pool.assetRouter.deposit(pool.pool, amountA, amountB, amountAMin, amountBMin, 0, address(this));
-        } else {
-            (sentB, sentA, liquidity) = pool.assetRouter.deposit(pool.pool, amountB, amountA, amountBMin, amountAMin, 0, address(this));
-        }
-    }
-
-    function _withdraw(uint256 amountLP, uint256 amountAMin, uint256 amountBMin, address recipient) internal returns (uint256 amountA, uint256 amountB){
-        PoolInfo memory pool = pools[currentPoolID];
-        (address _tokenA,) = pool.assetRouter.getTokens(pool.pool);
-        if(tokenA == _tokenA){
-            (amountA, amountB) = pool.assetRouter.withdraw(pool.pool, amountLP, amountAMin, amountBMin, false, recipient);
-        } else {
-            (amountB, amountA) = pool.assetRouter.withdraw(pool.pool, amountLP, amountBMin, amountAMin, false, recipient);
-        }
-    }
-
     function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual override {
         super._beforeTokenTransfer(from, to, amount);
 
         // Decrease blockedLiquidty from {from} address, but no less then 0.
-        if(amount > blockedLiquidty[from][lastMoveLiquidity]){
-            blockedLiquidty[from][lastMoveLiquidity] = 0;
+        if(amount > blockedLiquidty[from][lastMoveInfo.block]){
+            blockedLiquidty[from][lastMoveInfo.block] = 0;
         } else {
-            blockedLiquidty[from][lastMoveLiquidity] -= amount;
+            blockedLiquidty[from][lastMoveInfo.block] -= amount;
         }
         // Block {to} address from withdrawing their share of leftover tokens immediately.
-        blockedLiquidty[to][lastMoveLiquidity] += amount;
+        blockedLiquidty[to][lastMoveInfo.block] += amount;
     }
 }
