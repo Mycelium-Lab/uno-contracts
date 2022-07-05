@@ -98,6 +98,9 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
         poolId = IBasePool(_lpPool).getPoolId();
 
         gauge = IRewardsOnlyGauge(GaugeFactory.getPoolGauge(_lpPool));
+        if(address(gauge) == address(0)){
+            gauge = IRewardsOnlyGauge(GaugeFactory.create(_lpPool));
+        }
         streamer = IChildChainStreamer(GaugeFactory.getPoolStreamer(_lpPool));
 
         distributionInfo[0] = DistributionInfo(block.number, 0, 0);
