@@ -93,15 +93,12 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
     event Withdraw(uint256 indexed poolID, address indexed from, address indexed recipient, uint256 amountA, uint256 amountB);
     event MoveLiquidity(uint256 indexed previousPoolID, uint256 indexed nextPoolID);
 
-    modifier onlyLiquidityManager(){
-        require(accessManager.hasRole(LIQUIDITY_MANAGER_ROLE, msg.sender), 'CALLER_NOT_LIQUIDITY_MANAGER');
-        _;
-    }
-
     modifier whenNotPaused(){
         require(factory.paused() == false, 'PAUSABLE: PAUSED');
         _;
     }
+
+    //TODO: ADD TOKENA TOKENB FETCH FUNCTION
 
     // ============ Methods ============
 
@@ -210,7 +207,9 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      *
      * Note: This function can only be called by LiquidityManager.
      */
-    function moveLiquidity(uint256 _poolID, bytes calldata swapAData, bytes calldata swapBData, uint256 amountAMin, uint256 amountBMin) whenNotPaused nonReentrant external onlyLiquidityManager {
+    function moveLiquidity(uint256 _poolID, bytes calldata swapAData, bytes calldata swapBData, uint256 amountAMin, uint256 amountBMin) whenNotPaused nonReentrant external {
+        require(accessManager.hasRole(LIQUIDITY_MANAGER_ROLE, msg.sender), 'CALLER_NOT_LIQUIDITY_MANAGER');
+
         require(totalSupply() != 0, 'NO_LIQUIDITY');
         require(lastMoveInfo.block != block.number, 'CANT_CALL_ON_THE_SAME_BLOCK');
         require((_poolID < pools.length) && (_poolID != poolID), 'BAD_POOL_ID');
@@ -218,29 +217,27 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         PoolInfo memory currentPool = pools[poolID];
         PoolInfo memory newPool = pools[_poolID];
 
-        (inputToken[] memory inputATokens, outputToken[] memory outputATokens,,,,) = abi.decode(swapAData, (inputToken[],outputToken[],uint256,uint256,address,bytes));
-        (inputToken[] memory inputBTokens, outputToken[] memory outputBTokens,,,,) = abi.decode(swapBData, (inputToken[],outputToken[],uint256,uint256,address,bytes));
-
-        require((inputATokens.length == 1) && (inputBTokens.length == 1), 'BAD_SWAP_INPUT_LENGTH');
-        require((outputATokens.length == 1) && (outputBTokens.length == 1), 'BAD_SWAP_OUTPUT_LENGTH');
-
-        require(inputATokens[0].tokenAddress == address(currentPool.tokenA), 'WRONG_SWAP_A_OUTPUT_TOKEN');
-        require(outputATokens[0].tokenAddress == address(newPool.tokenA), 'WRONG_SWAP_A_OUTPUT_TOKEN');
-
-        require(inputBTokens[0].tokenAddress == address(currentPool.tokenB), 'WRONG_SWAP_B_OUTPUT_TOKEN');
-        require(outputBTokens[0].tokenAddress == address(newPool.tokenB), 'WRONG_SWAP_B_OUTPUT_TOKEN');
-
         (uint256 totalDeposits,,) = currentPool.assetRouter.userStake(address(this), currentPool.pool);
         currentPool.assetRouter.withdraw(currentPool.pool, totalDeposits, 0, 0, false, address(this));
 
         if(currentPool.tokenA != newPool.tokenA){
-            (bool successA,) = OdosRouter.call(swapAData);
-            require(successA, 'SWAP_A_FAILED');
+            (inputToken[] memory inputTokens, outputToken[] memory outputTokens,,,,) = abi.decode(swapAData[4:], (inputToken[],outputToken[],uint256,uint256,address,bytes));
+            require((inputTokens.length == 1) && (outputTokens.length == 1), 'BAD_SWAP_A_TOKENS_LENGTH');
+            require(inputTokens[0].tokenAddress == address(currentPool.tokenA), 'BAD_SWAP_A_INPUT_TOKEN');
+            require(outputTokens[0].tokenAddress == address(newPool.tokenA), 'BAD_SWAP_A_OUTPUT_TOKEN');
+
+            (bool success,) = OdosRouter.call(swapAData);
+            require(success, 'SWAP_A_FAILED');
         }
 
         if(currentPool.tokenB != newPool.tokenB){
-            (bool successB,) = OdosRouter.call(swapBData);
-            require(successB, 'SWAP_B_FAILED');
+            (inputToken[] memory inputTokens, outputToken[] memory outputTokens,,,,) = abi.decode(swapBData[4:], (inputToken[],outputToken[],uint256,uint256,address,bytes));
+            require((inputTokens.length == 1) && (outputTokens.length == 1), 'BAD_SWAP_B_TOKENS_LENGTH');
+            require(inputTokens[0].tokenAddress == address(currentPool.tokenB), 'BAD_SWAP_B_INPUT_TOKEN');
+            require(outputTokens[0].tokenAddress == address(newPool.tokenB), 'BAD_SWAP_B_OUTPUT_TOKEN');
+
+            (bool success,) = OdosRouter.call(swapBData);
+            require(success, 'SWAP_B_FAILED');
         }
         
         (,,reserveLP) = newPool.assetRouter.deposit(newPool.pool, newPool.tokenA.balanceOf(address(this)), newPool.tokenB.balanceOf(address(this)), amountAMin, amountBMin, 0, address(this));
