@@ -67,6 +67,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      * {reserveLP} - LP token reserve.
      * {lastMoveInfo} - Info on last MoveLiquidity() block.
      * {blockedLiquidty} - User's blocked LP tokens. Prevents user from stealing leftover tokens by depositing and exiting before moveLiquidity() has been called.
+     * {leftoversCollected} - Flag that prevents leftover token collection if they were already collected this MoveLiquidity() cycle.
 
      * {accessManager} - Role manager contract.
      * {factory} - The address of AutoStrategyFactory this contract was deployed by.
@@ -81,7 +82,8 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
 
     uint256 private reserveLP;
     MoveLiquidityInfo private lastMoveInfo;
-    mapping(address =>  mapping(uint256 => uint256)) private blockedLiquidty;
+    mapping(address => mapping(uint256 => uint256)) private blockedLiquidty;
+    mapping(address => mapping(uint256 => bool)) private leftoversCollected;
 
     IUnoAccessManager public accessManager;
     IUnoAutoStrategyFactory public factory;
@@ -97,8 +99,6 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         require(factory.paused() == false, 'PAUSABLE: PAUSED');
         _;
     }
-
-    //TODO: ADD TOKENA TOKENB FETCH FUNCTION
 
     // ============ Methods ============
 
@@ -166,8 +166,8 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      * @dev Withdraws tokens from the {pools[poolID]} pool and sends them to the recipient. Burns tokens representing user share. Emits {Withdraw} event.
      * @param pid - Current poolID. Throws revert if moveLiquidity() has been called before the transaction has been mined.
      * @param liquidity - Liquidity to burn from this user.
-     * @param amountAMin - The minimum amount of tokenA that must be received for the transaction not to revert.
-     * @param amountBMin - The minimum amount of tokenB that must be received for the transaction not to revert.
+     * @param amountAMin - The minimum amount of tokenA that must be received from the pool for the transaction not to revert.
+     * @param amountBMin - The minimum amount of tokenB that must be received from the pool for the transaction not to revert.
      * @param recipient - Address which will recieve withdrawn tokens.
      
      * @return amountA - Token A amount sent to the {recipient}.
@@ -177,24 +177,40 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         require (pid == poolID, 'BAD_POOL_ID');
         PoolInfo memory pool = pools[poolID];
 
-        uint256 _leftoverA;
-        uint256 _leftoverB;
-        // Transfer lefover tokens to recipient.
-        if((liquidity > blockedLiquidty[msg.sender][lastMoveInfo.block]) && (lastMoveInfo.totalSupply != 0)){
-            uint256 leftoverLiquidity = liquidity - blockedLiquidty[msg.sender][lastMoveInfo.block];
-            _leftoverA = leftoverLiquidity * lastMoveInfo.leftoverA / lastMoveInfo.totalSupply;
-            _leftoverB = leftoverLiquidity * lastMoveInfo.leftoverB / lastMoveInfo.totalSupply;
-            pool.tokenA.safeTransfer(recipient, _leftoverA);
-            pool.tokenB.safeTransfer(recipient, _leftoverB);
-        }
+        (uint256 leftoverA, uint256 leftoverB) = collectLeftovers(recipient);
 
         uint256 amountLP = burn(liquidity);
         (amountA, amountB) = pool.assetRouter.withdraw(pool.pool, amountLP, amountAMin, amountBMin, false, recipient);
 
-        amountA += _leftoverA;
-        amountB += _leftoverB;
+        amountA += leftoverA;
+        amountB += leftoverB;
 
         emit Withdraw(poolID, msg.sender, recipient, amountA, amountB); 
+    }
+
+    /**
+     * @dev Collects leftover tokens left from moveLiquidity() function.
+     * @param recipient - Address which will recieve leftover tokens.
+     
+     * @return leftoverA - Token A amount sent to the {recipient}.
+     * @return leftoverB - Token B amount sent to the {recipient}.
+     */
+    function collectLeftovers(address recipient) internal returns (uint256 leftoverA, uint256 leftoverB){
+        if(!leftoversCollected[msg.sender][lastMoveInfo.block]){
+            PoolInfo memory pool = pools[poolID];
+
+            leftoverA = (balanceOf(msg.sender) - blockedLiquidty[msg.sender][lastMoveInfo.block]) * lastMoveInfo.leftoverA / lastMoveInfo.totalSupply;
+            leftoverB = (balanceOf(msg.sender) - blockedLiquidty[msg.sender][lastMoveInfo.block]) * lastMoveInfo.leftoverB / lastMoveInfo.totalSupply;
+
+            if(leftoverA > 0){
+                pool.tokenA.safeTransfer(recipient, leftoverA);
+            }
+            if(leftoverB > 0){
+                pool.tokenB.safeTransfer(recipient, leftoverB);
+            }
+
+            leftoversCollected[msg.sender][lastMoveInfo.block] = true;
+        }
     }
 
     /**
@@ -217,8 +233,8 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         PoolInfo memory currentPool = pools[poolID];
         PoolInfo memory newPool = pools[_poolID];
 
-        (uint256 totalDeposits,,) = currentPool.assetRouter.userStake(address(this), currentPool.pool);
-        currentPool.assetRouter.withdraw(currentPool.pool, totalDeposits, 0, 0, false, address(this));
+        (uint256 _totalDeposits,,) = currentPool.assetRouter.userStake(address(this), currentPool.pool);
+        currentPool.assetRouter.withdraw(currentPool.pool, _totalDeposits, 0, 0, false, address(this));
 
         if(currentPool.tokenA != newPool.tokenA){
             (inputToken[] memory inputTokens, outputToken[] memory outputTokens,,,,) = abi.decode(swapAData[4:], (inputToken[],outputToken[],uint256,uint256,address,bytes));
@@ -242,7 +258,6 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         
         (,,reserveLP) = newPool.assetRouter.deposit(newPool.pool, newPool.tokenA.balanceOf(address(this)), newPool.tokenB.balanceOf(address(this)), amountAMin, amountBMin, 0, address(this));
        
-        // Set variables for leftover token share calculations.
         lastMoveInfo = MoveLiquidityInfo({
             leftoverA: newPool.tokenA.balanceOf(address(this)),
             leftoverB: newPool.tokenB.balanceOf(address(this)),
@@ -255,13 +270,15 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
     }
 
     /**
-     * @dev Returns tokens staked by the {_address}.
+     * @dev Returns tokens staked by the {_address}. 
      * @param _address - The address to check stakes for.
 
      * @return stakeA - Token A stake.
      * @return stakeB - Token B stake.
+     * @return leftoverA - Token A Leftovers obligated to the {_address} after moveLiquidity() function call.
+     * @return leftoverB - Token B Leftovers obligated to the {_address} after moveLiquidity() function call.
      */
-    function userStake(address _address) external view returns (uint256 stakeA, uint256 stakeB) {
+    function userStake(address _address) external view returns (uint256 stakeA, uint256 stakeB, uint256 leftoverA, uint256 leftoverB) {
         PoolInfo memory pool = pools[poolID];
         (, uint256 balanceA, uint256 balanceB) = pool.assetRouter.userStake(address(this), pool.pool);
 
@@ -270,10 +287,9 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
             uint256 _totalSupply = totalSupply();
             stakeA = _balance * balanceA / _totalSupply; 
             stakeB = _balance * balanceB / _totalSupply; 
-            // Add leftover tokens.
-            if(lastMoveInfo.totalSupply != 0){
-                stakeA += (_balance - blockedLiquidty[_address][lastMoveInfo.block]) * lastMoveInfo.leftoverA / lastMoveInfo.totalSupply;
-                stakeB += (_balance - blockedLiquidty[_address][lastMoveInfo.block]) * lastMoveInfo.leftoverB / lastMoveInfo.totalSupply;
+            if(!leftoversCollected[msg.sender][lastMoveInfo.block]){
+                leftoverA = (_balance - blockedLiquidty[_address][lastMoveInfo.block]) * lastMoveInfo.leftoverA / lastMoveInfo.totalSupply;
+                leftoverB = (_balance - blockedLiquidty[_address][lastMoveInfo.block]) * lastMoveInfo.leftoverB / lastMoveInfo.totalSupply;
             }
         }
     }
@@ -283,13 +299,21 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      * @return totalDepositsA - Token A deposits.
      * @return totalDepositsB - Token B deposits.
      */     
-    function getTotalDeposits() external view returns(uint256 totalDepositsA, uint256 totalDepositsB){
+    function totalDeposits() external view returns(uint256 totalDepositsA, uint256 totalDepositsB){
         PoolInfo memory pool = pools[poolID];
         (, totalDepositsA, totalDepositsB) = pool.assetRouter.userStake(address(this), pool.pool);
 
         // Add leftover tokens.
         totalDepositsA += pool.tokenA.balanceOf(address(this));
         totalDepositsB += pool.tokenB.balanceOf(address(this));
+    }
+
+    /**
+     * @dev Returns pair of tokens currently in use. 
+     */
+    function tokens() external view returns(address, address){
+        PoolInfo memory pool = pools[poolID];
+        return (address(pool.tokenA), address(pool.tokenB));
     }
 
     function mint(address to) internal returns (uint256 liquidity){
