@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
+import "../interfaces/IOdosRouter.sol";   
 import "../interfaces/IUnoAssetRouter.sol";   
 import "../interfaces/IUnoAutoStrategyFactory.sol";  
 import '@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol';
@@ -42,22 +43,6 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
     }
     
     /**
-     * @dev inputToken, outputToken - structs used in OdosRouter contract.
-     */
-    struct inputToken {
-      address tokenAddress;
-      uint256 amountIn;
-      address receiver;
-      bytes permit;
-    }
-
-    struct outputToken {
-      address tokenAddress;
-      uint256 relativeValue;
-      address receiver;
-    }
-    
-    /**
      * @dev Contract Variables:
      * {OdosRouter} - Contract that executes swaps.
 
@@ -75,7 +60,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      * {MINIMUM_LIQUIDITY} - Ameliorates rounding errors.
      */
 
-    address private constant OdosRouter = 0xa32EE1C40594249eb3183c10792BcF573D4Da47C;
+    IOdosRouter private constant OdosRouter = IOdosRouter(0xa32EE1C40594249eb3183c10792BcF573D4Da47C);
 
     uint256 public poolID;
     PoolInfo[] public pools;
@@ -116,11 +101,11 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
             pools.push(pool);
 
             if (pool.tokenA.allowance(address(this), address(pool.assetRouter)) == 0) {
-                pool.tokenA.approve(OdosRouter, type(uint256).max);
+                pool.tokenA.approve(address(OdosRouter), type(uint256).max);
                 pool.tokenA.approve(address(pool.assetRouter), type(uint256).max);
             }
             if (pool.tokenB.allowance(address(this), address(pool.assetRouter)) == 0) {
-                pool.tokenB.approve(OdosRouter, type(uint256).max);
+                pool.tokenB.approve(address(OdosRouter), type(uint256).max);
                 pool.tokenB.approve(address(pool.assetRouter), type(uint256).max);
             }
         }
@@ -197,16 +182,17 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      */
     function collectLeftovers(address recipient) internal returns (uint256 leftoverA, uint256 leftoverB){
         if(!leftoversCollected[msg.sender][lastMoveInfo.block]){
-            PoolInfo memory pool = pools[poolID];
+            if(lastMoveInfo.totalSupply != 0){
+                PoolInfo memory pool = pools[poolID];
+                leftoverA = (balanceOf(msg.sender) - blockedLiquidty[msg.sender][lastMoveInfo.block]) * lastMoveInfo.leftoverA / lastMoveInfo.totalSupply;
+                leftoverB = (balanceOf(msg.sender) - blockedLiquidty[msg.sender][lastMoveInfo.block]) * lastMoveInfo.leftoverB / lastMoveInfo.totalSupply;
 
-            leftoverA = (balanceOf(msg.sender) - blockedLiquidty[msg.sender][lastMoveInfo.block]) * lastMoveInfo.leftoverA / lastMoveInfo.totalSupply;
-            leftoverB = (balanceOf(msg.sender) - blockedLiquidty[msg.sender][lastMoveInfo.block]) * lastMoveInfo.leftoverB / lastMoveInfo.totalSupply;
-
-            if(leftoverA > 0){
-                pool.tokenA.safeTransfer(recipient, leftoverA);
-            }
-            if(leftoverB > 0){
-                pool.tokenB.safeTransfer(recipient, leftoverB);
+                if(leftoverA > 0){
+                    pool.tokenA.safeTransfer(recipient, leftoverA);
+                }
+                if(leftoverB > 0){
+                    pool.tokenB.safeTransfer(recipient, leftoverB);
+                }
             }
 
             leftoversCollected[msg.sender][lastMoveInfo.block] = true;
@@ -225,7 +211,6 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      */
     function moveLiquidity(uint256 _poolID, bytes calldata swapAData, bytes calldata swapBData, uint256 amountAMin, uint256 amountBMin) whenNotPaused nonReentrant external {
         require(accessManager.hasRole(LIQUIDITY_MANAGER_ROLE, msg.sender), 'CALLER_NOT_LIQUIDITY_MANAGER');
-
         require(totalSupply() != 0, 'NO_LIQUIDITY');
         require(lastMoveInfo.block != block.number, 'CANT_CALL_ON_THE_SAME_BLOCK');
         require((_poolID < pools.length) && (_poolID != poolID), 'BAD_POOL_ID');
@@ -236,24 +221,43 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         (uint256 _totalDeposits,,) = currentPool.assetRouter.userStake(address(this), currentPool.pool);
         currentPool.assetRouter.withdraw(currentPool.pool, _totalDeposits, 0, 0, false, address(this));
 
-        if(currentPool.tokenA != newPool.tokenA){
-            (inputToken[] memory inputTokens, outputToken[] memory outputTokens,,,,) = abi.decode(swapAData[4:], (inputToken[],outputToken[],uint256,uint256,address,bytes));
-            require((inputTokens.length == 1) && (outputTokens.length == 1), 'BAD_SWAP_A_TOKENS_LENGTH');
-            require(inputTokens[0].tokenAddress == address(currentPool.tokenA), 'BAD_SWAP_A_INPUT_TOKEN');
-            require(outputTokens[0].tokenAddress == address(newPool.tokenA), 'BAD_SWAP_A_OUTPUT_TOKEN');
+        uint256 tokenABalance = currentPool.tokenA.balanceOf(address(this));
+        uint256 tokenBBalance = currentPool.tokenB.balanceOf(address(this));
 
-            (bool success,) = OdosRouter.call(swapAData);
-            require(success, 'SWAP_A_FAILED');
+        if(currentPool.tokenA != newPool.tokenA){
+            (
+                IOdosRouter.inputToken[] memory inputs, 
+                IOdosRouter.outputToken[] memory outputs, 
+                ,
+                uint256 valueOutMin,
+                address executor,
+                bytes memory pathDefinition
+            ) = abi.decode(swapAData[4:], (IOdosRouter.inputToken[],IOdosRouter.outputToken[],uint256,uint256,address,bytes));
+
+            require((inputs.length == 1) && (outputs.length == 1), 'BAD_SWAP_A_TOKENS_LENGTH');
+            require(inputs[0].tokenAddress == address(currentPool.tokenA), 'BAD_SWAP_A_INPUT_TOKEN');
+            require(outputs[0].tokenAddress == address(newPool.tokenA), 'BAD_SWAP_A_OUTPUT_TOKEN');
+
+            inputs[0].amountIn = tokenABalance;
+            OdosRouter.swap(inputs, outputs, type(uint256).max, valueOutMin, executor, pathDefinition);
         }
 
         if(currentPool.tokenB != newPool.tokenB){
-            (inputToken[] memory inputTokens, outputToken[] memory outputTokens,,,,) = abi.decode(swapBData[4:], (inputToken[],outputToken[],uint256,uint256,address,bytes));
-            require((inputTokens.length == 1) && (outputTokens.length == 1), 'BAD_SWAP_B_TOKENS_LENGTH');
-            require(inputTokens[0].tokenAddress == address(currentPool.tokenB), 'BAD_SWAP_B_INPUT_TOKEN');
-            require(outputTokens[0].tokenAddress == address(newPool.tokenB), 'BAD_SWAP_B_OUTPUT_TOKEN');
+            (
+                IOdosRouter.inputToken[] memory inputs,
+                IOdosRouter.outputToken[] memory outputs,
+                ,
+                uint256 valueOutMin,
+                address executor,
+                bytes memory pathDefinition
+            ) = abi.decode(swapBData[4:], (IOdosRouter.inputToken[],IOdosRouter.outputToken[],uint256,uint256,address,bytes));
 
-            (bool success,) = OdosRouter.call(swapBData);
-            require(success, 'SWAP_B_FAILED');
+            require((inputs.length == 1) && (outputs.length == 1), 'BAD_SWAP_B_TOKENS_LENGTH');
+            require(inputs[0].tokenAddress == address(currentPool.tokenB), 'BAD_SWAP_B_INPUT_TOKEN');
+            require(outputs[0].tokenAddress == address(newPool.tokenB), 'BAD_SWAP_B_OUTPUT_TOKEN');
+
+            inputs[0].amountIn = tokenBBalance;
+            OdosRouter.swap(inputs, outputs, type(uint256).max, valueOutMin, executor, pathDefinition);
         }
         
         (,,reserveLP) = newPool.assetRouter.deposit(newPool.pool, newPool.tokenA.balanceOf(address(this)), newPool.tokenB.balanceOf(address(this)), amountAMin, amountBMin, 0, address(this));
@@ -287,7 +291,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
             uint256 _totalSupply = totalSupply();
             stakeA = _balance * balanceA / _totalSupply; 
             stakeB = _balance * balanceB / _totalSupply; 
-            if(!leftoversCollected[msg.sender][lastMoveInfo.block]){
+            if((!leftoversCollected[msg.sender][lastMoveInfo.block]) && (lastMoveInfo.totalSupply != 0)){
                 leftoverA = (_balance - blockedLiquidty[_address][lastMoveInfo.block]) * lastMoveInfo.leftoverA / lastMoveInfo.totalSupply;
                 leftoverB = (_balance - blockedLiquidty[_address][lastMoveInfo.block]) * lastMoveInfo.leftoverB / lastMoveInfo.totalSupply;
             }
