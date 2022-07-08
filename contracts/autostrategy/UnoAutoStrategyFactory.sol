@@ -13,8 +13,8 @@ contract UnoAutoStrategyFactory is Pausable {
      * {pool} - Pool address. 
      */
     struct PoolInfo {
-        address assetRouter;
         address pool;
+        address assetRouter;
     }
 
     /**
@@ -33,7 +33,7 @@ contract UnoAutoStrategyFactory is Pausable {
 
     bytes32 private constant PAUSER_ROLE = keccak256('PAUSER_ROLE');
     
-    event AutoStrategyDeployed(address indexed autoStrategyAddress);
+    event AutoStrategyDeployed(address indexed autoStrategy);
     event AssetRouterApproved(address indexed assetRouter);
     event AssetRouterRevoked(address indexed assetRouter);
 

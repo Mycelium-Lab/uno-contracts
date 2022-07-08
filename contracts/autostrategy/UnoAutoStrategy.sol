@@ -17,13 +17,13 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      * {tokenB} - Pool's second token address.
      */
     struct _PoolInfo {
-        IUnoAssetRouter assetRouter;
         address pool;
+        IUnoAssetRouter assetRouter;
     }
 
     struct PoolInfo {
-        IUnoAssetRouter assetRouter;
         address pool;
+        IUnoAssetRouter assetRouter;
         IERC20Upgradeable tokenA;
         IERC20Upgradeable tokenB;
     }
@@ -93,8 +93,8 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         for (uint256 i = 0; i < poolInfos.length; i++) {
             (address _tokenA, address _tokenB) = poolInfos[i].assetRouter.getTokens(poolInfos[i].pool);
             PoolInfo memory pool = PoolInfo({
-                assetRouter: poolInfos[i].assetRouter,
                 pool: poolInfos[i].pool,
+                assetRouter: poolInfos[i].assetRouter,
                 tokenA: IERC20Upgradeable(_tokenA),
                 tokenB: IERC20Upgradeable(_tokenB)
             });
