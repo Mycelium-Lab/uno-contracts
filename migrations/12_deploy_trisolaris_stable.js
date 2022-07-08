@@ -6,8 +6,8 @@ const path = require("path");
 
 const { distributor, pauser } = require("./addresses/addresses");
 
-const Farm = artifacts.require("UnoFarmTrisolarisStandart");
-const AssetRouter = artifacts.require("UnoAssetRouterTrisolarisStandart");
+const Farm = artifacts.require("UnoFarmTrisolarisStable");
+const AssetRouter = artifacts.require("UnoAssetRouterTrisolarisStable");
 
 module.exports = async function (deployer, network, accounts) {
   // AccessManager deployment, dont deploy if already deployed on this network

@@ -25,17 +25,16 @@ module.exports = {
       // provider: () => new HDWalletProvider(mnemonic, "https://aurora-mainnet.infura.io/v3/125bc41c3c54485d8a57568bc1a83829"),
       network_id: 0x4e454152,
       gas: 7500000,
-      gasPrice: 30000000,
+      gasPrice: 70000000,
       from: "0x173c35e1D60f061F2Fd4a0C4a881119d39D51E7a",
     },
-    // aurora: {
-    //   networkCheckTimeout: 10000,
-    //   provider: () => setupWallet("wss://mainnet.aurora.dev"),
-    //   network_id: 0x4e454152, // 0x4e454152
-    //   gas: 10000000,
-    //   from: "0x173c35e1D60f061F2Fd4a0C4a881119d39D51E7a",
-    // },
-
+    development: {
+      host: "localhost",
+      port: 8545,
+      network_id: "1313161554",
+      gas: 7500000,
+      gasPrice: 765625000,
+    },
     auroraTestnet: {
       provider: () => setupWallet("wss://testnet.aurora.dev"),
       network_id: 0x4e454153,

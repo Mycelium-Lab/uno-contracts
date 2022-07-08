@@ -72,7 +72,7 @@ contract UnoFarmTrisolarisStandart is Initializable, ReentrancyGuardUpgradeable 
      * {trisolarisRouter} - The contract that executes swaps.
      * {MasterChef} -The contract that distibutes {rewardToken}.
      */
-    IUniswapV2Router02 private constant trisolarisRouter = IUniswapV2Router02(0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506);
+    IUniswapV2Router02 private constant trisolarisRouter = IUniswapV2Router02(0x2CB45Edb4517d5947aFdE3BEAbF95A582506858B);
     IUniversalMasterChef private MasterChef;
     IComplexRewarder private ComplexRewarder;
 
@@ -137,6 +137,7 @@ contract UnoFarmTrisolarisStandart is Initializable, ReentrancyGuardUpgradeable 
         if (address(ComplexRewarder) != address(0)) {
             (IERC20[] memory rewarderTokenArray, ) = ComplexRewarder.pendingTokens(pid, address(0), 0);
             rewarderToken = address(rewarderTokenArray[0]);
+            IERC20(rewarderToken).approve(address(trisolarisRouter), type(uint256).max);
         }
 
         tokenA = IUniswapV2Pair(lpPair).token0();
@@ -149,7 +150,6 @@ contract UnoFarmTrisolarisStandart is Initializable, ReentrancyGuardUpgradeable 
         IERC20(lpPair).approve(address(MasterChef), type(uint256).max);
         IERC20(lpPair).approve(address(trisolarisRouter), type(uint256).max);
         IERC20(rewardToken).approve(address(trisolarisRouter), type(uint256).max);
-        IERC20(rewarderToken).approve(address(trisolarisRouter), type(uint256).max);
         IERC20(tokenA).approve(address(trisolarisRouter), type(uint256).max);
         IERC20(tokenB).approve(address(trisolarisRouter), type(uint256).max);
     }
@@ -274,13 +274,15 @@ contract UnoFarmTrisolarisStandart is Initializable, ReentrancyGuardUpgradeable 
 
         {
             // scope to avoid stack too deep errors
-            uint256 rewarderTokenHalf = IERC20(rewarderToken).balanceOf(address(this)) / 2;
-            if (tokenA != rewarderToken) {
-                trisolarisRouter.swapExactTokensForTokens(rewarderTokenHalf, amountsOutMin[2], rewarderTokenToTokenARoute, address(this), block.timestamp);
-            }
+            if (address(ComplexRewarder) != address(0)) {
+                uint256 rewarderTokenHalf = IERC20(rewarderToken).balanceOf(address(this)) / 2;
+                if (tokenA != rewarderToken) {
+                    trisolarisRouter.swapExactTokensForTokens(rewarderTokenHalf, amountsOutMin[2], rewarderTokenToTokenARoute, address(this), block.timestamp);
+                }
 
-            if (tokenB != rewarderToken) {
-                trisolarisRouter.swapExactTokensForTokens(rewarderTokenHalf, amountsOutMin[3], rewarderTokenToTokenBRoute, address(this), block.timestamp);
+                if (tokenB != rewarderToken) {
+                    trisolarisRouter.swapExactTokensForTokens(rewarderTokenHalf, amountsOutMin[3], rewarderTokenToTokenBRoute, address(this), block.timestamp);
+                }
             }
         }
 

@@ -86,7 +86,7 @@ contract UnoAssetRouterTrisolarisStandart is Initializable, PausableUpgradeable,
         }
 
         if (amountA > 0) {
-            IERC20Upgradeable(farm.tokenA()).safeTransferFrom(msg.sender, address(farm), amountA);
+            IERC20Upgradeable(farm.tokenA()).transferFrom(msg.sender, address(farm), amountA);
         }
         if (amountB > 0) {
             IERC20Upgradeable(farm.tokenB()).safeTransferFrom(msg.sender, address(farm), amountB);

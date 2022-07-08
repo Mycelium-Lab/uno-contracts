@@ -73,12 +73,12 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
             farm = Farm(farmFactory.createFarm(swap));
         }
 
-        IERC20[] memory tokens = getTokens(swap);
-        require(amounts.length == tokens.length, "WRONG_NUMBER_OF_TOKENS");
+        (address[] memory poolTokens, uint8 tokensCount) = getTokens(swap);
+        require(amounts.length == tokensCount, "WRONG_NUMBER_OF_TOKENS");
 
-        for (uint256 i = 0; i < tokens.length; i++) {
+        for (uint256 i = 0; i < tokensCount; i++) {
             if (amounts[i] > 0) {
-                IERC20Upgradeable(address(tokens[i])).safeTransferFrom(msg.sender, address(farm), amounts[i]);
+                IERC20Upgradeable(poolTokens[i]).safeTransferFrom(msg.sender, address(farm), amounts[i]);
             }
         }
 
@@ -149,30 +149,25 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
     /**
      * @dev Utility function used to create tokens array.
      */
-    function getTokens(address _swap) internal view returns (IERC20[] memory poolTokens) {
+    function getTokens(address _swap) internal returns (address[] memory _poolTokens, uint8 _tokensCount) {
         ISwap Swap = ISwap(_swap);
-        bool tokensFound = false;
-        uint8 maxTokenId = 2**8 - 1;
-        uint8 tokensCount = 0;
 
-        for (uint8 i = 0; i < maxTokenId; i++) {
-            try Swap.getToken(i) {
-                tokensCount++;
-            } catch {
-                tokensFound = true;
-                break;
-            }
+        for (uint8 i = 0; i < type(uint8).max; i++) {
+            (bool success, ) = address(Swap).call(abi.encodeWithSignature("getToken(uint8)", i));
+            if (success) {
+                _tokensCount++;
+            } else break;
         }
 
-        poolTokens = new IERC20[](tokensCount);
+        require(_tokensCount > 0, "No tokens were found");
+        _poolTokens = new address[](_tokensCount);
 
-        for (uint8 i = 0; i < tokensCount; i++) {
-            address tokenAddress = Swap.getToken(i);
-            poolTokens[i] = IERC20(tokenAddress);
+        for (uint8 i = 0; i < _tokensCount; i++) {
+            (, bytes memory data) = address(Swap).call(abi.encodeWithSignature("getToken(uint8)", i));
+            _poolTokens[i] = abi.decode(data, (address));
         }
 
-        require(tokensFound, "No tokens were found");
-        return (poolTokens);
+        return (_poolTokens, _tokensCount);
     }
 
     function pause() external onlyPauser {
