@@ -164,6 +164,7 @@ contract UnoFarmTrisolarisStable is Initializable, ReentrancyGuardUpgradeable {
         userInfo[recipient].stake += liquidity;
         totalDeposits += liquidity;
         MasterChef.deposit(pid, liquidity, address(this));
+        return liquidity;
     }
 
     /**
@@ -211,55 +212,58 @@ contract UnoFarmTrisolarisStable is Initializable, ReentrancyGuardUpgradeable {
         uint256[] calldata rewarderAmountsOutMin,
         uint256[] calldata rewardAmountsOutMin
     ) external onlyAssetRouter nonReentrant returns (uint256 reward) {
-        // require(totalDeposits > 0, "NO_LIQUIDITY");
-        // require(distributionInfo[distributionID - 1]._block != block.number, "CANT_CALL_ON_THE_SAME_BLOCK");
-        // IERC20[] memory poolTokens = getTokens();
-        // require(tokensCount == _rewarderTokenRoutes.length, "Number of rewardER routes should be equal to the number of tokens in the pool");
-        // require(tokensCount == _rewardTokenRoutes.length, "Number of reward routes should be equal to the number of tokens in the pool");
-        // MasterChef.harvest(pid, address(this));
-        // {
-        //     for (uint256 i = 0; i < tokensCount; i++) {
-        //         if (address(poolTokens[i]) != rewardToken) {
-        //             trisolarisRouter.swapExactTokensForTokens(
-        //                 IERC20(rewardToken).balanceOf(address(this)) / tokensCount,
-        //                 rewarderAmountsOutMin[i],
-        //                 _rewardTokenRoutes[i],
-        //                 address(this),
-        //                 block.timestamp
-        //             );
-        //         }
-        //     }
-        // }
-        // {
-        //     if (address(ComplexRewarder) != address(0)) {
-        //         for (uint256 i = 0; i < tokensCount; i++) {
-        //             if (address(poolTokens[i]) != rewarderToken) {
-        //                 trisolarisRouter.swapExactTokensForTokens(
-        //                     IERC20(rewarderToken).balanceOf(address(this)) / tokensCount,
-        //                     rewardAmountsOutMin[i],
-        //                     _rewarderTokenRoutes[i],
-        //                     address(this),
-        //                     block.timestamp
-        //                 );
-        //             }
-        //         }
-        //     }
-        // }
-        // uint256[] memory amounts = new uint256[](tokensCount);
-        // for (uint256 i = 0; i < tokensCount; i++) {
-        //     uint256 tokenBalance = IERC20(poolTokens[i]).balanceOf(address(this));
-        //     amounts[i] = tokenBalance;
-        // }
-        // reward = Swap.addLiquidity(amounts, 1, block.timestamp);
-        // uint256 rewardPerDepositAge = (reward * fractionMultiplier) / (totalDepositAge + totalDeposits * (block.number - totalDepositLastUpdate));
-        // uint256 cumulativeRewardAgePerDepositAge = distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge +
-        //     rewardPerDepositAge *
-        //     (block.number - distributionInfo[distributionID - 1]._block);
-        // distributionInfo[distributionID] = DistributionInfo(block.number, rewardPerDepositAge, cumulativeRewardAgePerDepositAge);
-        // distributionID += 1;
-        // totalDepositLastUpdate = block.number;
-        // totalDepositAge = 0;
-        // MasterChef.deposit(pid, reward, address(this));
+        require(totalDeposits > 0, "NO_LIQUIDITY");
+        require(distributionInfo[distributionID - 1]._block != block.number, "CANT_CALL_ON_THE_SAME_BLOCK");
+
+        require(tokensCount == _rewarderTokenRoutes.length, "Number of rewardER routes should be equal to the number of tokens in the pool");
+        require(tokensCount == _rewardTokenRoutes.length, "Number of reward routes should be equal to the number of tokens in the pool");
+        MasterChef.harvest(pid, address(this));
+
+        {
+            for (uint256 i = 0; i < tokensCount; i++) {
+                if (poolTokens[i] != rewardToken) {
+                    trisolarisRouter.swapExactTokensForTokens(
+                        IERC20(rewardToken).balanceOf(address(this)) / tokensCount,
+                        rewarderAmountsOutMin[i],
+                        _rewardTokenRoutes[i],
+                        address(this),
+                        block.timestamp
+                    );
+                }
+            }
+        }
+        {
+            if (address(ComplexRewarder) != address(0)) {
+                for (uint256 i = 0; i < tokensCount; i++) {
+                    if (poolTokens[i] != rewarderToken) {
+                        trisolarisRouter.swapExactTokensForTokens(
+                            IERC20(rewarderToken).balanceOf(address(this)) / tokensCount,
+                            rewardAmountsOutMin[i],
+                            _rewarderTokenRoutes[i],
+                            address(this),
+                            block.timestamp
+                        );
+                    }
+                }
+            }
+        }
+
+        uint256[] memory amounts = new uint256[](tokensCount);
+        for (uint256 i = 0; i < tokensCount; i++) {
+            uint256 tokenBalance = IERC20(poolTokens[i]).balanceOf(address(this));
+            amounts[i] = tokenBalance;
+        }
+
+        reward = Swap.addLiquidity(amounts, 1, block.timestamp);
+        uint256 rewardPerDepositAge = (reward * fractionMultiplier) / (totalDepositAge + totalDeposits * (block.number - totalDepositLastUpdate));
+        uint256 cumulativeRewardAgePerDepositAge = distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge +
+            rewardPerDepositAge *
+            (block.number - distributionInfo[distributionID - 1]._block);
+        distributionInfo[distributionID] = DistributionInfo(block.number, rewardPerDepositAge, cumulativeRewardAgePerDepositAge);
+        distributionID += 1;
+        totalDepositLastUpdate = block.number;
+        totalDepositAge = 0;
+        MasterChef.deposit(pid, reward, address(this));
     }
 
     /**

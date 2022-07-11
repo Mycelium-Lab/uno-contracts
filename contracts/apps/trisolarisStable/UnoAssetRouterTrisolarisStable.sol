@@ -24,6 +24,9 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
     bytes32 private constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
     bytes32 private constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
+    uint256 public liq; // DELETE
+    address public ass; // DELETE
+
     event Deposit(address indexed lpPool, address indexed from, address indexed recipient, uint256 amount);
     event Withdraw(address indexed lpPool, address indexed from, address indexed recipient, uint256 amount);
     event Distribute(address indexed lpPool, uint256 reward);
@@ -68,7 +71,8 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
     ) external whenNotPaused returns (uint256 liquidity) {
         address lpPair = getLpPair(swap);
 
-        Farm farm = Farm(farmFactory.Farms(lpPair));
+        Farm farm = Farm(farmFactory.Farms(swap));
+        ass = address(farm); //DELETE
         if (farm == Farm(address(0))) {
             farm = Farm(farmFactory.createFarm(swap));
         }
@@ -88,6 +92,7 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
 
         liquidity = farm.deposit(amounts, minAamountToMint, amountLP, recipient);
         emit Deposit(lpPair, msg.sender, recipient, liquidity);
+        return liquidity;
     }
 
     /** 
@@ -108,8 +113,11 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
         address recipient
     ) external whenNotPaused returns (uint256[] memory amountsWitdrawn) {
         address lpPair = getLpPair(swap);
-        Farm farm = Farm(farmFactory.Farms(lpPair));
+        Farm farm = Farm(farmFactory.Farms(swap));
         require(farm != Farm(address(0)), "FARM_NOT_EXISTS");
+
+        (, uint8 tokensCount) = getTokens(swap);
+        require(minAmounts.length == tokensCount, "WRONG_NUMBER_OF_TOKENS");
 
         amountsWitdrawn = farm.withdraw(amount, minAmounts, withdrawLP, msg.sender, recipient);
         emit Withdraw(lpPair, msg.sender, recipient, amount);
@@ -133,7 +141,7 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
         uint256[] calldata rewardAmountsOutMin
     ) external whenNotPaused onlyDistributor {
         address lpPair = getLpPair(swap);
-        Farm farm = Farm(farmFactory.Farms(lpPair));
+        Farm farm = Farm(farmFactory.Farms(swap));
         require(farm != Farm(address(0)), "FARM_NOT_EXISTS");
 
         uint256 reward = farm.distribute(_rewarderTokenRoutes, _rewardTokenRoutes, rewarderAmountsOutMin, rewardAmountsOutMin);
@@ -144,6 +152,20 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
         address lpPair;
         (, , , , , , lpPair) = ISwap(_swap).swapStorage();
         return lpPair;
+    }
+
+    /**
+     * @dev Returns tokens staked by the {_address} for the given {lpPair}.
+     * @param _address - The address to check stakes for.
+     * @param swap - Address of the Swap contract.
+
+     * @return stakeLP - Total user stake(in LP tokens).
+     */
+    function userStake(address _address, address swap) external view returns (uint256 stakeLP) {
+        Farm farm = Farm(farmFactory.Farms(swap));
+        if (farm != Farm(address(0))) {
+            stakeLP = farm.userBalance(_address);
+        }
     }
 
     /**
