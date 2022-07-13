@@ -18,7 +18,7 @@ All contracts are deployed on the Polygon(Matic) Blockchain
 0xbCc48E7aF0100ca3DFf680dE995d4C2726F81b71
 
 ## UnoAutoStrategyFactory
-0x7C96370d036a0Eeb60BAbe0c6Ef718DC4938C479
+0x4c6eA6999D66a0aee4691644E0c8811369Cb6783
 
 ## Quickswap
 

@@ -9,7 +9,7 @@ module.exports = {
       provider: () => {
         return new HDWalletProvider({
           privateKeys:  [process.env.PRIVATE_KEY],
-          providerOrUrl: "wss://speedy-nodes-nyc.moralis.io/001e5f8996373e891a2971f5/polygon/mainnet/ws",
+          providerOrUrl: "https://polygon-rpc.com",
           chainId: 137,
           pollingInterval: 30000
         })

@@ -56,16 +56,13 @@ contract UnoAutoStrategyFactory is Pausable {
     /**
      * @dev Checks if provided assetRouters are approved for use, then deploys new AutoStrategy contract.
      * @param poolInfos - An array of (assetRouter - pool) pairs. AssetRouter needs to be approved for PoolInfo to be valid. poolInfos.length must be >= 2.
-     * @param name - AutoStrategy token name.
-     * @param symbol - AutoStrategy token symbol.
-
      * @return autoStrategy - Deployed Auto Strategy contract address.
      */  
-    function createStrategy(PoolInfo[] calldata poolInfos, string calldata name, string calldata symbol) whenNotPaused external returns (address) {
+    function createStrategy(PoolInfo[] calldata poolInfos) whenNotPaused external returns (address) {
         for (uint256 i = 0; i < poolInfos.length; i++) {
             require(assetRouterApproved[poolInfos[i].assetRouter] == true, 'ASSET_ROUTER_NOT_APPROVED');
         }
-        address autoStrategy = _createStrategy(poolInfos, name, symbol);
+        address autoStrategy = _createStrategy(poolInfos);
         autoStrategies.push(autoStrategy);
         return autoStrategy;
     }
@@ -107,14 +104,12 @@ contract UnoAutoStrategyFactory is Pausable {
     /**
      * @dev Deploys new AutoStrategy contract and calls initialize() on it. Emits {AutoStrategyDeployed} event.
      */
-    function _createStrategy(PoolInfo[] calldata poolInfos, string calldata name, string calldata symbol) internal returns (address) {
+    function _createStrategy(PoolInfo[] calldata poolInfos) internal returns (address) {
         BeaconProxy proxy = new BeaconProxy(
             autoStrategyBeacon,
             abi.encodeWithSelector(
-                bytes4(keccak256('initialize((address,address)[],string,string,address)')),
+                bytes4(keccak256('initialize((address,address)[],address)')),
                 poolInfos,
-                name,
-                symbol,
                 accessManager
             )
         );

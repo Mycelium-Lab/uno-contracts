@@ -87,8 +87,11 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
 
     // ============ Methods ============
 
-    function initialize(_PoolInfo[] calldata poolInfos, string calldata _name, string calldata _symbol, IUnoAccessManager _accessManager) external initializer {
-        require (poolInfos.length >= 2, 'NOT_ENOUGH_POOLS_PROVIDED');
+    function initialize(_PoolInfo[] calldata poolInfos, IUnoAccessManager _accessManager) external initializer {
+        require ((poolInfos.length >= 2) && (poolInfos.length <= 50), 'BAD_POOL_COUNT');
+
+        __ERC20_init("UNO-AutoStrategy", "UNO-LP");
+        __ReentrancyGuard_init();
         
         for (uint256 i = 0; i < poolInfos.length; i++) {
             (address _tokenA, address _tokenB) = poolInfos[i].assetRouter.getTokens(poolInfos[i].pool);
@@ -110,10 +113,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
             }
         }
 
-        __ERC20_init(_name, _symbol);
-        __ReentrancyGuard_init();
         accessManager = _accessManager;
-
         lastMoveInfo.block = block.number;
         factory = IUnoAutoStrategyFactory(msg.sender);
     }
@@ -310,6 +310,13 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         // Add leftover tokens.
         totalDepositsA += pool.tokenA.balanceOf(address(this));
         totalDepositsB += pool.tokenB.balanceOf(address(this));
+    }
+
+    /**
+     * @dev Returns the number of pools in the strategy. 
+     */
+    function poolsLength() external view returns(uint256){
+        return pools.length;
     }
 
     /**
