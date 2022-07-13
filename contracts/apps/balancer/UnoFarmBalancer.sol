@@ -13,12 +13,12 @@ import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
     /**
      * @dev DistributionInfo:
-     * {_block} - Distribution block number.
+     * {block} - Distribution block number.
      * {rewardPerDepositAge} - Distribution reward divided by {totalDepositAge}. 
      * {cumulativeRewardAgePerDepositAge} - Sum of {rewardPerDepositAge}s multiplied by distribution interval.
      */
     struct DistributionInfo {
-        uint256 _block;
+        uint256 block;
         uint256 rewardPerDepositAge;
         uint256 cumulativeRewardAgePerDepositAge;
     }
@@ -103,7 +103,11 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
         }
         streamer = IChildChainStreamer(GaugeFactory.getPoolStreamer(_lpPool));
 
-        distributionInfo[0] = DistributionInfo(block.number, 0, 0);
+        distributionInfo[0] = DistributionInfo({
+            block: block.number,
+            rewardPerDepositAge: 0,
+            cumulativeRewardAgePerDepositAge: 0
+        });
         distributionID = 1;
         totalDepositLastUpdate = block.number;
 
@@ -156,7 +160,9 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
         UserInfo storage user = userInfo[origin];
         // Subtract amount from user.reward first, then subtract remainder from user.stake.
         if(amount > user.reward){
-            user.stake = user.stake + user.reward - amount;
+            uint256 balance = user.stake + user.reward;
+            require(amount <= balance, 'INSUFFICIENT_BALANCE');
+            user.stake = balance - amount;
             totalDeposits = totalDeposits + user.reward - amount;
             user.reward = 0;
         } else {
@@ -186,7 +192,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
         int256[][] memory limits
     ) external onlyAssetRouter nonReentrant returns(uint256 reward){
         require(totalDeposits > 0, 'NO_LIQUIDITY');
-        require(distributionInfo[distributionID - 1]._block != block.number, 'CANT_CALL_ON_THE_SAME_BLOCK');
+        require(distributionInfo[distributionID - 1].block != block.number, 'CANT_CALL_ON_THE_SAME_BLOCK');
         require((swaps.length == streamer.reward_count()) && (swaps.length == assets.length) && (swaps.length == limits.length), 'PARAMS_LENGTHS_NOT_MATCH_REWARD_COUNT');
 
         gauge.claim_rewards();
@@ -223,13 +229,13 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
         reward = IERC20(lpPool).balanceOf(address(this));
 
         uint256 rewardPerDepositAge = reward * fractionMultiplier / (totalDepositAge + totalDeposits * (block.number - totalDepositLastUpdate));
-        uint256 cumulativeRewardAgePerDepositAge = distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge + rewardPerDepositAge * (block.number - distributionInfo[distributionID - 1]._block);
+        uint256 cumulativeRewardAgePerDepositAge = distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge + rewardPerDepositAge * (block.number - distributionInfo[distributionID - 1].block);
 
-        distributionInfo[distributionID] = DistributionInfo(
-            block.number,
-            rewardPerDepositAge,
-            cumulativeRewardAgePerDepositAge
-        );
+        distributionInfo[distributionID] = DistributionInfo({
+            block: block.number,
+            rewardPerDepositAge: rewardPerDepositAge,
+            cumulativeRewardAgePerDepositAge: cumulativeRewardAgePerDepositAge
+        });
 
         distributionID += 1;
         totalDepositLastUpdate = block.number;
@@ -264,7 +270,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
             // A reward has been distributed, update user.reward.
             user.reward = userReward(_address);
             // Count fresh deposit age from previous reward distribution to now.
-            user.depositAge = user.stake * (block.number - distributionInfo[distributionID - 1]._block);
+            user.depositAge = user.stake * (block.number - distributionInfo[distributionID - 1].block);
         }
 
         user.lastDistribution = distributionID;
@@ -282,7 +288,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
             return user.reward;
         }
         DistributionInfo memory lastUserDistributionInfo = distributionInfo[user.lastDistribution];
-        uint256 userDepositAge = user.depositAge + user.stake * (lastUserDistributionInfo._block - user.lastUpdate);
+        uint256 userDepositAge = user.depositAge + user.stake * (lastUserDistributionInfo.block - user.lastUpdate);
         // Calculate reward between the last user deposit and the distribution after that.
         uint256 rewardBeforeDistibution = userDepositAge * lastUserDistributionInfo.rewardPerDepositAge / fractionMultiplier;
         // Calculate reward from the distributions that have happened after the last user deposit.
