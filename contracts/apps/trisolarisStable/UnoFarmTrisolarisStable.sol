@@ -50,8 +50,7 @@ contract UnoFarmTrisolarisStable is Initializable, ReentrancyGuardUpgradeable {
     address public rewardToken;
     address public rewarderToken;
     address public lpPair;
-    uint8 public tokensCount; // delete
-    address public ass; // delete
+    uint8 public tokensCount;
 
     /**
      * @dev Third Party Contracts:
@@ -59,8 +58,10 @@ contract UnoFarmTrisolarisStable is Initializable, ReentrancyGuardUpgradeable {
      * {MasterChef} -The contract that distibutes {rewardToken}.
      */
     ISwap private Swap;
-    IUniswapV2Router02 private constant trisolarisRouter = IUniswapV2Router02(0x2CB45Edb4517d5947aFdE3BEAbF95A582506858B);
-    IUniversalMasterChef private constant MasterChef = IUniversalMasterChef(0x3838956710bcc9D122Dd23863a0549ca8D5675D6);
+    IUniswapV2Router02 private constant trisolarisRouter =
+        IUniswapV2Router02(0x2CB45Edb4517d5947aFdE3BEAbF95A582506858B);
+    IUniversalMasterChef private constant MasterChef =
+        IUniversalMasterChef(0x3838956710bcc9D122Dd23863a0549ca8D5675D6);
     IComplexRewarder private ComplexRewarder;
 
     /**
@@ -120,9 +121,14 @@ contract UnoFarmTrisolarisStable is Initializable, ReentrancyGuardUpgradeable {
 
         ComplexRewarder = IComplexRewarder(MasterChef.rewarder(pid));
         if (address(ComplexRewarder) != address(0)) {
-            (IERC20[] memory rewarderTokenArray, ) = ComplexRewarder.pendingTokens(pid, address(0), 0);
+            (IERC20[] memory rewarderTokenArray, ) = ComplexRewarder.pendingTokens(
+                pid,
+                address(0),
+                0
+            );
             rewarderToken = address(rewarderTokenArray[0]);
             IERC20(rewarderToken).approve(swap, type(uint256).max);
+            IERC20(rewarderToken).approve(address(trisolarisRouter), type(uint256).max);
         }
 
         distributionInfo[0] = DistributionInfo(block.number, 0, 0);
@@ -131,6 +137,9 @@ contract UnoFarmTrisolarisStable is Initializable, ReentrancyGuardUpgradeable {
 
         IERC20(lpPair).approve(address(MasterChef), type(uint256).max);
         IERC20(lpPair).approve(swap, type(uint256).max);
+
+        IERC20(rewardToken).approve(address(trisolarisRouter), type(uint256).max);
+
         for (uint256 i = 0; i < tokensCount; i++) {
             IERC20(poolTokens[i]).approve(swap, type(uint256).max);
         }
@@ -213,36 +222,70 @@ contract UnoFarmTrisolarisStable is Initializable, ReentrancyGuardUpgradeable {
         uint256[] calldata rewardAmountsOutMin
     ) external onlyAssetRouter nonReentrant returns (uint256 reward) {
         require(totalDeposits > 0, "NO_LIQUIDITY");
-        require(distributionInfo[distributionID - 1]._block != block.number, "CANT_CALL_ON_THE_SAME_BLOCK");
 
-        require(tokensCount == _rewarderTokenRoutes.length, "Number of rewardER routes should be equal to the number of tokens in the pool");
-        require(tokensCount == _rewardTokenRoutes.length, "Number of reward routes should be equal to the number of tokens in the pool");
+        require(
+            distributionInfo[distributionID - 1]._block != block.number,
+            "CANT_CALL_ON_THE_SAME_BLOCK"
+        );
+
+        require(
+            tokensCount == _rewarderTokenRoutes.length,
+            "Number of rewardER routes should be equal to the number of tokens in the pool"
+        );
+
+        require(
+            tokensCount == _rewardTokenRoutes.length,
+            "Number of reward routes should be equal to the number of tokens in the pool"
+        );
+
+        for (uint256 i = 0; i < tokensCount; i++) {
+            require(
+                _rewarderTokenRoutes[i][0] == rewarderToken &&
+                    _rewarderTokenRoutes[i][_rewarderTokenRoutes[i].length - 1] == poolTokens[i],
+                "BAD_REWARDER_TOKEN_ROUTES"
+            );
+            require(
+                _rewardTokenRoutes[i][0] == rewardToken &&
+                    _rewardTokenRoutes[i][_rewardTokenRoutes[i].length - 1] == poolTokens[i],
+                "BAD_REWARD_TOKEN_ROUTES"
+            );
+        }
+
         MasterChef.harvest(pid, address(this));
 
         {
-            for (uint256 i = 0; i < tokensCount; i++) {
-                if (poolTokens[i] != rewardToken) {
-                    trisolarisRouter.swapExactTokensForTokens(
-                        IERC20(rewardToken).balanceOf(address(this)) / tokensCount,
-                        rewarderAmountsOutMin[i],
-                        _rewardTokenRoutes[i],
-                        address(this),
-                        block.timestamp
-                    );
-                }
-            }
-        }
-        {
-            if (address(ComplexRewarder) != address(0)) {
+            uint256 rewardTokenFraction = IERC20(rewardToken).balanceOf(address(this)) /
+                tokensCount;
+            if (rewardTokenFraction > 0) {
                 for (uint256 i = 0; i < tokensCount; i++) {
-                    if (poolTokens[i] != rewarderToken) {
+                    if (poolTokens[i] != rewardToken) {
                         trisolarisRouter.swapExactTokensForTokens(
-                            IERC20(rewarderToken).balanceOf(address(this)) / tokensCount,
+                            rewardTokenFraction,
                             rewardAmountsOutMin[i],
-                            _rewarderTokenRoutes[i],
+                            _rewardTokenRoutes[i],
                             address(this),
                             block.timestamp
                         );
+                    }
+                }
+            }
+        }
+
+        {
+            if (address(ComplexRewarder) != address(0)) {
+                uint256 rewarderTokenFraction = IERC20(rewarderToken).balanceOf(address(this)) /
+                    tokensCount;
+                if (rewarderTokenFraction > 0) {
+                    for (uint256 i = 0; i < tokensCount; i++) {
+                        if (poolTokens[i] != rewarderToken) {
+                            trisolarisRouter.swapExactTokensForTokens(
+                                rewarderTokenFraction,
+                                rewarderAmountsOutMin[i],
+                                _rewarderTokenRoutes[i],
+                                address(this),
+                                block.timestamp
+                            );
+                        }
                     }
                 }
             }
@@ -255,11 +298,17 @@ contract UnoFarmTrisolarisStable is Initializable, ReentrancyGuardUpgradeable {
         }
 
         reward = Swap.addLiquidity(amounts, 1, block.timestamp);
-        uint256 rewardPerDepositAge = (reward * fractionMultiplier) / (totalDepositAge + totalDeposits * (block.number - totalDepositLastUpdate));
-        uint256 cumulativeRewardAgePerDepositAge = distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge +
+        uint256 rewardPerDepositAge = (reward * fractionMultiplier) /
+            (totalDepositAge + totalDeposits * (block.number - totalDepositLastUpdate));
+        uint256 cumulativeRewardAgePerDepositAge = distributionInfo[distributionID - 1]
+            .cumulativeRewardAgePerDepositAge +
             rewardPerDepositAge *
             (block.number - distributionInfo[distributionID - 1]._block);
-        distributionInfo[distributionID] = DistributionInfo(block.number, rewardPerDepositAge, cumulativeRewardAgePerDepositAge);
+        distributionInfo[distributionID] = DistributionInfo(
+            block.number,
+            rewardPerDepositAge,
+            cumulativeRewardAgePerDepositAge
+        );
         distributionID += 1;
         totalDepositLastUpdate = block.number;
         totalDepositAge = 0;
@@ -282,6 +331,13 @@ contract UnoFarmTrisolarisStable is Initializable, ReentrancyGuardUpgradeable {
         }
     }
 
+    /**
+     * @dev Function to return array of tokens in the pool.
+     */
+    function getPoolTokens() external view returns (address[] memory _poolTokens) {
+        _poolTokens = poolTokens;
+    }
+
     function _updateDeposit(address _address) internal {
         UserInfo storage user = userInfo[_address];
         // Accumulate deposit age within the current distribution period.
@@ -292,7 +348,9 @@ contract UnoFarmTrisolarisStable is Initializable, ReentrancyGuardUpgradeable {
             // A reward has been distributed, update user.reward.
             user.reward = userReward(_address);
             // Count fresh deposit age from previous reward distribution to now.
-            user.depositAge = user.stake * (block.number - distributionInfo[distributionID - 1]._block);
+            user.depositAge =
+                user.stake *
+                (block.number - distributionInfo[distributionID - 1]._block);
         }
 
         user.lastDistribution = distributionID;
@@ -310,19 +368,26 @@ contract UnoFarmTrisolarisStable is Initializable, ReentrancyGuardUpgradeable {
             return user.reward;
         }
         DistributionInfo memory lastUserDistributionInfo = distributionInfo[user.lastDistribution];
-        uint256 userDepositAge = user.depositAge + user.stake * (lastUserDistributionInfo._block - user.lastUpdate);
+        uint256 userDepositAge = user.depositAge +
+            user.stake *
+            (lastUserDistributionInfo._block - user.lastUpdate);
         // Calculate reward between the last user deposit and the distribution after that.
-        uint256 rewardBeforeDistibution = (userDepositAge * lastUserDistributionInfo.rewardPerDepositAge) / fractionMultiplier;
+        uint256 rewardBeforeDistibution = (userDepositAge *
+            lastUserDistributionInfo.rewardPerDepositAge) / fractionMultiplier;
         // Calculate reward from the distributions that have happened after the last user deposit.
-        uint256 rewardAfterDistribution = (user.stake * (distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge - lastUserDistributionInfo.cumulativeRewardAgePerDepositAge)) /
-            fractionMultiplier;
+        uint256 rewardAfterDistribution = (user.stake *
+            (distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge -
+                lastUserDistributionInfo.cumulativeRewardAgePerDepositAge)) / fractionMultiplier;
         return user.reward + rewardBeforeDistibution + rewardAfterDistribution;
     }
 
     /**
      * @dev Utility function used to create tokens array.
      */
-    function getTokens(address _swap) internal returns (address[] memory _poolTokens, uint8 _tokensCount) {
+    function getTokens(address _swap)
+        internal
+        returns (address[] memory _poolTokens, uint8 _tokensCount)
+    {
         for (uint8 i = 0; i < type(uint8).max; i++) {
             (bool success, ) = _swap.call(abi.encodeWithSignature("getToken(uint8)", i));
             if (success) {

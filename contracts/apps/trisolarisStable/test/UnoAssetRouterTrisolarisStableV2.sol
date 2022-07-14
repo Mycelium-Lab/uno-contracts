@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
 
-import { IUnoFarmTrisolarisStable as Farm } from "./interfaces/IUnoFarmTrisolarisStable.sol";
-import "../../interfaces/IUnoFarmFactory.sol";
-import "../../interfaces/IUnoAccessManager.sol";
-import "../../interfaces/ISwap.sol";
+import { IUnoFarmTrisolarisStable as Farm } from "../interfaces/IUnoFarmTrisolarisStable.sol";
+import "../../../interfaces/IUnoFarmFactory.sol";
+import "../../../interfaces/IUnoAccessManager.sol";
+import "../../../interfaces/ISwap.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, UUPSUpgradeable {
+contract UnoAssetRouterTrisolarisStableV2 is Initializable, PausableUpgradeable, UUPSUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     /**
@@ -23,6 +23,8 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
     IUnoAccessManager public accessManager;
     bytes32 private constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
     bytes32 private constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+
+    uint256 public constant version = 2;
 
     event Deposit(
         address indexed swap,
@@ -196,6 +198,35 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
         if (farm != Farm(address(0))) {
             totalDepositsLP = farm.getTotalDeposits();
         }
+    }
+
+    /**
+     * @dev Utility function used to create tokens array.
+     */
+    function getTokens(address _swap)
+        internal
+        returns (address[] memory _poolTokens, uint8 _tokensCount)
+    {
+        ISwap Swap = ISwap(_swap);
+
+        for (uint8 i = 0; i < type(uint8).max; i++) {
+            (bool success, ) = address(Swap).call(abi.encodeWithSignature("getToken(uint8)", i));
+            if (success) {
+                _tokensCount++;
+            } else break;
+        }
+
+        require(_tokensCount > 0, "No tokens were found");
+        _poolTokens = new address[](_tokensCount);
+
+        for (uint8 i = 0; i < _tokensCount; i++) {
+            (, bytes memory data) = address(Swap).call(
+                abi.encodeWithSignature("getToken(uint8)", i)
+            );
+            _poolTokens[i] = abi.decode(data, (address));
+        }
+
+        return (_poolTokens, _tokensCount);
     }
 
     function pause() external onlyPauser {

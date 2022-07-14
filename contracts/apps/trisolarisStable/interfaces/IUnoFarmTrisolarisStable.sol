@@ -57,4 +57,6 @@ interface IUnoFarmTrisolarisStable {
     function userBalance(address _address) external view returns (uint256);
 
     function getTotalDeposits() external view returns (uint256);
+
+    function getPoolTokens() external view returns (address[] memory _poolTokens);
 }

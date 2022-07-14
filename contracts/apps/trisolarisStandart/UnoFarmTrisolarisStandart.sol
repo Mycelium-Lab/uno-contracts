@@ -304,24 +304,26 @@ contract UnoFarmTrisolarisStandart is Initializable, ReentrancyGuardUpgradeable 
         {
             // scope to avoid stack too deep errors
             uint256 rewardTokenHalf = IERC20(rewardToken).balanceOf(address(this)) / 2;
-            if (tokenA != rewardToken) {
-                trisolarisRouter.swapExactTokensForTokens(
-                    rewardTokenHalf,
-                    amountsOutMin[0],
-                    rewardTokenToTokenARoute,
-                    address(this),
-                    block.timestamp
-                );
-            }
+            if (rewardTokenHalf > 0) {
+                if (tokenA != rewardToken) {
+                    trisolarisRouter.swapExactTokensForTokens(
+                        rewardTokenHalf,
+                        amountsOutMin[0],
+                        rewardTokenToTokenARoute,
+                        address(this),
+                        block.timestamp
+                    );
+                }
 
-            if (tokenB != rewardToken) {
-                trisolarisRouter.swapExactTokensForTokens(
-                    rewardTokenHalf,
-                    amountsOutMin[1],
-                    rewardTokenToTokenBRoute,
-                    address(this),
-                    block.timestamp
-                );
+                if (tokenB != rewardToken) {
+                    trisolarisRouter.swapExactTokensForTokens(
+                        rewardTokenHalf,
+                        amountsOutMin[1],
+                        rewardTokenToTokenBRoute,
+                        address(this),
+                        block.timestamp
+                    );
+                }
             }
         }
 
@@ -329,24 +331,26 @@ contract UnoFarmTrisolarisStandart is Initializable, ReentrancyGuardUpgradeable 
             // scope to avoid stack too deep errors
             if (address(ComplexRewarder) != address(0)) {
                 uint256 rewarderTokenHalf = IERC20(rewarderToken).balanceOf(address(this)) / 2;
-                if (tokenA != rewarderToken) {
-                    trisolarisRouter.swapExactTokensForTokens(
-                        rewarderTokenHalf,
-                        amountsOutMin[2],
-                        rewarderTokenToTokenARoute,
-                        address(this),
-                        block.timestamp
-                    );
-                }
+                if (rewarderTokenHalf > 0) {
+                    if (tokenA != rewarderToken) {
+                        trisolarisRouter.swapExactTokensForTokens(
+                            rewarderTokenHalf,
+                            amountsOutMin[2],
+                            rewarderTokenToTokenARoute,
+                            address(this),
+                            block.timestamp
+                        );
+                    }
 
-                if (tokenB != rewarderToken) {
-                    trisolarisRouter.swapExactTokensForTokens(
-                        rewarderTokenHalf,
-                        amountsOutMin[3],
-                        rewarderTokenToTokenBRoute,
-                        address(this),
-                        block.timestamp
-                    );
+                    if (tokenB != rewarderToken) {
+                        trisolarisRouter.swapExactTokensForTokens(
+                            rewarderTokenHalf,
+                            amountsOutMin[3],
+                            rewarderTokenToTokenBRoute,
+                            address(this),
+                            block.timestamp
+                        );
+                    }
                 }
             }
         }
