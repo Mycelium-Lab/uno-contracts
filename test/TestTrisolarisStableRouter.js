@@ -42,7 +42,7 @@ const poolTokensAddresses2 = [
 
 const masterChefV2 = "0x3838956710bcc9D122Dd23863a0549ca8D5675D6";
 
-const account1 = "0x01bF61e1bCBfb54a0cdb6C41f5457EC08B997872"; // has to be unlocked
+const account1 = "0xAE205662f4C14E062E7d8575554385B38BA14c2E"; // has to be unlocked
 const account2 = "0x949b82Dfc04558bC4D3CA033A1B194915a3A3bEE"; // has to be unlocked
 const accountNormalTokens = "0x173c35e1D60f061F2Fd4a0C4a881119d39D51E7a"; // has to be unlocked
 
@@ -927,12 +927,19 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                 let withdrawn = false;
                 for (let i = 0; i < poolTokensAddresses.length; i++) {
                     const token = await IERC20.at((await Swap.getToken(i)).toString());
-                    balanceAfter = await token.balanceOf(account1);
+                    const balanceAfter = await token.balanceOf(account1);
 
-                    if (balanceAfter > balancesBefore[i]) {
+                    console.log(`Before: ${balancesBefore[i]} After: ${balanceAfter}`);
+
+                    if (balanceAfter.toNumber() > balancesBefore[i].toNumber()) {
                         withdrawn = true;
+                        console.log("True");
                     }
-                    assert.isTrue(balanceAfter >= balancesBefore[i], "Tokens were not withdrawn");
+                    assert.isAtLeast(
+                        balanceAfter.toNumber(),
+                        balancesBefore[i].toNumber(),
+                        "Tokens were not withdrawn",
+                    );
                 }
 
                 assert.isTrue(withdrawn, "Tokens were not withdrawn");
