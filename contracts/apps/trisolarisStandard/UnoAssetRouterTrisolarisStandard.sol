@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
 
-import { IUnoFarmTrisolarisStandart as Farm } from "../interfaces/IUnoFarmTrisolarisStandart.sol";
-import "../../../interfaces/IUnoFarmFactory.sol";
-import "../../../interfaces/IUnoAccessManager.sol";
-import "../../../interfaces/IUniswapV2Pair.sol";
+import { IUnoFarmTrisolarisStandard as Farm } from "./interfaces/IUnoFarmTrisolarisStandard.sol";
+import "../../interfaces/IUnoFarmFactory.sol";
+import "../../interfaces/IUnoAccessManager.sol";
+import "../../interfaces/IUniswapV2Pair.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract UnoAssetRouterTrisolarisStandartV2 is Initializable, PausableUpgradeable, UUPSUpgradeable {
+contract UnoAssetRouterTrisolarisStandard is Initializable, PausableUpgradeable, UUPSUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     /**
@@ -23,8 +23,6 @@ contract UnoAssetRouterTrisolarisStandartV2 is Initializable, PausableUpgradeabl
     IUnoAccessManager public accessManager;
     bytes32 private constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
     bytes32 private constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
-
-    uint256 public constant version = 2;
 
     event Deposit(
         address indexed lpPool,

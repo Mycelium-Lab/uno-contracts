@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
 
-import { IUnoFarmTrisolarisStandart as Farm } from "./interfaces/IUnoFarmTrisolarisStandart.sol";
-import "../../interfaces/IUnoFarmFactory.sol";
-import "../../interfaces/IUnoAccessManager.sol";
-import "../../interfaces/IUniswapV2Pair.sol";
+import { IUnoFarmTrisolarisStandard as Farm } from "../interfaces/IUnoFarmTrisolarisStandard.sol";
+import "../../../interfaces/IUnoFarmFactory.sol";
+import "../../../interfaces/IUnoAccessManager.sol";
+import "../../../interfaces/IUniswapV2Pair.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract UnoAssetRouterTrisolarisStandart is Initializable, PausableUpgradeable, UUPSUpgradeable {
+contract UnoAssetRouterTrisolarisStandardV2 is Initializable, PausableUpgradeable, UUPSUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     /**
@@ -24,8 +24,20 @@ contract UnoAssetRouterTrisolarisStandart is Initializable, PausableUpgradeable,
     bytes32 private constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
     bytes32 private constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
-    event Deposit(address indexed lpPool, address indexed from, address indexed recipient, uint256 amount);
-    event Withdraw(address indexed lpPool, address indexed from, address indexed recipient, uint256 amount);
+    uint256 public constant version = 2;
+
+    event Deposit(
+        address indexed lpPool,
+        address indexed from,
+        address indexed recipient,
+        uint256 amount
+    );
+    event Withdraw(
+        address indexed lpPool,
+        address indexed from,
+        address indexed recipient,
+        uint256 amount
+    );
     event Distribute(address indexed lpPool, uint256 reward);
 
     modifier onlyDistributor() {
@@ -95,7 +107,15 @@ contract UnoAssetRouterTrisolarisStandart is Initializable, PausableUpgradeable,
             IERC20Upgradeable(lpPair).safeTransferFrom(msg.sender, address(farm), amountLP);
         }
 
-        (sentA, sentB, liquidity) = farm.deposit(amountA, amountB, amountAMin, amountBMin, amountLP, msg.sender, recipient);
+        (sentA, sentB, liquidity) = farm.deposit(
+            amountA,
+            amountB,
+            amountAMin,
+            amountBMin,
+            amountLP,
+            msg.sender,
+            recipient
+        );
         emit Deposit(lpPair, msg.sender, recipient, liquidity);
     }
 
@@ -122,7 +142,14 @@ contract UnoAssetRouterTrisolarisStandart is Initializable, PausableUpgradeable,
         Farm farm = Farm(farmFactory.Farms(lpPair));
         require(farm != Farm(address(0)), "FARM_NOT_EXISTS");
 
-        (amountA, amountB) = farm.withdraw(amount, amountAMin, amountBMin, withdrawLP, msg.sender, recipient);
+        (amountA, amountB) = farm.withdraw(
+            amount,
+            amountAMin,
+            amountBMin,
+            withdrawLP,
+            msg.sender,
+            recipient
+        );
         emit Withdraw(lpPair, msg.sender, recipient, amount);
     }
 
@@ -148,7 +175,13 @@ contract UnoAssetRouterTrisolarisStandart is Initializable, PausableUpgradeable,
         Farm farm = Farm(farmFactory.Farms(lpPair));
         require(farm != Farm(address(0)), "FARM_NOT_EXISTS");
 
-        uint256 reward = farm.distribute(rewardTokenToTokenARoute, rewardTokenToTokenBRoute, rewarderTokenToTokenARoute, rewarderTokenToTokenBRoute, amountsOutMin);
+        uint256 reward = farm.distribute(
+            rewardTokenToTokenARoute,
+            rewardTokenToTokenBRoute,
+            rewarderTokenToTokenARoute,
+            rewarderTokenToTokenBRoute,
+            amountsOutMin
+        );
         emit Distribute(lpPair, reward);
     }
 
@@ -221,10 +254,18 @@ contract UnoAssetRouterTrisolarisStandart is Initializable, PausableUpgradeable,
      * @return amountA - Token A amount.
      * @return amountB - Token B amount.
      */
-    function getTokenStake(address lpPair, uint256 amountLP) internal view returns (uint256 amountA, uint256 amountB) {
+    function getTokenStake(address lpPair, uint256 amountLP)
+        internal
+        view
+        returns (uint256 amountA, uint256 amountB)
+    {
         uint256 totalSupply = IERC20Upgradeable(lpPair).totalSupply();
-        amountA = (amountLP * IERC20Upgradeable(IUniswapV2Pair(lpPair).token0()).balanceOf(lpPair)) / totalSupply;
-        amountB = (amountLP * IERC20Upgradeable(IUniswapV2Pair(lpPair).token1()).balanceOf(lpPair)) / totalSupply;
+        amountA =
+            (amountLP * IERC20Upgradeable(IUniswapV2Pair(lpPair).token0()).balanceOf(lpPair)) /
+            totalSupply;
+        amountB =
+            (amountLP * IERC20Upgradeable(IUniswapV2Pair(lpPair).token1()).balanceOf(lpPair)) /
+            totalSupply;
     }
 
     function pause() external onlyPauser {

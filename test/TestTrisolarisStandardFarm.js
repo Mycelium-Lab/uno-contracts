@@ -4,14 +4,14 @@ const IUniswapV2Pair = artifacts.require("IUniswapV2Pair");
 const IUniversalMasterChef = artifacts.require("IUniversalMasterChef");
 const IComplexRewarder = artifacts.require("IComplexRewarder");
 
-const Farm = artifacts.require("UnoFarmTrisolarisStandart");
+const Farm = artifacts.require("UnoFarmTrisolarisStandard");
 
 const pool = "0x03B666f3488a7992b2385B12dF7f35156d7b29cD"; // wNEAR-USDT pool
 
 const masterChefV1 = "0x1f1Ed214bef5E83D8f5d0eB5D7011EB965D0D79B";
 const masterChefV2 = "0x3838956710bcc9D122Dd23863a0549ca8D5675D6";
 
-contract("Test UnoFarmTrisolarisStandart initialization", accounts => {
+contract("Test UnoFarmTrisolarisStandard initialization", accounts => {
     let assetRouter = accounts[0];
 
     let implementation;

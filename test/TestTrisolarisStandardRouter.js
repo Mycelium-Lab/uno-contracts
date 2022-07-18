@@ -13,9 +13,9 @@ const IERC20 = artifacts.require("IERC20");
 const AccessManager = artifacts.require("UnoAccessManager");
 const FarmFactory = artifacts.require("UnoFarmFactory");
 
-const Farm = artifacts.require("UnoFarmTrisolarisStandart");
-const AssetRouter = artifacts.require("UnoAssetRouterTrisolarisStandart");
-const AssetRouterV2 = artifacts.require("UnoAssetRouterTrisolarisStandartV2");
+const Farm = artifacts.require("UnoFarmTrisolarisStandard");
+const AssetRouter = artifacts.require("UnoAssetRouterTrisolarisStandard");
+const AssetRouterV2 = artifacts.require("UnoAssetRouterTrisolarisStandardV2");
 
 const trisolarisRouter = "0x2CB45Edb4517d5947aFdE3BEAbF95A582506858B";
 const pool = "0x2fe064B6c7D274082aa5d2624709bC9AE7D16C77"; // USDC-USDT pool
@@ -39,7 +39,7 @@ advanceBlocksAndTime = async function (blocks, time) {
     }
 };
 
-contract("UnoAssetRouterTrisolarisStandart", accounts => {
+contract("UnoAssetRouterTrisolarisStandard", accounts => {
     const admin = accounts[0];
     const pauser = accounts[1];
     const distributor = accounts[2];
