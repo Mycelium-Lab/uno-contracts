@@ -26,8 +26,8 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
     bytes32 private constant PAUSER_ROLE = keccak256('PAUSER_ROLE');
     IVault constant private Vault = IVault(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
 
-    event Deposit(address indexed lpPool, address indexed from, address indexed recipient, uint256 amount);
-    event Withdraw(address indexed lpPool, address indexed from, address indexed recipient, uint256 amount);
+    event Deposit(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
+    event Withdraw(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Distribute(address indexed lpPool, uint256 reward);
 
     modifier onlyDistributor(){

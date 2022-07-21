@@ -271,7 +271,7 @@ contract('UnoAssetRouterQuickswap', accounts => {
                 farm = await Farm.at(farmAddress)
             })
             it('fires events', async () => {
-                expectEvent(receipt, 'Deposit', {lpPool:pool, from:account1, recipient: account1, amount:amounts[0]})
+                expectEvent(receipt, 'Deposit', {lpPool:pool, sender:account1, recipient: account1, amount:amounts[0]})
             })
             it('updates stakes' ,async () => {
                 const {stakeLP} = await assetRouter.userStake(account1, pool)
@@ -304,7 +304,7 @@ contract('UnoAssetRouterQuickswap', accounts => {
                 receipt = await assetRouter.deposit(pool, 0, 0, 0, 0, amounts[1], account1, {from: account1})
             })
             it('fires events', async () => {
-                expectEvent(receipt, 'Deposit', {lpPool:pool, from: account1, recipient: account1, amount:amounts[1]})
+                expectEvent(receipt, 'Deposit', {lpPool:pool, sender: account1, recipient: account1, amount:amounts[1]})
             })
             it('updates stakes' ,async () => {
                 const {stakeLP} = await assetRouter.userStake(account1, pool)
@@ -337,7 +337,7 @@ contract('UnoAssetRouterQuickswap', accounts => {
                 receipt = await assetRouter.deposit(pool, 0, 0, 0, 0, amounts[2], account2, {from: account2} )
             })
             it('fires events', async () => {
-                expectEvent(receipt, 'Deposit', {lpPool:pool, from: account2, recipient: account2, amount: amounts[2]})
+                expectEvent(receipt, 'Deposit', {lpPool:pool, sender: account2, recipient: account2, amount: amounts[2]})
             })
             it("doesn't change stakes for account[0]" ,async () => {
                 const {stakeLP} = await assetRouter.userStake(account1, pool)
@@ -378,7 +378,7 @@ contract('UnoAssetRouterQuickswap', accounts => {
                 receipt = await assetRouter.deposit(pool, 0, 0, 0, 0, amounts[3], account2, {from: account1})
             })
             it('fires event', async () => {
-                expectEvent(receipt, 'Deposit', {lpPool:pool, from: account1, recipient: account2, amount:amounts[3]})
+                expectEvent(receipt, 'Deposit', {lpPool:pool, sender: account1, recipient: account2, amount:amounts[3]})
             })
             it('doesnt change stakes for account1' ,async () => {
                 const { stakeLP } = await assetRouter.userStake(account1, pool)
@@ -448,7 +448,7 @@ contract('UnoAssetRouterQuickswap', accounts => {
             })
             it('fires events', async () => {
                 receipt = await assetRouter.deposit(pool, amountA, amountB, 0, 0, 0, account1, {from: account1})
-                expectEvent(receipt, 'Deposit', {lpPool:pool, from: account1, recipient: account1})
+                expectEvent(receipt, 'Deposit', {lpPool:pool, sender: account1, recipient: account1})
             })
             it('withdraws tokens from balance', async () => {
                 const {stakeA, stakeB} = await assetRouter.userStake(account1, pool)
@@ -513,8 +513,8 @@ contract('UnoAssetRouterQuickswap', accounts => {
                 receipt2 = await assetRouter.withdraw(pool, amounts[2], 0, 0, true, account2, {from: account2})
             })
             it('fires events', async () => {
-                expectEvent(receipt1, 'Withdraw', {lpPool:pool, from: account1, recipient: account1, amount:amounts[0]})
-                expectEvent(receipt2, 'Withdraw', {lpPool:pool, from: account2, recipient: account2, amount:amounts[2]})
+                expectEvent(receipt1, 'Withdraw', {lpPool:pool, sender: account1, recipient: account1, amount:amounts[0]})
+                expectEvent(receipt2, 'Withdraw', {lpPool:pool, sender: account2, recipient: account2, amount:amounts[2]})
             })
         
             it('correctly updates userStake for account1', async () => {
@@ -571,7 +571,7 @@ contract('UnoAssetRouterQuickswap', accounts => {
                 receipt = await assetRouter.withdraw(pool, amounts[1], 0, 0, true, account2, {from: account1})
             })
             it('fires events', async () => {
-                expectEvent(receipt, 'Withdraw', {lpPool:pool, from: account1, recipient: account2, amount:amounts[1]})
+                expectEvent(receipt, 'Withdraw', {lpPool:pool, sender: account1, recipient: account2, amount:amounts[1]})
             })
             it('correctly changes userStake for account1', async () => {
                 const {stakeLP} = await assetRouter.userStake(account1, pool)
@@ -620,7 +620,7 @@ contract('UnoAssetRouterQuickswap', accounts => {
                 receipt = await assetRouter.withdraw(pool, stakeLP1, 0, 0, false, account1, {from: account1})
             })
             it('fires events', async () => {
-                expectEvent(receipt, 'Withdraw', {lpPool:pool, from: account1, recipient: account1, amount:stakeLP1})
+                expectEvent(receipt, 'Withdraw', {lpPool:pool, sender: account1, recipient: account1, amount:stakeLP1})
             })
             it('correctly updates account1 stake', async () => {
                 const {stakeLP, stakeA, stakeB} = await assetRouter.userStake(account1, pool)
@@ -690,7 +690,7 @@ contract('UnoAssetRouterQuickswap', accounts => {
                 receipt = await assetRouter.withdraw(pool, stakeLP2, 0, 0, false, account1, {from: account2})
             })
             it('fires events', async () => {
-                expectEvent(receipt, 'Withdraw', {lpPool:pool, from: account2, recipient: account1, amount:stakeLP2})
+                expectEvent(receipt, 'Withdraw', {lpPool:pool, sender: account2, recipient: account1, amount:stakeLP2})
             })
             it('correctly updates account2 stake', async () => {
                 const {stakeLP, stakeA, stakeB} = await assetRouter.userStake(account2, pool)
