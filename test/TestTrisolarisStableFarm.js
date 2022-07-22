@@ -17,15 +17,10 @@ const masterChefV2 = "0x3838956710bcc9D122Dd23863a0549ca8D5675D6";
 
 contract("Test UnoFarmTrisolarisStable initialization", accounts => {
     let assetRouter = accounts[0];
-
     let implementation;
-
     let lpToken;
-
     let pid;
-
     let rewardTokenAddress, rewarderTokenAddress;
-
     let receipt;
 
     before(async () => {
@@ -98,12 +93,12 @@ contract("Test UnoFarmTrisolarisStable initialization", accounts => {
             );
         });
         it("Sets tokens", async () => {
-            const tokensCount = (await implementation.tokensCount()).toNumber();
-            assert.equal(tokensCount, poolTokenAddresses.length, "Wrong number of tokens");
-            for (let i = 0; i < tokensCount; i++) {
+            const tokensLength = (await implementation.tokensLength()).toNumber();
+            assert.equal(tokensLength, poolTokenAddresses.length, "Wrong number of tokens");
+            for (let i = 0; i < tokensLength; i++) {
                 assert.equal(
                     poolTokenAddresses[i].toLowerCase(),
-                    (await implementation.poolTokens(i)).toString().toLowerCase(),
+                    (await implementation.tokens(i)).toString().toLowerCase(),
                     "Tokens are not correct",
                 );
             }

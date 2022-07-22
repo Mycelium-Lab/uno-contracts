@@ -24,18 +24,8 @@ contract UnoAssetRouterTrisolarisStandard is Initializable, PausableUpgradeable,
     bytes32 private constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
     bytes32 private constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
-    event Deposit(
-        address indexed lpPool,
-        address indexed from,
-        address indexed recipient,
-        uint256 amount
-    );
-    event Withdraw(
-        address indexed lpPool,
-        address indexed from,
-        address indexed recipient,
-        uint256 amount
-    );
+    event Deposit(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
+    event Withdraw(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Distribute(address indexed lpPool, uint256 reward);
 
     modifier onlyDistributor() {
@@ -81,15 +71,7 @@ contract UnoAssetRouterTrisolarisStandard is Initializable, PausableUpgradeable,
         uint256 amountBMin,
         uint256 amountLP,
         address recipient
-    )
-        external
-        whenNotPaused
-        returns (
-            uint256 sentA,
-            uint256 sentB,
-            uint256 liquidity
-        )
-    {
+    ) external whenNotPaused returns (uint256 sentA, uint256 sentB, uint256 liquidity) {
         Farm farm = Farm(farmFactory.Farms(lpPair));
         if (farm == Farm(address(0))) {
             farm = Farm(farmFactory.createFarm(lpPair));
@@ -192,15 +174,7 @@ contract UnoAssetRouterTrisolarisStandard is Initializable, PausableUpgradeable,
      * @return stakeA - Token A stake.
      * @return stakeB - Token B stake.
      */
-    function userStake(address _address, address lpPair)
-        external
-        view
-        returns (
-            uint256 stakeLP,
-            uint256 stakeA,
-            uint256 stakeB
-        )
-    {
+    function userStake(address _address, address lpPair) external view returns (uint256 stakeLP, uint256 stakeA, uint256 stakeB) {
         Farm farm = Farm(farmFactory.Farms(lpPair));
         if (farm != Farm(address(0))) {
             stakeLP = farm.userBalance(_address);
@@ -216,15 +190,7 @@ contract UnoAssetRouterTrisolarisStandard is Initializable, PausableUpgradeable,
      * @return totalDepositsA - Token A deposits.
      * @return totalDepositsB - Token B deposits.
      */
-    function totalDeposits(address lpPair)
-        external
-        view
-        returns (
-            uint256 totalDepositsLP,
-            uint256 totalDepositsA,
-            uint256 totalDepositsB
-        )
-    {
+    function totalDeposits(address lpPair) external view returns (uint256 totalDepositsLP, uint256 totalDepositsA, uint256 totalDepositsB) {
         Farm farm = Farm(farmFactory.Farms(lpPair));
         if (farm != Farm(address(0))) {
             totalDepositsLP = farm.getTotalDeposits();
@@ -252,18 +218,10 @@ contract UnoAssetRouterTrisolarisStandard is Initializable, PausableUpgradeable,
      * @return amountA - Token A amount.
      * @return amountB - Token B amount.
      */
-    function getTokenStake(address lpPair, uint256 amountLP)
-        internal
-        view
-        returns (uint256 amountA, uint256 amountB)
-    {
+    function getTokenStake(address lpPair, uint256 amountLP) internal view returns (uint256 amountA, uint256 amountB) {
         uint256 totalSupply = IERC20Upgradeable(lpPair).totalSupply();
-        amountA =
-            (amountLP * IERC20Upgradeable(IUniswapV2Pair(lpPair).token0()).balanceOf(lpPair)) /
-            totalSupply;
-        amountB =
-            (amountLP * IERC20Upgradeable(IUniswapV2Pair(lpPair).token1()).balanceOf(lpPair)) /
-            totalSupply;
+        amountA = amountLP * IERC20Upgradeable(IUniswapV2Pair(lpPair).token0()).balanceOf(lpPair) / totalSupply;
+        amountB = amountLP * IERC20Upgradeable(IUniswapV2Pair(lpPair).token1()).balanceOf(lpPair) / totalSupply;
     }
 
     function pause() external onlyPauser {
@@ -274,5 +232,7 @@ contract UnoAssetRouterTrisolarisStandard is Initializable, PausableUpgradeable,
         _unpause();
     }
 
-    function _authorizeUpgrade(address) internal override onlyAdmin {}
+    function _authorizeUpgrade(address) internal override onlyAdmin {
+        
+    }
 }

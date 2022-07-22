@@ -3,10 +3,6 @@ const { deployProxy, upgradeProxy } = require("@openzeppelin/truffle-upgrades");
 
 const timeMachine = require("ganache-time-traveler");
 
-// const IStakingRewards = artifacts.require("IStakingRewards");
-// const IStakingRewardsFactory = artifacts.require("IStakingRewardsFactory");
-const IUniswapV2Pair = artifacts.require("IUniswapV2Pair");
-const IUniswapV2Router02 = artifacts.require("IUniswapV2Router02");
 const IUniversalMasterChef = artifacts.require("IUniversalMasterChef");
 const IComplexRewarder = artifacts.require("IComplexRewarder");
 const IERC20 = artifacts.require("IERC20");
@@ -19,26 +15,16 @@ const Farm = artifacts.require("UnoFarmTrisolarisStable");
 const AssetRouter = artifacts.require("UnoAssetRouterTrisolarisStable");
 const AssetRouterV2 = artifacts.require("UnoAssetRouterTrisolarisStableV2");
 
-const trisolarisRouter = "0x2CB45Edb4517d5947aFdE3BEAbF95A582506858B";
 const swapAddress = "0x458459E48dbAC0C8Ca83F8D0b7b29FEfE60c3970"; // USDC-USDT-USN
 const swap2Address = "0x13e7a001EC72AB30D66E2f386f677e25dCFF5F59"; // wNEAR-USDT pool
 
 const lpTokenAddress = "0x87BCC091d0A7F9352728100268Ac8D25729113bB";
-const lpTokenAddress2 = "0x5EB99863f7eFE88c447Bc9D52AA800421b1de6c9";
-
-const numberOfTokens = 3;
-const numberOfTokens2 = 2;
 
 const poolTokensAddresses = [
     "0xb12bfca5a55806aaf64e99521918a4bf0fc40802",
     "0x4988a896b1227218e4a686fde5eabdcabd91571f",
     "0x5183e1b1091804bc2602586919e6880ac1cf2896",
 ]; // USDC, USDT, USN (in that order)
-
-const poolTokensAddresses2 = [
-    "0xb12bfca5a55806aaf64e99521918a4bf0fc40802",
-    "0x4988a896b1227218e4a686fde5eabdcabd91571f",
-]; // USDC, USDT (in that order)
 
 const masterChefV2 = "0x3838956710bcc9D122Dd23863a0549ca8D5675D6";
 
@@ -64,22 +50,10 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
     const distributor = accounts[2];
 
     let accessManager, assetRouter, factory;
-
-    // let stakingRewards, stakingToken;
     let stakingToken;
-
     let snapshotId;
-
-    let rewardTokenAddress, rewarderTokenAddress;
-
     let MasterChef;
-
     let pid;
-
-    let lpToken;
-
-    let poolTokens = [];
-
     let Swap;
 
     let initReceipt = {};
@@ -301,8 +275,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
             });
             it("fires events", async () => {
                 expectEvent(receipt, "Deposit", {
-                    swap: swapAddress,
-                    from: account1,
+                    lpPool: swapAddress,
+                    sender: account1,
                     recipient: account1,
                     amount: amounts[0],
                 });
@@ -348,8 +322,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
             });
             it("fires events", async () => {
                 expectEvent(receipt, "Deposit", {
-                    swap: swapAddress,
-                    from: account1,
+                    lpPool: swapAddress,
+                    sender: account1,
                     recipient: account1,
                     amount: amounts[1],
                 });
@@ -395,8 +369,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
             });
             it("fires events", async () => {
                 expectEvent(receipt, "Deposit", {
-                    swap: swapAddress,
-                    from: account2,
+                    lpPool: swapAddress,
+                    sender: account2,
                     recipient: account2,
                     amount: amounts[2],
                 });
@@ -450,8 +424,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
             });
             it("fires event", async () => {
                 expectEvent(receipt, "Deposit", {
-                    swap: swapAddress,
-                    from: account1,
+                    lpPool: swapAddress,
+                    sender: account1,
                     recipient: account2,
                     amount: amounts[3],
                 });
@@ -522,8 +496,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                     },
                 );
                 expectEvent(receipt, "Deposit", {
-                    swap: swapAddress,
-                    from: accountNormalTokens,
+                    lpPool: swapAddress,
+                    sender: accountNormalTokens,
                     recipient: accountNormalTokens,
                 });
             });
@@ -684,14 +658,14 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
             });
             it("fires events", async () => {
                 expectEvent(receipt1, "Withdraw", {
-                    swap: swapAddress,
-                    from: account1,
+                    lpPool: swapAddress,
+                    sender: account1,
                     recipient: account1,
                     amount: amounts[0],
                 });
                 expectEvent(receipt2, "Withdraw", {
-                    swap: swapAddress,
-                    from: account2,
+                    lpPool: swapAddress,
+                    sender: account2,
                     recipient: account2,
                     amount: amounts[2],
                 });
@@ -763,8 +737,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
             });
             it("fires events", async () => {
                 expectEvent(receipt, "Withdraw", {
-                    swap: swapAddress,
-                    from: account1,
+                    lpPool: swapAddress,
+                    sender: account1,
                     recipient: account2,
                     amount: amounts[1],
                 });
@@ -839,8 +813,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
             });
             it("fires events", async () => {
                 expectEvent(receipt, "Withdraw", {
-                    swap: swapAddress,
-                    from: account1,
+                    lpPool: swapAddress,
+                    sender: account1,
                     recipient: account1,
                     amount: stakeLP1,
                 });
@@ -909,8 +883,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
             });
             it("fires events", async () => {
                 expectEvent(receipt, "Withdraw", {
-                    swap: swapAddress,
-                    from: account2,
+                    lpPool: swapAddress,
+                    sender: account2,
                     recipient: account1,
                     amount: stakeLP2,
                 });
@@ -929,11 +903,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                     const token = await IERC20.at((await Swap.getToken(i)).toString());
                     const balanceAfter = await token.balanceOf(account1);
 
-                    console.log(`Before: ${balancesBefore[i]} After: ${balanceAfter}`);
-
                     if (balanceAfter.toNumber() > balancesBefore[i].toNumber()) {
                         withdrawn = true;
-                        console.log("True");
                     }
                     assert.isAtLeast(
                         balanceAfter.toNumber(),
@@ -954,37 +925,37 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                         swapAddress,
                         [
                             [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
                                 "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
                             ],
                             [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
                                 "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                 "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                             ],
                             [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                                 "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                 "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                             ],
                         ],
                         [
                             [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                 "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
                             ],
                             [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                 "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                 "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                             ],
                             [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
                                 "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                 "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                             ],
@@ -1002,37 +973,37 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                         swap2Address,
                         [
                             [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
                                 "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
                             ],
                             [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
                                 "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                 "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                             ],
                             [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                                 "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                 "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                             ],
                         ],
                         [
                             [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                 "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
                             ],
                             [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                 "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                 "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                             ],
                             [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
                                 "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                 "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                             ],
@@ -1084,37 +1055,37 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                     swapAddress,
                     [
                         [
-                            "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                            "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                            "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                            "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
                             "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
                         ],
                         [
-                            "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                            "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                            "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                            "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
                             "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                             "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                         ],
                         [
-                            "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                            "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                            "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                             "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                             "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                         ],
                     ],
                     [
                         [
-                            "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                            "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                            "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                            "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                             "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
                         ],
                         [
-                            "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                            "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                            "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                            "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                             "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                             "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                         ],
                         [
-                            "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                            "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                            "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
                             "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                             "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                         ],
@@ -1125,7 +1096,7 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                 );
             });
             it("emits event", async () => {
-                expectEvent(receipt, "Distribute", { swap: swapAddress });
+                expectEvent(receipt, "Distribute", { lpPool: swapAddress });
             });
             it("increases token stakes", async () => {
                 const stake1 = await assetRouter.userStake(account1, swapAddress);
@@ -1144,37 +1115,37 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                         swapAddress,
                         [
                             [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                                "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                                 "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
                             ],
                             [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
                                 "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                 "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                             ],
                             [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                                 "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                 "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                             ],
                         ],
                         [
                             [
-                                "0x5183e1B1091804BC2602586919E6880ac1cf2896",
+                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                 "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
                             ],
                             [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                 "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                 "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                             ],
                             [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
                                 "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                 "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                             ],
@@ -1190,37 +1161,37 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                         swapAddress,
                         [
                             [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
                                 "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
                             ],
                             [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                "0x5183e1B1091804BC2602586919E6880ac1cf2896",
+                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
                                 "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                 "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                             ],
                             [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                                 "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                 "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                             ],
                         ],
                         [
                             [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                 "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
                             ],
                             [
-                                "0x5183e1B1091804BC2602586919E6880ac1cf2896",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                 "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                 "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                             ],
                             [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
                                 "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                 "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                             ],
@@ -1236,37 +1207,37 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                         swapAddress,
                         [
                             [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
                                 "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
                             ],
                             [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
                                 "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                 "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                             ],
                             [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                "0x5183e1B1091804BC2602586919E6880ac1cf2896",
+                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                                 "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                 "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                             ],
                         ],
                         [
                             [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                 "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
                             ],
                             [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                 "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                 "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                             ],
                             [
-                                "0x5183e1B1091804BC2602586919E6880ac1cf2896",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
                                 "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                 "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                             ],
@@ -1284,27 +1255,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                         swapAddress,
                         [
                             [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                            ],
-                            [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                            ],
-                            [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0x5183e1B1091804BC2602586919E6880ac1cf2896",
-                            ],
-                        ],
-                        [
-                            [
                                 "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",//
                             ],
                             [
                                 "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
@@ -1315,6 +1267,25 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             [
                                 "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
                                 "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                "0x5183e1B1091804BC2602586919E6880ac1cf2896",
+                            ],
+                        ],
+                        [
+                            [
+                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                            ],
+                            [
+                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                            ],
+                            [
+                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
                                 "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                 "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                             ],
@@ -1323,7 +1294,7 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                         [0, 0, 0, 0],
                         { from: distributor },
                     ),
-                    "BAD_REWARDER_TOKEN_ROUTES",
+                    "BAD_REWARD_TOKEN_ROUTES",
                 );
             });
             it("reverts if passed wrong token2", async () => {
@@ -1332,37 +1303,37 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                         swapAddress,
                         [
                             [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
                                 "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
                             ],
                             [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
                                 "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                             ],
                             [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                                 "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                 "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                             ],
                         ],
                         [
                             [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                            ],
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                 "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
                             ],
                             [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                            ],
+                            [
+                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
                                 "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                 "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                             ],
@@ -1380,6 +1351,24 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                         swapAddress,
                         [
                             [
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                            ],
+                            [
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                            ],
+                            [
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                            ],
+                        ],
+                        [
+                            [
                                 "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
                                 "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                 "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
@@ -1395,24 +1384,6 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                                 "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
                                 "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                 "0x5183e1B1091804BC2602586919E6880ac1cf2896",
-                            ],
-                        ],
-                        [
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                            ],
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                            ],
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                             ],
                         ],
                         [0, 0, 0, 0],
@@ -1473,37 +1444,37 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                         swapAddress,
                         [
                             [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
                                 "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
                             ],
                             [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
                                 "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                 "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                             ],
                             [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                                 "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                 "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                             ],
                         ],
                         [
                             [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                 "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
                             ],
                             [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                 "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                 "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                             ],
                             [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
                                 "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                 "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                             ],

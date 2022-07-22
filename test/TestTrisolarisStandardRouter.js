@@ -3,8 +3,6 @@ const { deployProxy, upgradeProxy } = require("@openzeppelin/truffle-upgrades");
 
 const timeMachine = require("ganache-time-traveler");
 
-// const IStakingRewards = artifacts.require("IStakingRewards");
-// const IStakingRewardsFactory = artifacts.require("IStakingRewardsFactory");
 const IUniswapV2Pair = artifacts.require("IUniswapV2Pair");
 const IUniswapV2Router02 = artifacts.require("IUniswapV2Router02");
 const IUniversalMasterChef = artifacts.require("IUniversalMasterChef");
@@ -45,18 +43,10 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
     const distributor = accounts[2];
 
     let accessManager, assetRouter, factory;
-
-    // let stakingRewards, stakingToken;
     let snapshotId;
-
-    let rewardTokenAddress, rewarderTokenAddress;
-
     let MasterChef;
-
     let pid;
-
     let lpToken;
-
     let tokenA, tokenB;
 
     let initReceipt = {};
@@ -294,7 +284,7 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
             it("fires events", async () => {
                 expectEvent(receipt, "Deposit", {
                     lpPool: pool,
-                    from: account1,
+                    sender: account1,
                     recipient: account1,
                     amount: amounts[0],
                 });
@@ -334,7 +324,7 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
             it("fires events", async () => {
                 expectEvent(receipt, "Deposit", {
                     lpPool: pool,
-                    from: account1,
+                    sender: account1,
                     recipient: account1,
                     amount: amounts[1],
                 });
@@ -374,7 +364,7 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
             it("fires events", async () => {
                 expectEvent(receipt, "Deposit", {
                     lpPool: pool,
-                    from: account2,
+                    sender: account2,
                     recipient: account2,
                     amount: amounts[2],
                 });
@@ -422,7 +412,7 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
             it("fires event", async () => {
                 expectEvent(receipt, "Deposit", {
                     lpPool: pool,
-                    from: account1,
+                    sender: account1,
                     recipient: account2,
                     amount: amounts[3],
                 });
@@ -523,7 +513,7 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
                 });
                 expectEvent(receipt, "Deposit", {
                     lpPool: pool,
-                    from: account1,
+                    sender: account1,
                     recipient: account1,
                 });
             });
@@ -535,13 +525,13 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
                 approxeq(
                     stakeA.sub(stakeABefore),
                     balanceAbefore.sub(balanceAafter),
-                    new BN(1),
+                    new BN(10),
                     "StakeA is not correct",
                 );
                 approxeq(
                     stakeB.sub(stakeBBefore),
                     balanceBbefore.sub(balanceBafter),
-                    new BN(1),
+                    new BN(10),
                     "StakeB is not correct",
                 );
             });
@@ -625,13 +615,13 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
             it("fires events", async () => {
                 expectEvent(receipt1, "Withdraw", {
                     lpPool: pool,
-                    from: account1,
+                    sender: account1,
                     recipient: account1,
                     amount: amounts[0],
                 });
                 expectEvent(receipt2, "Withdraw", {
                     lpPool: pool,
-                    from: account2,
+                    sender: account2,
                     recipient: account2,
                     amount: amounts[2],
                 });
@@ -695,7 +685,7 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
             it("fires events", async () => {
                 expectEvent(receipt, "Withdraw", {
                     lpPool: pool,
-                    from: account1,
+                    sender: account1,
                     recipient: account2,
                     amount: amounts[1],
                 });
@@ -759,7 +749,7 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
             it("fires events", async () => {
                 expectEvent(receipt, "Withdraw", {
                     lpPool: pool,
-                    from: account1,
+                    sender: account1,
                     recipient: account1,
                     amount: stakeLP1,
                 });
@@ -820,7 +810,7 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
             it("fires events", async () => {
                 expectEvent(receipt, "Withdraw", {
                     lpPool: pool,
-                    from: account2,
+                    sender: account2,
                     recipient: account1,
                     amount: stakeLP2,
                 });
@@ -899,11 +889,11 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
                         "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
                         "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
                         "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                        "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                        "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
                     ],
                     [
                         "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                        "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                        "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
                     ],
                     [constants.ZERO_ADDRESS, "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"],
                     [constants.ZERO_ADDRESS, "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"],

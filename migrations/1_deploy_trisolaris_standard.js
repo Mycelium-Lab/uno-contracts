@@ -6,10 +6,11 @@ const path = require("path");
 
 const { distributor, pauser } = require("./addresses/addresses");
 
-const Farm = artifacts.require("UnoFarmTrisolarisStandart");
-const AssetRouter = artifacts.require("UnoAssetRouterTrisolarisStandart");
+const Farm = artifacts.require("UnoFarmTrisolarisStandard");
+const AssetRouter = artifacts.require("UnoAssetRouterTrisolarisStandard");
 
 module.exports = async function (deployer, network, accounts) {
+  if (network !== "aurora") return
   // AccessManager deployment, dont deploy if already deployed on this network
   await deployer.deploy(AccessManager, { overwrite: true, from: accounts[0] });
   // Deploy new Farm implementation for factory to deploy
@@ -41,6 +42,6 @@ async function addFactoryAddress(address) {
   const data = await fs.readFile(path.resolve(__dirname, "./addresses/factories.json"));
   var json = JSON.parse(data);
 
-  json.sushiswap = address;
+  json.trisolarisStandard = address;
   await fs.writeFile(path.resolve(__dirname, "./addresses/factories.json"), JSON.stringify(json));
 }

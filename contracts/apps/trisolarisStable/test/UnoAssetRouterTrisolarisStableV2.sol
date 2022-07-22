@@ -14,6 +14,8 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 contract UnoAssetRouterTrisolarisStableV2 is Initializable, PausableUpgradeable, UUPSUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
+    uint256 public constant version = 2;
+
     /**
      * @dev Contract Variables:
      * farmFactory - The contract that deploys new Farms and links them to {lpPair}s.
@@ -24,21 +26,9 @@ contract UnoAssetRouterTrisolarisStableV2 is Initializable, PausableUpgradeable,
     bytes32 private constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
     bytes32 private constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
-    uint256 public constant version = 2;
-
-    event Deposit(
-        address indexed swap,
-        address indexed from,
-        address indexed recipient,
-        uint256 amount
-    );
-    event Withdraw(
-        address indexed swap,
-        address indexed from,
-        address indexed recipient,
-        uint256 amount
-    );
-    event Distribute(address indexed swap, uint256 reward);
+    event Deposit(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
+    event Withdraw(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
+    event Distribute(address indexed lpPool, uint256 reward);
 
     modifier onlyDistributor() {
         require(accessManager.hasRole(DISTRIBUTOR_ROLE, msg.sender), "CALLER_NOT_DISTRIBUTOR");
@@ -65,59 +55,47 @@ contract UnoAssetRouterTrisolarisStableV2 is Initializable, PausableUpgradeable,
      * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpPair} and deposits tokens in it. Emits a {Deposit} event.
      * @param swap - Address of the Swap contract.
      * @param amounts - Amounts of tokens to deposit.
-     * @param minAamountToMint - Minimum amount of LP tokens to receive.
+     * @param minAmountLP - Minimum LP the user will receive from {{amounts}} deposit.
      * @param amountLP - Amount of LP tokens to deposit.
-     * @param recipient - Recipient.
+     * @param recipient - Address which will recieve the deposit.
 
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
     function deposit(
         address swap,
         uint256[] memory amounts,
-        uint256 minAamountToMint,
+        uint256 minAmountLP,
         uint256 amountLP,
         address recipient
     ) external whenNotPaused returns (uint256 liquidity) {
-        address lpPair = getLpPair(swap);
-
         Farm farm = Farm(farmFactory.Farms(swap));
         if (farm == Farm(address(0))) {
             farm = Farm(farmFactory.createFarm(swap));
         }
 
-        address[] memory poolTokens = farm.getPoolTokens();
-        uint256 tokensCount = poolTokens.length;
-
-        require(amounts.length == tokensCount, "WRONG_NUMBER_OF_TOKENS");
-
-        for (uint256 i = 0; i < tokensCount; i++) {
+        for (uint256 i = 0; i < amounts.length; i++) { 
             if (amounts[i] > 0) {
-                IERC20Upgradeable(poolTokens[i]).safeTransferFrom(
-                    msg.sender,
-                    address(farm),
-                    amounts[i]
-                );
+                IERC20Upgradeable(farm.tokens(i)).safeTransferFrom(msg.sender, address(farm), amounts[i]);
             }
         }
 
         if (amountLP > 0) {
-            IERC20Upgradeable(lpPair).safeTransferFrom(msg.sender, address(farm), amountLP);
+            IERC20Upgradeable(farm.lpPair()).safeTransferFrom(msg.sender, address(farm), amountLP);
         }
 
-        liquidity = farm.deposit(amounts, minAamountToMint, amountLP, recipient);
+        liquidity = farm.deposit(amounts, minAmountLP, amountLP, recipient);
         emit Deposit(swap, msg.sender, recipient, liquidity);
-        return liquidity;
     }
 
     /** 
      * @dev Withdraws tokens from the given pool. Emits a {Withdraw} event.
      * @param swap - Address of the Swap contract.
      * @param amount - Amounts of LP tokens to withdraw.
-     * @param minAmounts - Minimum amounts of tokens to receive.
+     * @param minAmounts - Minimum amounts of tokens sent to {recipient}.
      * @param withdrawLP - Whether to withdraw or not to withdraw the deposits in LP tokens.
-     * @param recipient - Recipient.
+     * @param recipient - The address which will recieve tokens.
 
-     * @return amountsWitdrawn - Token amounts sent to the {recipient}, an array of zeros if withdrawLP == false.
+     * @return amounts - Token amounts sent to {recipient}, an array of zeros if withdrawLP == false.
      */
     function withdraw(
         address swap,
@@ -125,52 +103,41 @@ contract UnoAssetRouterTrisolarisStableV2 is Initializable, PausableUpgradeable,
         uint256[] memory minAmounts,
         bool withdrawLP,
         address recipient
-    ) external whenNotPaused returns (uint256[] memory amountsWitdrawn) {
+    ) external whenNotPaused returns (uint256[] memory amounts) {
         Farm farm = Farm(farmFactory.Farms(swap));
         require(farm != Farm(address(0)), "FARM_NOT_EXISTS");
 
-        address[] memory poolTokens = farm.getPoolTokens();
-        uint256 tokensCount = poolTokens.length;
-
-        require(minAmounts.length == tokensCount, "WRONG_NUMBER_OF_TOKENS");
-
-        amountsWitdrawn = farm.withdraw(amount, minAmounts, withdrawLP, msg.sender, recipient);
+        amounts = farm.withdraw(amount, minAmounts, withdrawLP, msg.sender, recipient);
         emit Withdraw(swap, msg.sender, recipient, amount);
     }
 
     /**
      * @dev Distributes tokens between users.
      * @param swap - Address of the Swap contract.
-     * @param _rewarderTokenRoutes An array of rewarder token addresses.
-     * @param _rewardTokenRoutes An array of reward token addresses.
-     * @param rewarderAmountsOutMin An array of minimum amounts of rewarder tokens.
+     * @param rewardTokenRoutes An array of reward token addresses.
+     * @param rewarderTokenRoutes An array of rewarder token addresses.
      * @param rewardAmountsOutMin  An array of minimum amounts of reward tokens.
+     * @param rewarderAmountsOutMin An array of minimum amounts of rewarder tokens.
      *
      * Note: This function can only be called by the distributor.
      */
     function distribute(
         address swap,
-        address[][] calldata _rewarderTokenRoutes,
-        address[][] calldata _rewardTokenRoutes,
-        uint256[] calldata rewarderAmountsOutMin,
-        uint256[] calldata rewardAmountsOutMin
+        address[][] calldata rewardTokenRoutes,
+        address[][] calldata rewarderTokenRoutes,
+        uint256[] calldata rewardAmountsOutMin,
+        uint256[] calldata rewarderAmountsOutMin
     ) external whenNotPaused onlyDistributor {
         Farm farm = Farm(farmFactory.Farms(swap));
         require(farm != Farm(address(0)), "FARM_NOT_EXISTS");
 
         uint256 reward = farm.distribute(
-            _rewarderTokenRoutes,
-            _rewardTokenRoutes,
-            rewarderAmountsOutMin,
-            rewardAmountsOutMin
+            rewardTokenRoutes,
+            rewarderTokenRoutes,
+            rewardAmountsOutMin,
+            rewarderAmountsOutMin
         );
         emit Distribute(swap, reward);
-    }
-
-    function getLpPair(address _swap) internal view returns (address) {
-        address lpPair;
-        (, , , , , , lpPair) = ISwap(_swap).swapStorage();
-        return lpPair;
     }
 
     /**
@@ -201,32 +168,29 @@ contract UnoAssetRouterTrisolarisStableV2 is Initializable, PausableUpgradeable,
     }
 
     /**
-     * @dev Utility function used to create tokens array.
-     */
-    function getTokens(address _swap)
-        internal
-        returns (address[] memory _poolTokens, uint8 _tokensCount)
-    {
-        ISwap Swap = ISwap(_swap);
+     * @dev Returns addresses of tokens in {swap}.
+     * @param swap - LP pool to check tokens in.
 
+     * @return tokens - Token address.
+     */  
+    function getTokens(address swap) external view returns(address[] memory tokens){
+        uint8 tokenCount;
+        address[] memory _tokens = new address[](type(uint8).max);
         for (uint8 i = 0; i < type(uint8).max; i++) {
-            (bool success, ) = address(Swap).call(abi.encodeWithSignature("getToken(uint8)", i));
-            if (success) {
-                _tokensCount++;
-            } else break;
+            try ISwap(swap).getToken(i) returns (address token) {
+                _tokens[i] = token;
+                tokenCount++;
+            } catch (bytes memory /*lowLevelData*/) {
+                break;
+            }
         }
+        require(tokenCount > 0, "NO_TOKENS_IN_SWAP");
 
-        require(_tokensCount > 0, "No tokens were found");
-        _poolTokens = new address[](_tokensCount);
-
-        for (uint8 i = 0; i < _tokensCount; i++) {
-            (, bytes memory data) = address(Swap).call(
-                abi.encodeWithSignature("getToken(uint8)", i)
-            );
-            _poolTokens[i] = abi.decode(data, (address));
+        tokens = new address[](tokenCount);
+        for (uint8 i = 0; i < tokenCount; i++) {
+            tokens[i] = _tokens[i];
         }
-
-        return (_poolTokens, _tokensCount);
+        return tokens;
     }
 
     function pause() external onlyPauser {

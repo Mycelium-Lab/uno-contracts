@@ -3,17 +3,11 @@ pragma solidity 0.8.10;
 
 interface IUnoFarmTrisolarisStandard {
     function rewardToken() external view returns (address);
-
     function rewarderToken() external view returns (address);
-
     function lpPair() external view returns (address);
-
     function tokenA() external view returns (address);
-
     function tokenB() external view returns (address);
-
     function pid() external view returns (uint256);
-
     function assetRouter() external view returns (address);
 
     function initialize(address _lpPair, address _assetRouter) external;
@@ -26,14 +20,8 @@ interface IUnoFarmTrisolarisStandard {
         uint256 amountLP,
         address origin,
         address recipient
-    )
-        external
-        returns (
-            uint256 sentA,
-            uint256 sentB,
-            uint256 liquidity
-        );
-
+    ) external returns (uint256 sentA, uint256 sentB, uint256 liquidity);
+    
     function withdraw(
         uint256 amount,
         uint256 amountAMin,
@@ -52,6 +40,5 @@ interface IUnoFarmTrisolarisStandard {
     ) external returns (uint256 reward);
 
     function userBalance(address _address) external view returns (uint256);
-
     function getTotalDeposits() external view returns (uint256);
 }

@@ -3,8 +3,8 @@ const FarmFactory = artifacts.require("UnoFarmFactory");
 const { promises: fs } = require("fs");
 const path = require("path");
 
-const Farm = artifacts.require("UnoFarmTrisolarisStable");
-const AssetRouter = artifacts.require("UnoAssetRouterTrisolarisStable");
+const Farm = artifacts.require("UnoFarmTrisolarisStandard");
+const AssetRouter = artifacts.require("UnoAssetRouterTrisolarisStandard");
 
 module.exports = async function (deployer, network) {
     if (network !== "aurora") return
@@ -23,5 +23,5 @@ async function readFactoryAddress() {
     const data = await fs.readFile(path.resolve(__dirname, "./addresses/factories.json"));
     var json = JSON.parse(data);
 
-    return json.trisolarisStable;
+    return json.trisolarisStandard;
 }

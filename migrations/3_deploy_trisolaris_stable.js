@@ -10,6 +10,7 @@ const Farm = artifacts.require("UnoFarmTrisolarisStable");
 const AssetRouter = artifacts.require("UnoAssetRouterTrisolarisStable");
 
 module.exports = async function (deployer, network, accounts) {
+  if (network !== "aurora") return
   // AccessManager deployment, dont deploy if already deployed on this network
   await deployer.deploy(AccessManager, { overwrite: true, from: accounts[0] });
   // Deploy new Farm implementation for factory to deploy
@@ -41,6 +42,6 @@ async function addFactoryAddress(address) {
   const data = await fs.readFile(path.resolve(__dirname, "./addresses/factories.json"));
   var json = JSON.parse(data);
 
-  json.sushiswap = address;
+  json.trisolarisStable = address;
   await fs.writeFile(path.resolve(__dirname, "./addresses/factories.json"), JSON.stringify(json));
 }

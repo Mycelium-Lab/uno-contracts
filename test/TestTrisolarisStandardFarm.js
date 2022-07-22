@@ -1,5 +1,4 @@
 const { expectEvent, expectRevert, BN, constants } = require("@openzeppelin/test-helpers");
-const IStakingRewards = artifacts.require("IStakingRewards");
 const IUniswapV2Pair = artifacts.require("IUniswapV2Pair");
 const IUniversalMasterChef = artifacts.require("IUniversalMasterChef");
 const IComplexRewarder = artifacts.require("IComplexRewarder");
@@ -13,17 +12,11 @@ const masterChefV2 = "0x3838956710bcc9D122Dd23863a0549ca8D5675D6";
 
 contract("Test UnoFarmTrisolarisStandard initialization", accounts => {
     let assetRouter = accounts[0];
-
     let implementation;
-
     let lpToken;
-
     let pid;
-
     let masterChefType;
-
     let rewardTokenAddress, rewarderTokenAddress;
-
     let receipt;
 
     before(async () => {
