@@ -6,11 +6,11 @@
 
 2. Compile all contracts before running migrations `truffle compile --all`
 
-3. Run specific migration: `truffle migrate --network polygon --compile-none -f 2 --to 2`
+3. Run specific migration: `truffle migrate --network aurora --compile-none -f 2 --to 2`
 
 # Deployed Smart Contracts
 
-All contracts are deployed on the Polygon(Matic) Blockchain
+All contracts are deployed on the Aurora Blockchain
 
 ### UnoAccessManager
 

@@ -16,7 +16,7 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
 
     /**
      * @dev Contract Variables:
-     * farmFactory - The contract that deploys new Farms and links them to {lpPair}s.
+     * farmFactory - The contract that deploys new Farms and links them to {swap}s.
      * accessManager - Role manager contract.
      */
     IUnoFarmFactory public farmFactory;
@@ -50,7 +50,7 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
     }
 
     /**
-     * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpPair} and deposits tokens in it. Emits a {Deposit} event.
+     * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {swap} and deposits tokens in it. Emits a {Deposit} event.
      * @param swap - Address of the Swap contract.
      * @param amounts - Amounts of tokens to deposit.
      * @param minAmountLP - Minimum LP the user will receive from {{amounts}} deposit.
@@ -139,7 +139,7 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
     }
 
     /**
-     * @dev Returns tokens staked by the {_address} for the given {lpPair}.
+     * @dev Returns tokens staked by the {_address} for the given {swap}.
      * @param _address - The address to check stakes for.
      * @param swap - Address of the Swap contract.
 
@@ -167,9 +167,9 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
 
     /**
      * @dev Returns addresses of tokens in {swap}.
-     * @param swap - LP pool to check tokens in.
+     * @param swap - Swap to check tokens in.
 
-     * @return tokens - Token address.
+     * @return tokens - Array of token addresses.
      */  
     function getTokens(address swap) external view returns(address[] memory tokens){
         uint8 tokenCount;
