@@ -8,10 +8,6 @@ interface IStakingRewards {
     function rewardsDistribution() external view returns (address);
     
     function rewardRate() external view returns (uint256);
-
-    function periodFinish() external view returns (uint256);
-    
-    function lastUpdateTime() external view returns (uint256);
     
     function rewardsToken() external view returns (address);
     
@@ -26,10 +22,6 @@ interface IStakingRewards {
     function totalSupply() external view returns (uint256);
 
     function balanceOf(address account) external view returns (uint256);
-
-    function userRewardPerTokenPaid(address account) external view returns (uint256);
-
-    function rewards(address account) external view returns (uint256);
 
     // Mutative
 

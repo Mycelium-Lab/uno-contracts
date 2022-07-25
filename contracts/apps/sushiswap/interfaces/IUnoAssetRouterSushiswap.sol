@@ -5,8 +5,8 @@ import '../../../interfaces/IUnoFarmFactory.sol';
 import '../../../interfaces/IUnoAccessManager.sol'; 
 
 interface IUnoAssetRouterSushiswap {
-    event Deposit(address indexed lpPool, address indexed from, address indexed recipient, uint256 amount);
-    event Withdraw(address indexed lpPool, address indexed from, address indexed recipient, uint256 amount);
+    event Deposit(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
+    event Withdraw(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Distribute(address indexed lpPool, uint256 reward);
 
     function farmFactory() external view returns(IUnoFarmFactory);
