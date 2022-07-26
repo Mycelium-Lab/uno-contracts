@@ -4,6 +4,10 @@ const HDWalletProvider = require("@truffle/hdwallet-provider");
 module.exports = {
   contracts_build_directory: "./build",
 
+  api_keys: {
+    polygonscan: process.env.POLYGONSCAN
+  },
+
   networks: {
     polygon: {
       provider: () => {
@@ -28,7 +32,10 @@ module.exports = {
       network_id: 137
     }
   },
-  plugins: ["truffle-contract-size"],
+  plugins: [
+    "truffle-contract-size",
+    'truffle-plugin-verify'
+  ],
   compilers: {
     solc: {
       version: "0.8.10",
