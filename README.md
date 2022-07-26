@@ -8,6 +8,12 @@
 
 3. Run specific migration: `truffle migrate --network aurora --compile-none -f 2 --to 2`
 
+# Test
+
+1. Start ganache with ```npm run ganache```
+
+2. Run tests with ```truffle test --network test```
+
 # Deployed Smart Contracts
 
 All contracts are deployed on the Aurora Blockchain
