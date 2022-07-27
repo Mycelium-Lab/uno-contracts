@@ -47,7 +47,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
      */   
     IVault constant private Vault = IVault(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
     IChildChainLiquidityGaugeFactory constant private GaugeFactory = IChildChainLiquidityGaugeFactory(0x3b8cA519122CdD8efb272b0D3085453404B25bD0);
-    IRewardsOnlyGauge private gauge;
+    IRewardsOnlyGauge public gauge;
     IChildChainStreamer private streamer;
 
     /**
