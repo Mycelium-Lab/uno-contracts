@@ -244,13 +244,6 @@ contract UnoFarmTrisolarisStandard is Initializable, ReentrancyGuardUpgradeable 
     ) external onlyAssetRouter nonReentrant returns (uint256 reward) {
         require(totalDeposits > 0, "NO_LIQUIDITY");
         require(distributionInfo[distributionID - 1].block != block.number, "CANT_CALL_ON_THE_SAME_BLOCK");
-        require(rewardTokenToTokenARoute[0] == rewardToken && rewardTokenToTokenARoute[rewardTokenToTokenARoute.length - 1] == tokenA, "BAD_REWARD_TOKEN_A_ROUTE");
-        require(rewardTokenToTokenBRoute[0] == rewardToken && rewardTokenToTokenBRoute[rewardTokenToTokenBRoute.length - 1] == tokenB, "BAD_REWARD_TOKEN_B_ROUTE");
-        
-        if(rewarderToken != address(0)){
-            require(rewarderTokenToTokenARoute[0] == rewarderToken && rewarderTokenToTokenARoute[rewarderTokenToTokenARoute.length - 1] == tokenA, "BAD_REWARDER_TOKEN_A_ROUTE");
-            require(rewarderTokenToTokenBRoute[0] == rewarderToken && rewarderTokenToTokenBRoute[rewarderTokenToTokenBRoute.length - 1] == tokenB, "BAD_REWARDER_TOKEN_B_ROUTE");
-        }
 
         if (masterChefType == MASTERCHEF_TYPE.V2) {
             MasterChef.harvest(pid, address(this));
@@ -260,28 +253,33 @@ contract UnoFarmTrisolarisStandard is Initializable, ReentrancyGuardUpgradeable 
 
         {// scope to avoid stack too deep errors
         uint256 rewardTokenHalf = IERC20(rewardToken).balanceOf(address(this)) / 2;
+        uint256 rewarderTokenHalf;
+        if (rewarderToken != address(0)) {
+            rewarderTokenHalf = IERC20(rewarderToken).balanceOf(address(this)) / 2;
+        }
         if (rewardTokenHalf > 0) {
             if (tokenA != rewardToken) {
+                require(rewardTokenToTokenARoute[0] == rewardToken && rewardTokenToTokenARoute[rewardTokenToTokenARoute.length - 1] == tokenA, "BAD_REWARD_TOKEN_A_ROUTE");
                 trisolarisRouter.swapExactTokensForTokens(rewardTokenHalf, amountsOutMin[0], rewardTokenToTokenARoute, address(this), block.timestamp);
             }
 
             if (tokenB != rewardToken) {
+                require(rewardTokenToTokenBRoute[0] == rewardToken && rewardTokenToTokenBRoute[rewardTokenToTokenBRoute.length - 1] == tokenB, "BAD_REWARD_TOKEN_B_ROUTE");
                 trisolarisRouter.swapExactTokensForTokens(rewardTokenHalf, amountsOutMin[1], rewardTokenToTokenBRoute, address(this), block.timestamp);
             }
         }
-        }
 
-        if (rewarderToken != address(0)) {
-            uint256 rewarderTokenHalf = IERC20(rewarderToken).balanceOf(address(this)) / 2;
-            if (rewarderTokenHalf > 0) {
-                if (tokenA != rewarderToken) {
-                    trisolarisRouter.swapExactTokensForTokens(rewarderTokenHalf, amountsOutMin[2], rewarderTokenToTokenARoute, address(this), block.timestamp);
-                }
-
-                if (tokenB != rewarderToken) {
-                    trisolarisRouter.swapExactTokensForTokens(rewarderTokenHalf, amountsOutMin[3], rewarderTokenToTokenBRoute, address(this), block.timestamp);
-                }
+        if (rewarderTokenHalf > 0) {
+            if (tokenA != rewarderToken) {
+                require(rewarderTokenToTokenARoute[0] == rewarderToken && rewarderTokenToTokenARoute[rewarderTokenToTokenARoute.length - 1] == tokenA, "BAD_REWARDER_TOKEN_A_ROUTE");
+                trisolarisRouter.swapExactTokensForTokens(rewarderTokenHalf, amountsOutMin[2], rewarderTokenToTokenARoute, address(this), block.timestamp);
             }
+
+            if (tokenB != rewarderToken) {
+                require(rewarderTokenToTokenBRoute[0] == rewarderToken && rewarderTokenToTokenBRoute[rewarderTokenToTokenBRoute.length - 1] == tokenB, "BAD_REWARDER_TOKEN_B_ROUTE");
+                trisolarisRouter.swapExactTokensForTokens(rewarderTokenHalf, amountsOutMin[3], rewarderTokenToTokenBRoute, address(this), block.timestamp);
+            }
+        }
         }
 
         (,,reward) = trisolarisRouter.addLiquidity(tokenA, tokenB, IERC20(tokenA).balanceOf(address(this)), IERC20(tokenB).balanceOf(address(this)), amountsOutMin[0] + amountsOutMin[2], amountsOutMin[1] + amountsOutMin[3], address(this), block.timestamp);

@@ -225,35 +225,33 @@ contract UnoFarmTrisolarisStable is Initializable, ReentrancyGuardUpgradeable {
         require(distributionInfo[distributionID - 1].block != block.number, "CANT_CALL_ON_THE_SAME_BLOCK");
         require(rewardTokenRoutes.length == tokens.length, "BAD_REWARD_ROUTES_LENGTH");
         require(rewarderTokenRoutes.length == tokens.length, "BAD_REWARDER_ROUTES_LENGTH");
-        
-        for (uint256 i = 0; i < tokens.length; i++) {
-            require(rewardTokenRoutes[i][0] == rewardToken && rewardTokenRoutes[i][rewardTokenRoutes[i].length - 1] == tokens[i], "BAD_REWARD_TOKEN_ROUTES");
-            require(rewarderTokenRoutes[i][0] == rewarderToken && rewarderTokenRoutes[i][rewarderTokenRoutes[i].length - 1] == tokens[i], "BAD_REWARDER_TOKEN_ROUTES");
-        }
 
         MasterChef.harvest(pid, address(this));
         { // scope to avoid stack too deep errors
         uint256 rewardTokenFraction = IERC20(rewardToken).balanceOf(address(this)) / tokens.length;
+        uint256 rewarderTokenFraction;
+        if (rewarderToken != address(0)) {
+            rewarderTokenFraction = IERC20(rewarderToken).balanceOf(address(this)) / tokens.length;
+        }
         if (rewardTokenFraction > 0) {
             for (uint256 i = 0; i < tokens.length; i++) {
                 if (tokens[i] != rewardToken) {
+                    require(rewardTokenRoutes[i][0] == rewardToken && rewardTokenRoutes[i][rewardTokenRoutes[i].length - 1] == tokens[i], "BAD_REWARD_TOKEN_ROUTES");
                     trisolarisRouter.swapExactTokensForTokens(rewardTokenFraction, rewardAmountsOutMin[i], rewardTokenRoutes[i], address(this), block.timestamp);
                 }
             }
         }
-        }
 
-        if (rewarderToken != address(0)) {
-            uint256 rewarderTokenFraction = IERC20(rewarderToken).balanceOf(address(this)) / tokens.length;
-            if (rewarderTokenFraction > 0) {
-                for (uint256 i = 0; i < tokens.length; i++) {
-                    if (tokens[i] != rewarderToken) {
-                        trisolarisRouter.swapExactTokensForTokens(rewarderTokenFraction, rewarderAmountsOutMin[i], rewarderTokenRoutes[i], address(this), block.timestamp);
-                    }
+        if (rewarderTokenFraction > 0) {
+            for (uint256 i = 0; i < tokens.length; i++) {
+                if (tokens[i] != rewarderToken) {
+                    require(rewarderTokenRoutes[i][0] == rewarderToken && rewarderTokenRoutes[i][rewarderTokenRoutes[i].length - 1] == tokens[i], "BAD_REWARDER_TOKEN_ROUTES");
+                    trisolarisRouter.swapExactTokensForTokens(rewarderTokenFraction, rewarderAmountsOutMin[i], rewarderTokenRoutes[i], address(this), block.timestamp);
                 }
             }
         }
-
+        }
+        
         uint256[] memory amounts = new uint256[](tokens.length);
         for (uint256 i = 0; i < tokens.length; i++) {
             amounts[i] = IERC20(tokens[i]).balanceOf(address(this));
