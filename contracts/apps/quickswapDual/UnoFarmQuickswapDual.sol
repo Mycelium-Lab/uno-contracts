@@ -179,33 +179,31 @@ contract UnoFarmQuickswapDual is Initializable, ReentrancyGuardUpgradeable {
     function distribute(address[] calldata rewardTokenAToTokenARoute, address[] calldata rewardTokenAToTokenBRoute, address[] calldata rewardTokenBToTokenARoute, address[] calldata rewardTokenBToTokenBRoute, uint256[4] memory amountsOutMin) external onlyAssetRouter nonReentrant returns(uint256 reward){
         require(totalDeposits > 0, 'NO_LIQUIDITY');
         require(distributionInfo[distributionID - 1].block != block.number, 'CANT_CALL_ON_THE_SAME_BLOCK');
-        require(rewardTokenAToTokenARoute[0] == rewardTokenA && rewardTokenAToTokenARoute[rewardTokenAToTokenARoute.length - 1] == tokenA, 'BAD_REWARD_A_TOKEN_A_ROUTE');
-        require(rewardTokenAToTokenBRoute[0] == rewardTokenA && rewardTokenAToTokenBRoute[rewardTokenAToTokenBRoute.length - 1] == tokenB, 'BAD_REWARD_A_TOKEN_B_ROUTE');
-        require(rewardTokenBToTokenARoute[0] == rewardTokenB && rewardTokenBToTokenARoute[rewardTokenBToTokenARoute.length - 1] == tokenA, 'BAD_REWARD_B_TOKEN_A_ROUTE');
-        require(rewardTokenBToTokenBRoute[0] == rewardTokenB && rewardTokenBToTokenBRoute[rewardTokenBToTokenBRoute.length - 1] == tokenB, 'BAD_REWARD_B_TOKEN_B_ROUTE');
 
         lpStakingPool.getReward();
         { // scope to avoid stack too deep errors
         uint256 rewardTokenAHalf = IERC20(rewardTokenA).balanceOf(address(this)) / 2;
+        uint256 rewardTokenBHalf = IERC20(rewardTokenB).balanceOf(address(this)) / 2;
         if (rewardTokenAHalf > 0) {
             if (tokenA != rewardTokenA) {
+                require(rewardTokenAToTokenARoute[0] == rewardTokenA && rewardTokenAToTokenARoute[rewardTokenAToTokenARoute.length - 1] == tokenA, 'BAD_REWARD_A_TOKEN_A_ROUTE');
                 quickswapRouter.swapExactTokensForTokens(rewardTokenAHalf, amountsOutMin[0], rewardTokenAToTokenARoute, address(this), block.timestamp);
             }
 
             if (tokenB != rewardTokenA) {
+                require(rewardTokenAToTokenBRoute[0] == rewardTokenA && rewardTokenAToTokenBRoute[rewardTokenAToTokenBRoute.length - 1] == tokenB, 'BAD_REWARD_A_TOKEN_B_ROUTE');
                 quickswapRouter.swapExactTokensForTokens(rewardTokenAHalf, amountsOutMin[1], rewardTokenAToTokenBRoute, address(this), block.timestamp);
             }
         }
-        }
-
-        { // scope to avoid stack too deep errors
-        uint256 rewardTokenBHalf = IERC20(rewardTokenB).balanceOf(address(this)) / 2;
+        
         if (rewardTokenBHalf > 0) {
             if (tokenA != rewardTokenB) {
+                require(rewardTokenBToTokenARoute[0] == rewardTokenB && rewardTokenBToTokenARoute[rewardTokenBToTokenARoute.length - 1] == tokenA, 'BAD_REWARD_B_TOKEN_A_ROUTE');
                 quickswapRouter.swapExactTokensForTokens(rewardTokenBHalf, amountsOutMin[2], rewardTokenBToTokenARoute, address(this), block.timestamp);
             }
     
             if (tokenB != rewardTokenB) {
+                require(rewardTokenBToTokenBRoute[0] == rewardTokenB && rewardTokenBToTokenBRoute[rewardTokenBToTokenBRoute.length - 1] == tokenB, 'BAD_REWARD_B_TOKEN_B_ROUTE');
                 quickswapRouter.swapExactTokensForTokens(rewardTokenBHalf, amountsOutMin[3], rewardTokenBToTokenBRoute, address(this), block.timestamp);
             }
         }
