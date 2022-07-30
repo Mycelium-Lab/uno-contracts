@@ -31,4 +31,5 @@ interface IMiniChefV2 {
     
     function lpToken(uint256 _pid) external view returns (address);
     function pendingSushi(uint256 _pid, address _user) external view returns (uint256);
+    function setSushiPerSecond(uint256) external view; 
 }

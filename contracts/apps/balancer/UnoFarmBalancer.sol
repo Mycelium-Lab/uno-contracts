@@ -121,6 +121,8 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
      */
     function deposit(uint256[] memory amounts, address[] memory tokens, uint256 minAmountLP, uint256 amountLP,  address recipient) external nonReentrant onlyAssetRouter returns(uint256 liquidity){
         (IERC20[] memory poolTokens, IAsset[] memory assets,) = getTokens();
+        require ((amounts.length == poolTokens.length) && (tokens.length == poolTokens.length), 'BAD_AMOUNTS_LENGTH');
+        require ((amounts.length == poolTokens.length) && (tokens.length == poolTokens.length), 'BAD_TOKENS_LENGTH');
 
         bool joinPool = false;
         for (uint256 i = 0; i < poolTokens.length; i++) {
@@ -200,16 +202,17 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
         uint256[] memory balances = new uint256[](swaps.length);
         IERC20[] memory rewardTokens = new IERC20[](swaps.length);
         for (uint256 i = 0; i < swaps.length; i++) {
-            require(swaps[i][0].assetInIndex == 0, 'BAD_SWAPS_TOKEN_ORDERING');
-
             rewardTokens[i] = IERC20(streamer.reward_tokens(i));
-            require(address(assets[i][0]) == address(rewardTokens[i]), 'ASSET_NOT_REWARD');
-
             balances[i] = IERC20(rewardTokens[i]).balanceOf(address(this));
-        }
 
+            require(address(assets[i][swaps[i][0].assetInIndex]) == address(rewardTokens[i]), 'ASSET_NOT_REWARD');
+        }
         for (uint256 i = 0; i < swaps.length; i++) {
-            if (balances[i] > 0 && (address(assets[i][0]) != address(gauge))) {
+            if (
+                (balances[i] > 0) && 
+                (address(rewardTokens[i]) != address(gauge)) && 
+                (address(rewardTokens[i]) != address(assets[i][swaps[i][swaps[i].length - 1].assetOutIndex])) 
+            ) {
                 swaps[i][0].amount = balances[i];
                 rewardTokens[i].approve(address(Vault), balances[i]);
                 Vault.batchSwap(
