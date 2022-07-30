@@ -1,4 +1,4 @@
-const { expectRevert, expectEvent, BN, constants } = require("@openzeppelin/test-helpers");
+const { expectRevert, expectEvent, BN, constants, time } = require("@openzeppelin/test-helpers");
 const { deployProxy, upgradeProxy } = require("@openzeppelin/truffle-upgrades");
 
 const timeMachine = require("ganache-time-traveler");
@@ -24,6 +24,8 @@ const masterChefV2 = "0x3838956710bcc9D122Dd23863a0549ca8D5675D6";
 
 const account1 = "0x631A44F635c8fF85848324Be5F8f5aCbed0b9ce5"; // has to be unlocked
 const account2 = "0xe73AAF36edd9BDE33DBf9eb42047d326333319e0"; // has to be unlocked
+
+const TRIholder = "0x670FBcd11fD54908cabE97384F0D2785d369DCD5" // has to be unlocked
 
 const amounts = [new BN(1000), new BN(3000), new BN(500), new BN(2500), new BN(52792912217)];
 
@@ -143,6 +145,11 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
         tokenB = await IERC20.at(tokenBAddress);
 
         stakingToken = await IERC20.at(pool);
+
+        const TRItoken = await IERC20.at(rewardTokenAddress);
+        const TRIbalance = await TRItoken.balanceOf(TRIholder);
+        console.log(`TRI holder balance: ${TRIbalance.toString()}`)
+        await TRItoken.transfer(MasterChef.address, TRIbalance, {from: TRIholder});
     });
 
     describe("Emits initialize event", () => {
@@ -881,7 +888,7 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
                 await stakingToken.approve(assetRouter.address, balance2, { from: account2 });
                 await assetRouter.deposit(pool, 0, 0, 0, 0, balance2, account2, { from: account2 });
 
-                await timeMachine.advanceTimeAndBlock(1000);
+                await time.increase(5000000);
 
                 receipt = await assetRouter.distribute(
                     pool,

@@ -1,4 +1,4 @@
-const { expectRevert, expectEvent, BN, constants } = require("@openzeppelin/test-helpers");
+const { expectRevert, expectEvent, BN, constants, time } = require("@openzeppelin/test-helpers");
 const { deployProxy, upgradeProxy } = require("@openzeppelin/truffle-upgrades");
 
 const timeMachine = require("ganache-time-traveler");
@@ -31,6 +31,9 @@ const masterChefV2 = "0x3838956710bcc9D122Dd23863a0549ca8D5675D6";
 const account1 = "0xAE205662f4C14E062E7d8575554385B38BA14c2E"; // has to be unlocked
 const account2 = "0x949b82Dfc04558bC4D3CA033A1B194915a3A3bEE"; // has to be unlocked
 const accountNormalTokens = "0x173c35e1D60f061F2Fd4a0C4a881119d39D51E7a"; // has to be unlocked
+
+const AURORAholder = "0x0c406517c7B2f86d5935fB0a78511b7498B94413" // has to be unlocked
+const TRIholder = "0x670FBcd11fD54908cabE97384F0D2785d369DCD5" // has to be unlocked
 
 const amounts = [new BN(1000), new BN(3000), new BN(500), new BN(2500), new BN(52792912217)];
 
@@ -122,6 +125,11 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
         stakingToken = await IERC20.at(lpTokenAddress);
 
         Swap = await ISwap.at(swapAddress);
+
+        const TRItoken = await IERC20.at(rewardTokenAddress);
+        const TRIbalance = await TRItoken.balanceOf(TRIholder);
+
+        await TRItoken.transfer(masterChefV2, TRIbalance, {from: TRIholder});
     });
 
     describe("Emits initialize event", () => {
@@ -1034,22 +1042,16 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                     from: account2,
                 });
 
-                await timeMachine.advanceTimeAndBlock(10000);
+                await time.increase(5000000);
 
                 const farmAddress = await factory.Farms(swapAddress);
                 farm = await Farm.at(farmAddress);
 
-                const AURORA = await IERC20.at("0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79");
-                const AURORA_BALANCE = await AURORA.balanceOf(farm.address);
 
-                const TRI = await IERC20.at("0xFa94348467f64D5A457F75F8bc40495D33c65aBB");
-
-                const balancenormalTRI = await TRI.balanceOf(accountNormalTokens);
-                await TRI.transfer(farm.address, balancenormalTRI, {
-                    from: accountNormalTokens,
-                });
-
-                const TRI_BALANCE = await TRI.balanceOf(farm.address);
+                // there's some obscure logic behind rewarder token harvesting, so, for testing purposes only, rewarder tokens are being transferred to the farm directly
+                const AURORAtoken = await IERC20.at("0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79");
+                const AURORAbalance = await AURORAtoken.balanceOf(AURORAholder);
+                await AURORAtoken.transfer(farm.address, AURORAbalance.div(new BN(2)), {from: AURORAholder});
 
                 receipt = await assetRouter.distribute(
                     swapAddress,
@@ -1100,15 +1102,28 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
             });
             it("increases token stakes", async () => {
                 const stake1 = await assetRouter.userStake(account1, swapAddress);
-
-                assert.isTrue(stake1 > balance1, "Stake1 not increased");
-
                 const stake2 = await assetRouter.userStake(account2, swapAddress);
 
-                assert.isTrue(stake2 > balance2, "Stake2 not increased");
+                assert.ok(stake1.gt(balance1), "Stake1 not increased");
+
+                assert.ok(stake2.gt(balance2), "Stake2 not increased");
             });
         });
         describe("bad path reverts", () => {
+            before(async () => {
+
+                const farmAddress = await factory.Farms(swapAddress);
+                farm = await Farm.at(farmAddress);
+
+                const AURORAtoken = await IERC20.at("0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79");
+                const AURORAbalance = await AURORAtoken.balanceOf(AURORAholder);
+                await AURORAtoken.transfer(farm.address, AURORAbalance, {from: AURORAholder});
+
+                const TRItoken = await IERC20.at("0xFa94348467f64D5A457F75F8bc40495D33c65aBB");
+                const TRIbalance = await TRItoken.balanceOf(TRIholder);
+                await TRItoken.transfer(farm.address, TRIbalance, {from: TRIholder});
+
+            });
             it("reverts if passed wrong reward tokens", async () => {
                 await expectRevert(
                     assetRouter.distribute(
