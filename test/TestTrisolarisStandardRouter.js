@@ -148,7 +148,6 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
 
         const TRItoken = await IERC20.at(rewardTokenAddress);
         const TRIbalance = await TRItoken.balanceOf(TRIholder);
-        console.log(`TRI holder balance: ${TRIbalance.toString()}`)
         await TRItoken.transfer(MasterChef.address, TRIbalance, {from: TRIholder});
     });
 
@@ -920,6 +919,9 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
             });
         });
         describe("bad path reverts", () => {
+            before(async () => {
+                await time.increase(5000000);
+            })
             it("reverts if passed wrong reward token", async () => {
                 await expectRevert(
                     assetRouter.distribute(

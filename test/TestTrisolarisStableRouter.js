@@ -28,14 +28,14 @@ const poolTokensAddresses = [
 
 const masterChefV2 = "0x3838956710bcc9D122Dd23863a0549ca8D5675D6";
 
-const account1 = "0xAE205662f4C14E062E7d8575554385B38BA14c2E"; // has to be unlocked
+const account1 = "0x49D8B1389df580B1602Ae385D32b9c5A7Ceb2e25"; // has to be unlocked
 const account2 = "0x949b82Dfc04558bC4D3CA033A1B194915a3A3bEE"; // has to be unlocked
 const accountNormalTokens = "0x173c35e1D60f061F2Fd4a0C4a881119d39D51E7a"; // has to be unlocked
 
 const AURORAholder = "0x0c406517c7B2f86d5935fB0a78511b7498B94413" // has to be unlocked
 const TRIholder = "0x670FBcd11fD54908cabE97384F0D2785d369DCD5" // has to be unlocked
 
-const amounts = [new BN(1000), new BN(3000), new BN(500), new BN(2500), new BN(52792912217)];
+const amounts = [new BN(1000), new BN(3000), new BN(500), new BN(2500), new BN('500000000000000000000')];
 
 approxeq = function (bn1, bn2, epsilon, message) {
     const amountDelta = bn1.sub(bn2).add(epsilon);
@@ -117,6 +117,10 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
             const ComplexRewarder = await IComplexRewarder.at(complexRewarder);
             const data = await ComplexRewarder.pendingTokens(pid, constants.ZERO_ADDRESS, 0);
             rewarderTokenAddress = data["0"]["0"].toString();
+
+            const AURORAtoken = await IERC20.at(rewarderTokenAddress);
+            const AURORAbalance = await AURORAtoken.balanceOf(AURORAholder);
+            await AURORAtoken.transfer(complexRewarder, AURORAbalance, {from: AURORAholder});
         } else {
             rewarderTokenAddress = constants.ZERO_ADDRESS;
         }
@@ -128,7 +132,6 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
 
         const TRItoken = await IERC20.at(rewardTokenAddress);
         const TRIbalance = await TRItoken.balanceOf(TRIholder);
-
         await TRItoken.transfer(masterChefV2, TRIbalance, {from: TRIholder});
     });
 
@@ -471,12 +474,7 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
             });
         });
         describe("deposit normal tokens", () => {
-            let balanceAbefore, balanceBbefore;
-            let stakeABefore, stakeBBefore;
-            let amountsWithdrawn = [];
             let balancesBefore = [];
-
-            let stakesBefore;
 
             let receipt;
 
@@ -612,9 +610,6 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
             });
         });
         describe("withdraws for multiple accs", () => {
-            let balances1before = [];
-            let balances2before = [];
-
             let balance1before, balance2before;
 
             let stake1before;
@@ -625,15 +620,6 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
             let totalDepositsBefore;
 
             before(async () => {
-                for (let i = 0; i < poolTokensAddresses.length; i++) {
-                    const token = await IERC20.at((await Swap.getToken(i)).toString());
-                    balances1before.push(
-                        new BN((await token.balanceOf(accountNormalTokens)).toString()),
-                    );
-                    balances2before.push(
-                        new BN((await token.balanceOf(accountNormalTokens)).toString()),
-                    );
-                }
 
                 balance1before = await stakingToken.balanceOf(account1);
                 balance2before = await stakingToken.balanceOf(account2);
@@ -1042,16 +1028,7 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                     from: account2,
                 });
 
-                await time.increase(5000000);
-
-                const farmAddress = await factory.Farms(swapAddress);
-                farm = await Farm.at(farmAddress);
-
-
-                // there's some obscure logic behind rewarder token harvesting, so, for testing purposes only, rewarder tokens are being transferred to the farm directly
-                const AURORAtoken = await IERC20.at("0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79");
-                const AURORAbalance = await AURORAtoken.balanceOf(AURORAholder);
-                await AURORAtoken.transfer(farm.address, AURORAbalance.div(new BN(2)), {from: AURORAholder});
+                await time.increase(50000);
 
                 receipt = await assetRouter.distribute(
                     swapAddress,
@@ -1111,17 +1088,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
         });
         describe("bad path reverts", () => {
             before(async () => {
+                await time.increase(5000000);
 
-                const farmAddress = await factory.Farms(swapAddress);
-                farm = await Farm.at(farmAddress);
-
-                const AURORAtoken = await IERC20.at("0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79");
-                const AURORAbalance = await AURORAtoken.balanceOf(AURORAholder);
-                await AURORAtoken.transfer(farm.address, AURORAbalance, {from: AURORAholder});
-
-                const TRItoken = await IERC20.at("0xFa94348467f64D5A457F75F8bc40495D33c65aBB");
-                const TRIbalance = await TRItoken.balanceOf(TRIholder);
-                await TRItoken.transfer(farm.address, TRIbalance, {from: TRIholder});
 
             });
             it("reverts if passed wrong reward tokens", async () => {
