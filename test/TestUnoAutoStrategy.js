@@ -3,24 +3,17 @@ const { deployProxy, upgradeProxy } = require('@openzeppelin/truffle-upgrades')
 
 const timeMachine = require('ganache-time-traveler')
 
-const IUniswapV2Pair = artifacts.require('IUniswapV2Pair')
-const IUniswapV2Router01 = artifacts.require('IUniswapV2Router01')
-const IMiniChefV2 = artifacts.require('IMiniChefV2')
+
 const IERC20 = artifacts.require("IERC20")
-const IRewarder = artifacts.require("IRewarder")
+const IUnoAssetRouter = artifacts.require("IUnoAssetRouter")
 
 const AccessManager = artifacts.require('UnoAccessManager') 
-const FarmFactory = artifacts.require('UnoFarmFactory') 
 
-const Farm1 = artifacts.require('UnoFarmQuickswap')
-const Farm2 = artifacts.require('UnoFarmSushiswap')
-const AssetRouter1 = artifacts.require('UnoAssetRouterQuickswap')
-const AssetRouter2 = artifacts.require('UnoAssetRouterSushiswap')
 const AutoStrategy = artifacts.require('UnoAutoStrategy')
 const AutoStrategyFactory = artifacts.require('UnoAutoStrategyFactory')
 
-const pool1 = "0xafb76771c98351aa7fca13b130c9972181612b54" //usdt-usdc quickswap
-const pool2 = "0x4b1f1e2435a9c96f7330faea190ef6a7c8d70001" //usdt-usdc sushiswap
+const pool1 = "0xafb76771c98351aa7fca13b130c9972181612b54" // usdt-usdc quickswap
+const pool2 = "0x4b1f1e2435a9c96f7330faea190ef6a7c8d70001" // usdt-usdc sushiswap
 
 const assetRouter1 = "0xF5AE5c5151aE25019be8b328603C18153d669461" // quickswap
 const assetRouter2 = "0xa5eb4E95a92b74f48f8eb118c4675095DcCDe3f8" // sushiswap
@@ -70,7 +63,6 @@ contract('UnoAutoStrategy', accounts => {
 
         let snapshot = await timeMachine.takeSnapshot()
         snapshotId = snapshot['result']
-        console.log(snapshotId)
     })
 
     describe('Deposits', () => {
@@ -88,7 +80,6 @@ contract('UnoAutoStrategy', accounts => {
             let receipt
             let sentA, sentB
             let tokenABalanceBefore, tokenBBalanceBefore
-            let stakeABefore, stakeBBefore
             let totalDepositsABefore, totalDepositsBBefore
             let strategyTokenBalanceBefore
             before(async () => {
@@ -107,11 +98,6 @@ contract('UnoAutoStrategy', accounts => {
     
                 await tokenA.approve(autoStrategy.address, amounts[1], {from: account1})
                 await tokenB.approve(autoStrategy.address, amounts[1], {from: account1})
-
-                const {stakeA, stakeB, leftoverA, leftoverB} = await autoStrategy.userStake(account1)
-
-                stakeABefore = stakeA
-                stakeBBefore = stakeB
 
                 const {totalDepositsA, totalDepositsB} = await autoStrategy.totalDeposits()
 
@@ -136,11 +122,20 @@ contract('UnoAutoStrategy', accounts => {
                 const strategyTokenBalance = await strategyToken.balanceOf(account1)
                 assert.ok(strategyTokenBalance.gt(strategyTokenBalanceBefore), "tokens were not minted")
             })
-            it('increases user stakes', async () => {
+            it('updates user stakes', async () => {
                 const {stakeA, stakeB, leftoverA, leftoverB} = await autoStrategy.userStake(account1)
-                
-                assert.ok(stakeA.gt(stakeABefore), "stakeA is not correct")
-                assert.ok(stakeB.gt(stakeBBefore), "stakeB is not correct")
+
+                const assetRouter = await IUnoAssetRouter.at((await autoStrategy.pools(id))["assetRouter"])
+                const pool = (await autoStrategy.pools(id))["pool"]
+
+                const {stakeLP: assetRouterStakeAStakeLP, stakeA: assetRouterStakeA, stakeB: assetRouterStakeB} = await assetRouter.userStake(autoStrategy.address, pool)
+
+                const strategyTokenBalance = await strategyToken.balanceOf(account1)
+                const totalSupply = await strategyToken.totalSupply()
+
+                approxeq(stakeA, assetRouterStakeA.mul(strategyTokenBalance).div(totalSupply), new BN(10), "stakeA is not correct")
+                approxeq(stakeB, assetRouterStakeB.mul(strategyTokenBalance).div(totalSupply), new BN(10), "stakeB is not correct")
+
             })
             it('updates total deposits', async () => {
                 const {totalDepositsA, totalDepositsB} = await autoStrategy.totalDeposits()
@@ -151,8 +146,6 @@ contract('UnoAutoStrategy', accounts => {
         })
         describe('deposit tokens from multiple accounts', () => {
             let id
-            let stakesABefore = [] 
-            let stakesBBefore = []
             let totalDepositsABefore, totalDepositsBBefore
             let strategyTokenBalancesBefore = []
 
@@ -180,11 +173,6 @@ contract('UnoAutoStrategy', accounts => {
 
                     await tokenA.approve(autoStrategy.address, amounts[2], {from: testAccounts[i]})
                     await tokenB.approve(autoStrategy.address, amounts[2], {from: testAccounts[i]})
-
-                    const {stakeA, stakeB, leftoverA, leftoverB} = await autoStrategy.userStake(testAccounts[i])
-
-                    stakesABefore.push(stakeA)
-                    stakesBBefore.push(stakeB)
 
                     strategyTokenBalancesBefore.push(await strategyToken.balanceOf(testAccounts[i]))
                 }
@@ -217,12 +205,22 @@ contract('UnoAutoStrategy', accounts => {
                     assert.ok(strategyTokenBalance.gt(strategyTokenBalancesBefore[i]), `tokens were not minted for ${testAccounts[i]}`)
                 }
             })
-            it('increases user stakes', async () => {
+            it('updates user stakes', async () => {
+                const assetRouter = await IUnoAssetRouter.at((await autoStrategy.pools(id))["assetRouter"])
+                const pool = (await autoStrategy.pools(id))["pool"]
+
+                const totalSupply = await strategyToken.totalSupply()
+
+                
                 for (let i = 0; i < testAccounts.length; i++) {
                     const {stakeA, stakeB, leftoverA, leftoverB} = await autoStrategy.userStake(testAccounts[i])
 
-                    assert.ok(stakeA.gt(stakesABefore[i]), `stakeA is not correct for ${testAccounts[i]}`)
-                    assert.ok(stakeB.gt(stakesBBefore[i]), `stakeB is not correct for ${testAccounts[i]}`)
+                    const {stakeLP: assetRouterStakeAStakeLP, stakeA: assetRouterStakeA, stakeB: assetRouterStakeB} = await assetRouter.userStake(autoStrategy.address, pool)
+
+                    const strategyTokenBalance = await strategyToken.balanceOf(testAccounts[i])
+
+                    approxeq(stakeA, assetRouterStakeA.mul(strategyTokenBalance).div(totalSupply), new BN(10), `stakeA is not correct for ${testAccounts[i]}`)
+                    approxeq(stakeB, assetRouterStakeB.mul(strategyTokenBalance).div(totalSupply), new BN(10), `stakeB is not correct for ${testAccounts[i]}`)
                 }
             })
             it('updates total deposits', async () => {
@@ -255,7 +253,6 @@ contract('UnoAutoStrategy', accounts => {
             let id
             let receipt
             let tokenABalanceBefore, tokenBBalanceBefore
-            let stakeABefore, stakeBBefore
             let totalDepositsABefore, totalDepositsBBefore
             let strategyTokenBalanceBefore
             let tokensToBurn
@@ -282,12 +279,6 @@ contract('UnoAutoStrategy', accounts => {
                 tokenABalanceBefore = tokenABalance
                 tokenBBalanceBefore = tokenBBalance
 
-
-                const {stakeA, stakeB, leftoverA, leftoverB} = await autoStrategy.userStake(account1)
-
-                stakeABefore = stakeA
-                stakeBBefore = stakeB
-
                 const {totalDepositsA, totalDepositsB} = await autoStrategy.totalDeposits()
 
                 totalDepositsABefore = totalDepositsA
@@ -313,11 +304,21 @@ contract('UnoAutoStrategy', accounts => {
 
                 assert.equal(strategyTokenBalance.toString(), strategyTokenBalanceBefore.sub(tokensToBurn).toString(), "Amount of tokens burnt is not correct")
             })
-            it('reduces user stakes', async () => {
+            it('updates user stakes', async () => {
                 const {stakeA, stakeB, leftoverA, leftoverB} = await autoStrategy.userStake(account1)
+
+                const assetRouter = await IUnoAssetRouter.at((await autoStrategy.pools(id))["assetRouter"])
+                const pool = (await autoStrategy.pools(id))["pool"]
+
+                const {stakeLP: assetRouterStakeAStakeLP, stakeA: assetRouterStakeA, stakeB: assetRouterStakeB} = await assetRouter.userStake(autoStrategy.address, pool)
+
+                const strategyTokenBalance = await strategyToken.balanceOf(account1)
+                const totalSupply = await strategyToken.totalSupply()
+
+                approxeq(stakeA, assetRouterStakeA.mul(strategyTokenBalance).div(totalSupply), new BN(10), "stakeA is not correct")
+                approxeq(stakeB, assetRouterStakeB.mul(strategyTokenBalance).div(totalSupply), new BN(10), "stakeB is not correct")
+
                 
-                assert.ok(stakeABefore.gt(stakeA), "stakeA is not correct")
-                assert.ok(stakeBBefore.gt(stakeB), "stakeB is not correct")
             })
             it('updates total deposits', async () => {
                 const {totalDepositsA, totalDepositsB} = await autoStrategy.totalDeposits()
@@ -331,15 +332,12 @@ contract('UnoAutoStrategy', accounts => {
             let receipt
             let tokenABalancesBefore = []
             let tokenBBalancesBefore = []
-            let stakeABefore, stakeBBefore
             let totalDepositsABefore, totalDepositsBBefore
             let strategyTokenBalancesBefore = []
             let tokensToBurn = []
 
             let withdrawnA = []
             let withdrawnB = []
-            let stakesABefore = []
-            let stakesBBefore = []
             const testAccounts = [account2, account3]
             let txs = []
             before(async () => {
@@ -358,11 +356,6 @@ contract('UnoAutoStrategy', accounts => {
                     await tokenB.approve(autoStrategy.address, amounts[4], {from: testAccounts[i]})
 
                     await autoStrategy.deposit(id, amounts[4], amounts[4], 0, 0, testAccounts[i], {from: testAccounts[i]})
-
-                    const {stakeA, stakeB, leftoverA, leftoverB} = await autoStrategy.userStake(testAccounts[i])
-
-                    stakesABefore.push(stakeA)
-                    stakesBBefore.push(stakeB)
 
                     strategyTokenBalancesBefore.push(await strategyToken.balanceOf(testAccounts[i]))
                     tokensToBurn.push(strategyTokenBalancesBefore[i].sub(amounts[5]))
@@ -401,12 +394,21 @@ contract('UnoAutoStrategy', accounts => {
                 }
 
             })
-            it('reduces user stakes', async () => {
+            it('updates user stakes', async () => {
+                const assetRouter = await IUnoAssetRouter.at((await autoStrategy.pools(id))["assetRouter"])
+                const pool = (await autoStrategy.pools(id))["pool"]
+
+                const totalSupply = await strategyToken.totalSupply()
+
                 for (let i = 0; i < testAccounts.length; i++) {
                     const {stakeA, stakeB, leftoverA, leftoverB} = await autoStrategy.userStake(testAccounts[i])
 
-                    assert.ok(stakesABefore[i].gt(stakeA), `stakeA is not correct for ${testAccounts[i]}`)
-                    assert.ok(stakesBBefore[i].gt(stakeB), `stakeB is not correct for ${testAccounts[i]}`)
+                    const {stakeLP: assetRouterStakeAStakeLP, stakeA: assetRouterStakeA, stakeB: assetRouterStakeB} = await assetRouter.userStake(autoStrategy.address, pool)
+
+                    const strategyTokenBalance = await strategyToken.balanceOf(testAccounts[i])
+
+                    approxeq(stakeA, assetRouterStakeA.mul(strategyTokenBalance).div(totalSupply), new BN(10), `stakeA is not correct for ${testAccounts[i]}`)
+                    approxeq(stakeB, assetRouterStakeB.mul(strategyTokenBalance).div(totalSupply), new BN(10), `stakeB is not correct for ${testAccounts[i]}`)
                 }
             })
             it('updates total deposits', async () => {
@@ -429,6 +431,7 @@ contract('UnoAutoStrategy', accounts => {
         
     })
     describe('Move Liquidity', () => {
+        let snapshotIdBeforeDeposit
 
         describe('reverts', () => {
             it('reverts if called not by liquidity manager', async () => {
@@ -442,8 +445,7 @@ contract('UnoAutoStrategy', accounts => {
                 const poolID = await autoStrategy.poolID()
                 
                 await timeMachine.revertToSnapshot(snapshotId)
-                console.log(snapshotId)
-                console.log((await strategyToken.totalSupply()).toString())
+                console.log(`### Reverting to snapshot: ${snapshotId}`)
                 
                 await expectRevert(
                     autoStrategy.moveLiquidity(poolID.add(new BN(1)), "0x", "0x", 0, 0, {from: liquidityManager}),
@@ -451,6 +453,8 @@ contract('UnoAutoStrategy', accounts => {
                 )
             })
             it('reverts if provided with the wrong poolID', async () => {
+                snapshotIdBeforeDeposit = (await timeMachine.takeSnapshot())['result']
+
                 const poolID = await autoStrategy.poolID()
 
                 const data = await autoStrategy.pools(poolID)
@@ -469,62 +473,63 @@ contract('UnoAutoStrategy', accounts => {
                 )
             })
         })
-        describe('withdraw tokens', () => {
+        describe('multiple users stakes and totalDeposits after move liquidity', () => {
             let id
             let receipt
-            let tokenABalanceBefore, tokenBBalanceBefore
-            let stakeABefore, stakeBBefore
             let totalDepositsABefore, totalDepositsBBefore
-            let strategyTokenBalanceBefore
-            let tokensToBurn
 
-            let withdrawnA
-            let withdrawnB
+            testAccounts = [account2, account3]
+
+            let stakesABefore = []
+            let stakesBBefore = []
+            let leftoversABefore = []
+            let leftoversBBefore = []
 
             before(async () => {
                 id = await autoStrategy.poolID()
-    
+
+                await timeMachine.revertToSnapshot(snapshotIdBeforeDeposit)
+                console.log(`### Reverting to snapshot: ${snapshotIdBeforeDeposit}`)
+
                 const data = await autoStrategy.pools(id)
-    
+
                 const tokenA = await IERC20.at(data["tokenA"])
                 const tokenB = await IERC20.at(data["tokenB"])
 
-                await tokenA.approve(autoStrategy.address, amounts[3], {from: account1})
-                await tokenB.approve(autoStrategy.address, amounts[3], {from: account1})
+                for (let i = 0; i < testAccounts.length; i++) {
+                    await tokenA.approve(autoStrategy.address, amounts[3], {from: testAccounts[i]})
+                    await tokenB.approve(autoStrategy.address, amounts[3], {from: testAccounts[i]})
 
-                await autoStrategy.deposit(id, amounts[3], amounts[3], 0, 0, account1, {from: account1})
-    
-                let tokenABalance = await tokenA.balanceOf(account1)
-                let tokenBBalance = await tokenB.balanceOf(account1)
+                    await autoStrategy.deposit(id, amounts[3], amounts[3], 0, 0, testAccounts[i], {from: testAccounts[i]})
 
-                tokenABalanceBefore = tokenABalance
-                tokenBBalanceBefore = tokenBBalance
+                    const { stakeA, stakeB, leftoverA, leftoverB } = await autoStrategy.userStake(testAccounts[i])
 
+                    stakesABefore.push(stakeA)
+                    stakesBBefore.push(stakeB)
 
-                const {stakeA, stakeB, leftoverA, leftoverB} = await autoStrategy.userStake(account1)
-
-                stakeABefore = stakeA
-                stakeBBefore = stakeB
+                    leftoversABefore.push(leftoverA)
+                    leftoversBBefore.push(leftoverB)
+                }
 
                 const {totalDepositsA, totalDepositsB} = await autoStrategy.totalDeposits()
 
                 totalDepositsABefore = totalDepositsA
                 totalDepositsBBefore = totalDepositsB
 
-                strategyTokenBalanceBefore = await strategyToken.balanceOf(account1)
-                tokensToBurn = strategyTokenBalanceBefore
-
-                // Withdraw
-                receipt = await autoStrategy.withdraw(id, tokensToBurn, 0, 0, account1, {from: account1})
-
-                tokenABalance = await tokenA.balanceOf(account1)
-                tokenBBalance = await tokenB.balanceOf(account1)
-
-                withdrawnA = tokenABalance.sub(tokenABalanceBefore)
-                withdrawnB = tokenBBalance.sub(tokenBBalanceBefore)
+                receipt = await autoStrategy.moveLiquidity(id.add(new BN(1)), "0x", "0x", 0, 0, {from: liquidityManager})
             })
-            it('fires events', async () => {
-                expectEvent(receipt, 'Withdraw', {poolID: id, from: account1, recipient: account1})
+            it('user stakes stay the same', async () => {
+                for (let i = 0; i < testAccounts.length; i++) {
+                    const { stakeA, stakeB, leftoverA, leftoverB } = await autoStrategy.userStake(testAccounts[i])
+
+                    approxeq(stakeA.add(leftoverA), stakesABefore[i], new BN(10), `stakeA is not correct for ${testAccounts[i]}`)
+                    approxeq(stakeB.add(leftoverB), stakesBBefore[i], new BN(10), `stakeA is not correct for ${testAccounts[i]}`)
+                }
+            })
+            it('totalDeposits stay the same', async () => {
+                const {totalDepositsA, totalDepositsB} = await autoStrategy.totalDeposits()
+                approxeq(totalDepositsA, totalDepositsABefore, new BN(10), "totalDepositsA is not correct")
+                approxeq(totalDepositsB, totalDepositsBBefore, new BN(10), "totalDepositsB is not correct")
             })
         })
     })
