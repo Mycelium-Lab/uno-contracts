@@ -4,7 +4,7 @@ pragma solidity 0.8.10;
 import '@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol';
 import '@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol';
 import '@openzeppelin/contracts/security/Pausable.sol';
-import '../../interfaces/IUnoAccessManager.sol'; 
+import '../interfaces/IUnoAccessManager.sol'; 
 
 contract UnoAutoStrategyFactoryV2 is Pausable {
     /**

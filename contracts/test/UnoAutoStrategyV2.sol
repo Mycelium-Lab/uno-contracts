@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
-import "../../interfaces/IOdosRouter.sol";   
-import "../../interfaces/IUnoAssetRouter.sol";   
-import "../../interfaces/IUnoAutoStrategyFactory.sol";  
+import "../interfaces/IOdosRouter.sol";   
+import "../interfaces/IUnoAssetRouter.sol";   
+import "../interfaces/IUnoAutoStrategyFactory.sol";  
 import '@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol';

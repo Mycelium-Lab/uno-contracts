@@ -15,12 +15,12 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
     /**
      * @dev DistributionInfo:
-     * {_block} - Distribution block number.
+     * {block} - Distribution block number.
      * {rewardPerDepositAge} - Distribution reward divided by {totalDepositAge}. 
      * {cumulativeRewardAgePerDepositAge} - Sum of {rewardPerDepositAge}s multiplied by distribution interval.
      */
     struct DistributionInfo {
-        uint256 _block;
+        uint256 block;
         uint256 rewardPerDepositAge;
         uint256 cumulativeRewardAgePerDepositAge;
     }
@@ -113,7 +113,11 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
         tokenA = IUniswapV2Pair(lpPair).token0();
         tokenB = IUniswapV2Pair(lpPair).token1();
 
-        distributionInfo[0] = DistributionInfo(block.number, 0, 0);
+        distributionInfo[0] = DistributionInfo({
+            block: block.number,
+            rewardPerDepositAge: 0,
+            cumulativeRewardAgePerDepositAge: 0
+        });
         distributionID = 1;
         totalDepositLastUpdate = block.number;
 
@@ -157,7 +161,9 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
         UserInfo storage user = userInfo[origin];
         // Subtract amount from user.reward first, then subtract remainder from user.stake.
         if(amount > user.reward){
-            user.stake = user.stake + user.reward - amount;
+            uint256 balance = user.stake + user.reward;
+            require(amount <= balance, 'INSUFFICIENT_BALANCE');
+            user.stake = balance - amount;
             totalDeposits = totalDeposits + user.reward - amount;
             user.reward = 0;
         } else {
@@ -180,49 +186,47 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
      */
     function distribute(address[] calldata rewardTokenToTokenARoute, address[] calldata rewardTokenToTokenBRoute, address[] calldata rewarderTokenToTokenARoute, address[] calldata rewarderTokenToTokenBRoute, uint256[4] memory amountsOutMin) external onlyAssetRouter nonReentrant returns(uint256 reward){
         require(totalDeposits > 0, 'NO_LIQUIDITY');
-        require(distributionInfo[distributionID - 1]._block != block.number, 'CANT_CALL_ON_THE_SAME_BLOCK');
-        require(rewardTokenToTokenARoute[0] == rewardToken && rewardTokenToTokenARoute[rewardTokenToTokenARoute.length - 1] == tokenA, 'BAD_REWARD_TOKEN_A_ROUTE');
-        require(rewardTokenToTokenBRoute[0] == rewardToken && rewardTokenToTokenBRoute[rewardTokenToTokenBRoute.length - 1] == tokenB, 'BAD_REWARD_TOKEN_B_ROUTE');
-        require(rewarderTokenToTokenARoute[0] == rewarderToken && rewarderTokenToTokenARoute[rewarderTokenToTokenARoute.length - 1] == tokenA, 'BAD_REWARDER_TOKEN_A_ROUTE');
-        require(rewarderTokenToTokenBRoute[0] == rewarderToken && rewarderTokenToTokenBRoute[rewarderTokenToTokenBRoute.length - 1] == tokenB, 'BAD_REWARDER_TOKEN_B_ROUTE');
+        require(distributionInfo[distributionID - 1].block != block.number, 'CANT_CALL_ON_THE_SAME_BLOCK');
 
         MiniChef.harvest(pid, address(this));
         { // scope to avoid stack too deep errors
         uint256 rewardTokenHalf = IERC20(rewardToken).balanceOf(address(this)) / 2;
+        uint256 rewarderTokenHalf = IERC20(rewarderToken).balanceOf(address(this)) / 2;
         if (rewardTokenHalf > 0) {
             if (tokenA != rewardToken) {
+                require(rewardTokenToTokenARoute[0] == rewardToken && rewardTokenToTokenARoute[rewardTokenToTokenARoute.length - 1] == tokenA, 'BAD_REWARD_TOKEN_A_ROUTE');
                 sushiswapRouter.swapExactTokensForTokens(rewardTokenHalf, amountsOutMin[0], rewardTokenToTokenARoute, address(this), block.timestamp);
             }
 
             if (tokenB != rewardToken) {
+                require(rewardTokenToTokenBRoute[0] == rewardToken && rewardTokenToTokenBRoute[rewardTokenToTokenBRoute.length - 1] == tokenB, 'BAD_REWARD_TOKEN_B_ROUTE');
                 sushiswapRouter.swapExactTokensForTokens(rewardTokenHalf, amountsOutMin[1], rewardTokenToTokenBRoute, address(this), block.timestamp);
             }
         }
-        }
-
-        { // scope to avoid stack too deep errors
-        uint256 rewarderTokenHalf = IERC20(rewarderToken).balanceOf(address(this)) / 2;
+        
         if (rewarderTokenHalf > 0) {
             if (tokenA != rewarderToken) {
+                require(rewarderTokenToTokenARoute[0] == rewarderToken && rewarderTokenToTokenARoute[rewarderTokenToTokenARoute.length - 1] == tokenA, 'BAD_REWARDER_TOKEN_A_ROUTE');
                 sushiswapRouter.swapExactTokensForTokens(rewarderTokenHalf, amountsOutMin[2], rewarderTokenToTokenARoute, address(this), block.timestamp);
             }
 
             if (tokenB != rewarderToken) {
+                require(rewarderTokenToTokenBRoute[0] == rewarderToken && rewarderTokenToTokenBRoute[rewarderTokenToTokenBRoute.length - 1] == tokenB, 'BAD_REWARDER_TOKEN_B_ROUTE');
                 sushiswapRouter.swapExactTokensForTokens(rewarderTokenHalf, amountsOutMin[3], rewarderTokenToTokenBRoute, address(this), block.timestamp);
             }
         }
         }
 
-        (,,reward) = sushiswapRouter.addLiquidity(tokenA, tokenB, IERC20(tokenA).balanceOf(address(this)), IERC20(tokenB).balanceOf(address(this)), 1, 1, address(this), block.timestamp);
+        (,,reward) = sushiswapRouter.addLiquidity(tokenA, tokenB, IERC20(tokenA).balanceOf(address(this)), IERC20(tokenB).balanceOf(address(this)), amountsOutMin[0] + amountsOutMin[2], amountsOutMin[1] + amountsOutMin[3], address(this), block.timestamp);
         
         uint256 rewardPerDepositAge = reward * fractionMultiplier / (totalDepositAge + totalDeposits * (block.number - totalDepositLastUpdate));
-        uint256 cumulativeRewardAgePerDepositAge = distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge + rewardPerDepositAge * (block.number - distributionInfo[distributionID - 1]._block);
+        uint256 cumulativeRewardAgePerDepositAge = distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge + rewardPerDepositAge * (block.number - distributionInfo[distributionID - 1].block);
 
-        distributionInfo[distributionID] = DistributionInfo(
-            block.number,
-            rewardPerDepositAge,
-            cumulativeRewardAgePerDepositAge
-        );
+        distributionInfo[distributionID] = DistributionInfo({
+            block: block.number,
+            rewardPerDepositAge: rewardPerDepositAge,
+            cumulativeRewardAgePerDepositAge: cumulativeRewardAgePerDepositAge
+        });
 
         distributionID += 1;
         totalDepositLastUpdate = block.number;
@@ -257,7 +261,7 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
             // A reward has been distributed, update user.reward.
             user.reward = userReward(_address);
             // Count fresh deposit age from previous reward distribution to now.
-            user.depositAge = user.stake * (block.number - distributionInfo[distributionID - 1]._block);
+            user.depositAge = user.stake * (block.number - distributionInfo[distributionID - 1].block);
         }
 
         user.lastDistribution = distributionID;
@@ -275,7 +279,7 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
             return user.reward;
         }
         DistributionInfo memory lastUserDistributionInfo = distributionInfo[user.lastDistribution];
-        uint256 userDepositAge = user.depositAge + user.stake * (lastUserDistributionInfo._block - user.lastUpdate);
+        uint256 userDepositAge = user.depositAge + user.stake * (lastUserDistributionInfo.block - user.lastUpdate);
         // Calculate reward between the last user deposit and the distribution after that.
         uint256 rewardBeforeDistibution = userDepositAge * lastUserDistributionInfo.rewardPerDepositAge / fractionMultiplier;
         // Calculate reward from the distributions that have happened after the last user deposit.

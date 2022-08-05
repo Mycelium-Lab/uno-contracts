@@ -25,8 +25,8 @@ contract UnoAssetRouterQuickswapDual is Initializable, PausableUpgradeable, UUPS
     bytes32 private constant DISTRIBUTOR_ROLE = keccak256('DISTRIBUTOR_ROLE');
     bytes32 private constant PAUSER_ROLE = keccak256('PAUSER_ROLE');
 
-    event Deposit(address indexed lpPool, address indexed from, address indexed recipient, uint256 amount);
-    event Withdraw(address indexed lpPool, address indexed from, address indexed recipient, uint256 amount);
+    event Deposit(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
+    event Withdraw(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Distribute(address indexed lpPool, uint256 reward);
 
     modifier onlyDistributor(){

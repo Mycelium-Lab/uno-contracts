@@ -13,12 +13,12 @@ import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
     /**
      * @dev DistributionInfo:
-     * {_block} - Distribution block number.
+     * {block} - Distribution block number.
      * {rewardPerDepositAge} - Distribution reward divided by {totalDepositAge}. 
      * {cumulativeRewardAgePerDepositAge} - Sum of {rewardPerDepositAge}s multiplied by distribution interval.
      */
     struct DistributionInfo {
-        uint256 _block;
+        uint256 block;
         uint256 rewardPerDepositAge;
         uint256 cumulativeRewardAgePerDepositAge;
     }
@@ -47,7 +47,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
      */   
     IVault constant private Vault = IVault(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
     IChildChainLiquidityGaugeFactory constant private GaugeFactory = IChildChainLiquidityGaugeFactory(0x3b8cA519122CdD8efb272b0D3085453404B25bD0);
-    IRewardsOnlyGauge private gauge;
+    IRewardsOnlyGauge public gauge;
     IChildChainStreamer private streamer;
 
     /**
@@ -103,7 +103,11 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
         }
         streamer = IChildChainStreamer(GaugeFactory.getPoolStreamer(_lpPool));
 
-        distributionInfo[0] = DistributionInfo(block.number, 0, 0);
+        distributionInfo[0] = DistributionInfo({
+            block: block.number,
+            rewardPerDepositAge: 0,
+            cumulativeRewardAgePerDepositAge: 0
+        });
         distributionID = 1;
         totalDepositLastUpdate = block.number;
 
@@ -117,6 +121,8 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
      */
     function deposit(uint256[] memory amounts, address[] memory tokens, uint256 minAmountLP, uint256 amountLP,  address recipient) external nonReentrant onlyAssetRouter returns(uint256 liquidity){
         (IERC20[] memory poolTokens, IAsset[] memory assets,) = getTokens();
+        require ((amounts.length == poolTokens.length) && (tokens.length == poolTokens.length), 'BAD_AMOUNTS_LENGTH');
+        require ((amounts.length == poolTokens.length) && (tokens.length == poolTokens.length), 'BAD_TOKENS_LENGTH');
 
         bool joinPool = false;
         for (uint256 i = 0; i < poolTokens.length; i++) {
@@ -156,7 +162,9 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
         UserInfo storage user = userInfo[origin];
         // Subtract amount from user.reward first, then subtract remainder from user.stake.
         if(amount > user.reward){
-            user.stake = user.stake + user.reward - amount;
+            uint256 balance = user.stake + user.reward;
+            require(amount <= balance, 'INSUFFICIENT_BALANCE');
+            user.stake = balance - amount;
             totalDeposits = totalDeposits + user.reward - amount;
             user.reward = 0;
         } else {
@@ -186,20 +194,27 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
         int256[][] memory limits
     ) external onlyAssetRouter nonReentrant returns(uint256 reward){
         require(totalDeposits > 0, 'NO_LIQUIDITY');
-        require(distributionInfo[distributionID - 1]._block != block.number, 'CANT_CALL_ON_THE_SAME_BLOCK');
+        require(distributionInfo[distributionID - 1].block != block.number, 'CANT_CALL_ON_THE_SAME_BLOCK');
         require((swaps.length == streamer.reward_count()) && (swaps.length == assets.length) && (swaps.length == limits.length), 'PARAMS_LENGTHS_NOT_MATCH_REWARD_COUNT');
 
         gauge.claim_rewards();
+
+        uint256[] memory balances = new uint256[](swaps.length);
+        IERC20[] memory rewardTokens = new IERC20[](swaps.length);
         for (uint256 i = 0; i < swaps.length; i++) {
-            require(swaps[i][0].assetInIndex == 0, 'BAD_SWAPS_TOKEN_ORDERING');
+            rewardTokens[i] = IERC20(streamer.reward_tokens(i));
+            balances[i] = IERC20(rewardTokens[i]).balanceOf(address(this));
 
-            IERC20 rewardToken = IERC20(streamer.reward_tokens(i));
-            require(address(assets[i][0]) == address(rewardToken), 'ASSET_NOT_REWARD');
-
-            uint256 rewardTokenBalance = rewardToken.balanceOf(address(this));
-            if (rewardTokenBalance > 0 && (address(assets[i][0]) != address(gauge))) {
-                swaps[i][0].amount = rewardTokenBalance;
-                rewardToken.approve(address(Vault), rewardTokenBalance);
+            require(address(assets[i][swaps[i][0].assetInIndex]) == address(rewardTokens[i]), 'ASSET_NOT_REWARD');
+        }
+        for (uint256 i = 0; i < swaps.length; i++) {
+            if (
+                (balances[i] > 0) && 
+                (address(rewardTokens[i]) != address(gauge)) && 
+                (address(rewardTokens[i]) != address(assets[i][swaps[i][swaps[i].length - 1].assetOutIndex])) 
+            ) {
+                swaps[i][0].amount = balances[i];
+                rewardTokens[i].approve(address(Vault), balances[i]);
                 Vault.batchSwap(
                     IVault.SwapKind.GIVEN_IN,
                     swaps[i],
@@ -223,13 +238,13 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
         reward = IERC20(lpPool).balanceOf(address(this));
 
         uint256 rewardPerDepositAge = reward * fractionMultiplier / (totalDepositAge + totalDeposits * (block.number - totalDepositLastUpdate));
-        uint256 cumulativeRewardAgePerDepositAge = distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge + rewardPerDepositAge * (block.number - distributionInfo[distributionID - 1]._block);
+        uint256 cumulativeRewardAgePerDepositAge = distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge + rewardPerDepositAge * (block.number - distributionInfo[distributionID - 1].block);
 
-        distributionInfo[distributionID] = DistributionInfo(
-            block.number,
-            rewardPerDepositAge,
-            cumulativeRewardAgePerDepositAge
-        );
+        distributionInfo[distributionID] = DistributionInfo({
+            block: block.number,
+            rewardPerDepositAge: rewardPerDepositAge,
+            cumulativeRewardAgePerDepositAge: cumulativeRewardAgePerDepositAge
+        });
 
         distributionID += 1;
         totalDepositLastUpdate = block.number;
@@ -264,7 +279,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
             // A reward has been distributed, update user.reward.
             user.reward = userReward(_address);
             // Count fresh deposit age from previous reward distribution to now.
-            user.depositAge = user.stake * (block.number - distributionInfo[distributionID - 1]._block);
+            user.depositAge = user.stake * (block.number - distributionInfo[distributionID - 1].block);
         }
 
         user.lastDistribution = distributionID;
@@ -282,7 +297,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
             return user.reward;
         }
         DistributionInfo memory lastUserDistributionInfo = distributionInfo[user.lastDistribution];
-        uint256 userDepositAge = user.depositAge + user.stake * (lastUserDistributionInfo._block - user.lastUpdate);
+        uint256 userDepositAge = user.depositAge + user.stake * (lastUserDistributionInfo.block - user.lastUpdate);
         // Calculate reward between the last user deposit and the distribution after that.
         uint256 rewardBeforeDistibution = userDepositAge * lastUserDistributionInfo.rewardPerDepositAge / fractionMultiplier;
         // Calculate reward from the distributions that have happened after the last user deposit.
