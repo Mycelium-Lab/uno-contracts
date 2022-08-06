@@ -6,6 +6,7 @@ const {liquidityManager, pauser} = require('./addresses/addresses')
 const AutoStrategy = artifacts.require('UnoAutoStrategy')
 
 module.exports = async function (deployer, network, accounts) {
+  if (network != "polygon") return
   // AccessManager deployment, dont deploy if already deployed on this network
   await deployer.deploy(AccessManager, {overwrite: false, from: accounts[0]})
   // Deploy new AutoStrategy implementation for factory to deploy

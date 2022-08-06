@@ -5,6 +5,7 @@ const AssetRouterQuickswapDual = artifacts.require('UnoAssetRouterQuickswapDual'
 const AssetRouterSushiswap = artifacts.require('UnoAssetRouterSushiswap')
 
 module.exports = async function (deployer, network, accounts) {
+  if (network != "polygon") return
   const autoStrategyFactory = await AutoStrategyFactory.deployed()
   const quickswapRouterApproved = await autoStrategyFactory.assetRouterApproved(AssetRouterQuickswap.address)
   if(!quickswapRouterApproved){

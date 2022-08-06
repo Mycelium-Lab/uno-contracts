@@ -6,7 +6,8 @@ const path = require("path")
 const Farm = artifacts.require('UnoFarmQuickswap')
 const AssetRouter = artifacts.require('UnoAssetRouterQuickswap')
 
-module.exports = async function (deployer) {
+module.exports = async function (deployer, network) {
+    if (network != "polygon") return
     //AssetRouter upgrade
     const assetRouter = await AssetRouter.deployed()
     const instance = await upgradeProxy(assetRouter.address, AssetRouter, { deployer })
