@@ -8,11 +8,13 @@
 
 3. Run specific migration: `truffle migrate --network aurora --compile-none -f 2 --to 2`
 
-# Test
+# Testing
 
-1. Start ganache with ```npm run ganache```
+1. Make sure you have `ganache` available from command line, it can be installed with `npm install -g ganache`.
 
-2. Run tests with ```truffle test --network test```
+2. Start ganache with `npm run ganache`. *Note!* It's preconfigured here, so if you run your ganache differently, the tests will be failing.
+
+3. Run tests with `truffle test --network test`
 
 # Deployed Smart Contracts
 
