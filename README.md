@@ -1,5 +1,15 @@
 # Uno Contracts
 
+# Checkout the right branch
+
+`polygon+` - core UNO contracts plus autostrategies on Polygon
+
+`aurora` - core UNO contracts on Aurora
+
+Please note that both branches include identical core contracts except for the `/contracts/apps` directory where specific (app / farm - related) contracts for Polygon and Aurora are located, the `/test` directory and the configs.
+
+Branch `polygon+` also includes the autostrategies contracts located in the `/contracts/autostrategy` directory.
+
 # Development
 
 1. Provide your private key in the PRIVATE_KEY field in the `.env` file
@@ -8,17 +18,13 @@
 
 3. Run specific migration: `truffle migrate --network polygon --compile-none -f 2 --to 2`
 
-# Test
+# Testing
 
-1. Start ganache with `npm run ganache`
+1. Make sure you have `ganache` available from command line, it can be installed with `npm install -g ganache`.
 
-2. Run tests with `truffle test --network test`
+2. Start ganache with `npm run ganache`. *Note!* It's preconfigured here, so if you run your ganache differently, the tests will be failing.
 
-# Test
-
-1. Start ganache with ```npm run ganache```
-
-2. Run tests with ```truffle test --network test```
+3. Run tests with `truffle test --network test`
 
 
 # Deployed Smart Contracts
