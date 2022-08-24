@@ -19,14 +19,10 @@ interface IUnoAssetRouterQuickswapDual {
 
     function distribute(
         address lpStakingPool,
-        address[] calldata rewardTokenAToTokenARoute,
-        address[] calldata rewardTokenAToTokenBRoute,
-        address[] calldata rewardTokenBToTokenARoute,
-        address[] calldata rewardTokenBToTokenBRoute, 
+        address[][4] calldata swapRoutes,
         uint256[4] memory amountsOutMin
     ) external;
 
-   
     function userStake(address _address, address lpStakingPool) external view returns (uint256 stakeLP, uint256 stakeA, uint256 stakeB);
     function totalDeposits(address lpStakingPool) external view returns (uint256 totalDepositsLP, uint256 totalDepositsA, uint256 totalDepositsB);
     function getTokens(address lpStakingPool) external view returns(address tokenA, address tokenB);

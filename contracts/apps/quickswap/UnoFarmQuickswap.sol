@@ -4,7 +4,6 @@ pragma solidity 0.8.10;
 import '../../interfaces/IUniswapV2Pair.sol';
 import '../../interfaces/IUniswapV2Router.sol';
 import '../../interfaces/IStakingRewards.sol';
-import '../../interfaces/IWMATIC.sol';
 import '@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol';
@@ -93,6 +92,9 @@ contract UnoFarmQuickswap is Initializable, ReentrancyGuardUpgradeable {
     // ============ Methods ============
 
     function initialize(address _lpStakingPool, address _assetRouter) external initializer {
+        require (_lpStakingPool != address(0), 'BAD_LP_POOL');
+        require (_assetRouter != address(0), 'BAD_ASSET_ROUTER');
+
         __ReentrancyGuard_init();
         assetRouter = _assetRouter;
 
@@ -173,7 +175,10 @@ contract UnoFarmQuickswap is Initializable, ReentrancyGuardUpgradeable {
      * 2. It swaps {rewardToken} token for {tokenA} & {tokenB}.
      * 3. It deposits new LP tokens back to the {lpStakingPool}.
      */
-    function distribute(address[] calldata rewardTokenToTokenARoute, address[] calldata rewardTokenToTokenBRoute, uint256[2] memory amountsOutMin) external onlyAssetRouter nonReentrant returns(uint256 reward){
+    function distribute(
+        address[][2] calldata swapRoutes,
+        uint256[2] calldata amountsOutMin
+    ) external onlyAssetRouter nonReentrant returns(uint256 reward){
         require(totalDeposits > 0, 'NO_LIQUIDITY');
         require(distributionInfo[distributionID - 1].block != block.number, 'CANT_CALL_ON_THE_SAME_BLOCK');
 
@@ -181,12 +186,12 @@ contract UnoFarmQuickswap is Initializable, ReentrancyGuardUpgradeable {
         uint256 rewardTokenHalf = IERC20(rewardToken).balanceOf(address(this)) / 2;
 
         if (tokenA != rewardToken) {
-            require(rewardTokenToTokenARoute[0] == rewardToken && rewardTokenToTokenARoute[rewardTokenToTokenARoute.length - 1] == tokenA, 'BAD_REWARD_TOKEN_A_ROUTE');
-            quickswapRouter.swapExactTokensForTokens(rewardTokenHalf, amountsOutMin[0], rewardTokenToTokenARoute, address(this), block.timestamp);
+            require(swapRoutes[0][0] == rewardToken && swapRoutes[0][swapRoutes[0].length - 1] == tokenA, 'BAD_REWARD_TOKEN_A_ROUTE');
+            quickswapRouter.swapExactTokensForTokens(rewardTokenHalf, amountsOutMin[0], swapRoutes[0], address(this), block.timestamp);
         }
         if (tokenB != rewardToken) {
-            require(rewardTokenToTokenBRoute[0] == rewardToken && rewardTokenToTokenBRoute[rewardTokenToTokenBRoute.length - 1] == tokenB, 'BAD_REWARD_TOKEN_B_ROUTE');
-            quickswapRouter.swapExactTokensForTokens(rewardTokenHalf, amountsOutMin[1], rewardTokenToTokenBRoute, address(this), block.timestamp);
+            require(swapRoutes[1][0] == rewardToken && swapRoutes[1][swapRoutes[1].length - 1] == tokenB, 'BAD_REWARD_TOKEN_B_ROUTE');
+            quickswapRouter.swapExactTokensForTokens(rewardTokenHalf, amountsOutMin[1], swapRoutes[1], address(this), block.timestamp);
         }
 
         (,,reward) = quickswapRouter.addLiquidity(tokenA, tokenB, IERC20(tokenA).balanceOf(address(this)), IERC20(tokenB).balanceOf(address(this)), amountsOutMin[0], amountsOutMin[1], address(this), block.timestamp);

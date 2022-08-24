@@ -8,6 +8,9 @@ contract Farm is Initializable {
     uint256 public constant version = 1;
 
     function initialize(address _lpStakingPool, address _assetRouter) external initializer {
+        require (_lpStakingPool != address(0), 'BAD_LP_POOL');
+        require (_assetRouter != address(0), 'BAD_ASSET_ROUTER');
+
         lpStakingPool = _lpStakingPool;
         assetRouter = _assetRouter;
     }

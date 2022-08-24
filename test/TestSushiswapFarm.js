@@ -128,7 +128,7 @@ contract('UnoFarmSushiswap', accounts => {
                 "CALLER_NOT_ASSET_ROUTER"
             )
             await expectRevert(
-                implementation.distribute([], [], [], [], [0, 0, 0, 0], {from: accounts[1]}),
+                implementation.distribute([[], [], [], []], [0, 0, 0, 0], {from: accounts[1]}),
                 "CALLER_NOT_ASSET_ROUTER"
             )
         })
@@ -144,7 +144,7 @@ contract('UnoFarmSushiswap', accounts => {
                 "INSUFFICIENT_AMOUNT"
             )
             await expectRevert(
-                implementation.distribute([], [], [], [], [0, 0, 0, 0], {from: assetRouter}),
+                implementation.distribute([[], [], [], []], [0, 0, 0, 0], {from: assetRouter}),
                 "NO_LIQUIDITY"
             )
         })

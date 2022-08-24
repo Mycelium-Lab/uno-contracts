@@ -168,11 +168,11 @@ contract('UnoAssetRouterQuickswapDual', accounts => {
             it('reverts if called not by a pauser', async () => {
                 await expectRevert(
                     assetRouter.pause({from: account1}),
-                    "CALLER_NOT_PAUSER"
+                    "CALLER_NOT_AUTHORIZED"
                 )
                 await expectRevert(
                     assetRouter.unpause({from: account1}),
-                    "CALLER_NOT_PAUSER"
+                    "CALLER_NOT_AUTHORIZED"
                 )
             })
         })
@@ -202,7 +202,7 @@ contract('UnoAssetRouterQuickswapDual', accounts => {
                     "Pausable: paused"
                 )
                 await expectRevert(
-                    assetRouter.distribute(pool, [], [], [], [], [0, 0, 0, 0], {from: account1}),
+                    assetRouter.distribute(pool, [[], [], [], []], [0, 0, 0, 0], {from: account1}),
                     "Pausable: paused"
                 )
             })
@@ -240,8 +240,8 @@ contract('UnoAssetRouterQuickswapDual', accounts => {
                     "FARM_NOT_EXISTS"
                 )
                 await expectRevert(
-                    assetRouter.distribute(pool, [], [], [], [], [0, 0 ,0, 0], {from: account1}),
-                    "CALLER_NOT_DISTRIBUTOR"
+                    assetRouter.distribute(pool, [[], [], [], []], [0, 0 ,0, 0], {from: account1}),
+                    "CALLER_NOT_AUTHORIZED"
                 )
             })
             it('reverts if called unpause on unpaused contract', async () => {
@@ -760,19 +760,19 @@ contract('UnoAssetRouterQuickswapDual', accounts => {
         describe('reverts', () => {
             it('reverts if called not by distributor', async () => {
                 await expectRevert(
-                    assetRouter.distribute(pool, [], [], [], [], [0, 0, 0, 0], {from: pauser}),
-                    "CALLER_NOT_DISTRIBUTOR"
+                    assetRouter.distribute(pool, [[], [], [], []], [0, 0, 0, 0], {from: pauser}),
+                    "CALLER_NOT_AUTHORIZED"
                 )
             })
             it('reverts if pool doesnt exist', async () => {
                 await expectRevert(
-                    assetRouter.distribute(pool2, [], [], [], [], [0, 0, 0, 0], {from: distributor}),
+                    assetRouter.distribute(pool2, [[], [], [], []], [0, 0, 0, 0], {from: distributor}),
                     "FARM_NOT_EXISTS"
                 )
             })
             it('reverts if there is no liquidity in the pool', async () => {
                 await expectRevert(
-                    assetRouter.distribute(pool, [], [], [], [], [0, 0, 0, 0], {from: distributor}),
+                    assetRouter.distribute(pool, [[], [], [], []], [0, 0, 0, 0], {from: distributor}),
                     "NO_LIQUIDITY"
                 )
             })
@@ -794,19 +794,21 @@ contract('UnoAssetRouterQuickswapDual', accounts => {
                 receipt = await assetRouter.distribute(
                     pool, 
                     [
-                        rewardsTokenA.address,//dQuick
-                        '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
-                        tokenA.address//WMATIC
-                    ], 
-                    [
-                        rewardsTokenA.address,//dQuick
-                        '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
-                        tokenB.address//USDC
-                    ], 
-                    [],
-                    [
-                        rewardsTokenB.address,//WMATIC
-                        tokenB.address//USDC
+                        [
+                            rewardsTokenA.address,//dQuick
+                            '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
+                            tokenA.address//WMATIC
+                        ],
+                        [
+                            rewardsTokenA.address,//dQuick
+                            '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
+                            tokenB.address//USDC
+                        ],
+                        [],
+                        [
+                            rewardsTokenB.address,//WMATIC
+                            tokenB.address//USDC
+                        ]
                     ],
                     [0, 0, 0, 0], 
                     {from: distributor}
@@ -832,19 +834,21 @@ contract('UnoAssetRouterQuickswapDual', accounts => {
                     assetRouter.distribute(
                         pool, 
                         [
-                            constants.ZERO_ADDRESS,
-                            '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
-                            tokenA.address//WMATIC
-                        ], 
-                        [
-                            rewardsTokenA.address,//dQuick
-                            '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
-                            tokenB.address//USDC
-                        ], 
-                        [],//don't need to pass anything since we are swapping from wmatic to wmatic
-                        [                        
-                            '0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270',//WMATIC
-                            tokenB.address//USDC
+                            [
+                                constants.ZERO_ADDRESS,
+                                '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
+                                tokenA.address//WMATIC
+                            ],
+                            [
+                                rewardsTokenA.address,//dQuick
+                                '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
+                                tokenB.address//USDC
+                            ],
+                            [],//don't need to pass anything since we are swapping from wmatic to wmatic
+                            [                    
+                                '0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270',//WMATIC
+                                tokenB.address//USDC
+                            ]
                         ],
                         [0, 0, 0, 0], 
                         {from: distributor}
@@ -855,19 +859,21 @@ contract('UnoAssetRouterQuickswapDual', accounts => {
                     assetRouter.distribute(
                         pool, 
                         [
-                            rewardsTokenA.address,//dQuick
-                            '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
-                            tokenA.address//WMATIC
-                        ], 
-                        [
-                            constants.ZERO_ADDRESS,
-                            '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
-                            tokenA.address//USDC
-                        ], 
-                        [],
-                        [                        
-                            rewardsTokenB.address,//WMATIC
-                            tokenB.address//USDC
+                            [
+                                rewardsTokenA.address,//dQuick
+                                '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
+                                tokenA.address//WMATIC
+                            ],
+                            [
+                                constants.ZERO_ADDRESS,
+                                '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
+                                tokenA.address//USDC
+                            ],
+                            [],
+                            [                    
+                                rewardsTokenB.address,//WMATIC
+                                tokenB.address//USDC
+                            ]
                         ],
                         [0, 0, 0, 0], 
                         {from: distributor}
@@ -880,19 +886,21 @@ contract('UnoAssetRouterQuickswapDual', accounts => {
                     assetRouter.distribute(
                         pool, 
                         [
-                            rewardsTokenA.address,//dQuick
-                            '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
-                            constants.ZERO_ADDRESS
-                        ], 
-                        [
-                            rewardsTokenA.address,//dQuick
-                            '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
-                            tokenA.address//USDC
-                        ], 
-                        [],
-                        [                        
-                            rewardsTokenB.address,//WMATIC
-                            tokenB.address//USDC
+                            [
+                                rewardsTokenA.address,//dQuick
+                                '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
+                                constants.ZERO_ADDRESS
+                            ],
+                            [
+                                rewardsTokenA.address,//dQuick
+                                '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
+                                tokenA.address//USDC
+                            ],
+                            [],
+                            [                    
+                                rewardsTokenB.address,//WMATIC
+                                tokenB.address//USDC
+                            ]
                         ],
                         [0, 0, 0, 0], 
                         {from: distributor}
@@ -905,19 +913,21 @@ contract('UnoAssetRouterQuickswapDual', accounts => {
                     assetRouter.distribute(
                         pool, 
                         [
-                            rewardsTokenA.address,//dQuick
-                            '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
-                            tokenA.address//WMATIC
-                        ], 
-                        [
-                            rewardsTokenA.address,//dQuick
-                            '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
-                            constants.ZERO_ADDRESS
-                        ], 
-                        [],
-                        [
-                            rewardsTokenB.address,//WMATIC
-                            tokenB.address//USDC
+                            [
+                                rewardsTokenA.address,//dQuick
+                                '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
+                                tokenA.address//WMATIC
+                            ],
+                            [
+                                rewardsTokenA.address,//dQuick
+                                '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
+                                constants.ZERO_ADDRESS
+                            ],
+                            [],
+                            [
+                                rewardsTokenB.address,//WMATIC
+                                tokenB.address//USDC
+                            ]
                         ],
                         [0, 0, 0, 0], 
                         {from: distributor}
@@ -928,19 +938,21 @@ contract('UnoAssetRouterQuickswapDual', accounts => {
                     assetRouter.distribute(
                         pool, 
                         [
-                            rewardsTokenA.address,//dQuick
-                            '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
-                            tokenA.address//WMATIC
-                        ], 
-                        [
-                            rewardsTokenA.address,//dQuick
-                            '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
-                            tokenB.address//USDC
-                        ], 
-                        [],
-                        [
-                            rewardsTokenB.address,//WMATIC
-                            constants.ZERO_ADDRESS
+                            [
+                                rewardsTokenA.address,//dQuick
+                                '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
+                                tokenA.address//WMATIC
+                            ],
+                            [
+                                rewardsTokenA.address,//dQuick
+                                '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
+                                tokenB.address//USDC
+                            ],
+                            [],
+                            [
+                                rewardsTokenB.address,//WMATIC
+                                constants.ZERO_ADDRESS
+                            ]
                         ],
                         [0, 0, 0, 0], 
                         {from: distributor}
@@ -954,19 +966,21 @@ contract('UnoAssetRouterQuickswapDual', accounts => {
                     assetRouter.distribute(
                         pool, 
                         [
-                            rewardsTokenA.address,//dQuick
-                            '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
-                            tokenA.address//WMATIC
-                        ], 
-                        [
-                            rewardsTokenA.address,//dQuick
-                            '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
-                            tokenB.address//USDC
-                        ], 
-                        [],
-                        [
-                            constants.ZERO_ADDRESS,
-                            tokenB.address//USDC
+                            [
+                                rewardsTokenA.address,//dQuick
+                                '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
+                                tokenA.address//WMATIC
+                            ],
+                            [
+                                rewardsTokenA.address,//dQuick
+                                '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
+                                tokenB.address//USDC
+                            ],
+                            [],
+                            [
+                                constants.ZERO_ADDRESS,
+                                tokenB.address//USDC
+                            ]
                         ],
                         [0, 0, 0, 0], 
                         {from: distributor}
