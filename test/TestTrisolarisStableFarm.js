@@ -137,8 +137,10 @@ contract("Test UnoFarmTrisolarisStable initialization", accounts => {
                 implementation.distribute(
                     [[constants.ZERO_ADDRESS], [constants.ZERO_ADDRESS]],
                     [[constants.ZERO_ADDRESS], [constants.ZERO_ADDRESS]],
-                    [0, 0, 0, 0],
-                    [0, 0, 0, 0],
+                    [
+                        [0, 0, 0, 0],
+                        [0, 0, 0, 0]
+                    ],
                     { from: accounts[1] },
                 ),
                 "CALLER_NOT_ASSET_ROUTER",

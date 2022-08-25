@@ -4,6 +4,10 @@ const HDWalletProvider = require("@truffle/hdwallet-provider");
 module.exports = {
   contracts_build_directory: "./build",
 
+  api_keys: {
+    aurorascan: process.env.AURORASCAN
+  },
+
   networks: {
     aurora: {
       networkCheckTimeout: 100000,
@@ -27,7 +31,10 @@ module.exports = {
       gasPrice: 50,
     }
   },
-  plugins: ["truffle-contract-size"],
+  plugins: [
+    "truffle-contract-size",
+    'truffle-plugin-verify'
+  ],
   compilers: {
     solc: {
       version: "0.8.10",

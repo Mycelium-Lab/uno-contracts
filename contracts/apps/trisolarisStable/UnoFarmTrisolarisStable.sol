@@ -103,6 +103,9 @@ contract UnoFarmTrisolarisStable is Initializable, ReentrancyGuardUpgradeable {
     // ============ Methods ============
 
     function initialize(address _swap, address _assetRouter) external initializer {
+        require (_swap != address(0), 'BAD_LP_POOL');
+        require (_assetRouter != address(0), 'BAD_ASSET_ROUTER');
+
         __ReentrancyGuard_init();
         assetRouter = _assetRouter;
 
@@ -205,7 +208,7 @@ contract UnoFarmTrisolarisStable is Initializable, ReentrancyGuardUpgradeable {
 
         amounts = swap.removeLiquidity(amount, minAmounts, block.timestamp);
         for (uint256 i = 0; i < tokens.length; i++) {
-            IERC20Upgradeable(tokens[i]).transfer(recipient, amounts[i]);
+            IERC20Upgradeable(tokens[i]).safeTransfer(recipient, amounts[i]);
         }
     }
 
@@ -218,8 +221,7 @@ contract UnoFarmTrisolarisStable is Initializable, ReentrancyGuardUpgradeable {
     function distribute(
         address[][] calldata rewardTokenRoutes,
         address[][] calldata rewarderTokenRoutes,
-        uint256[] calldata rewardAmountsOutMin,
-        uint256[] calldata rewarderAmountsOutMin
+        uint256[][2] calldata amountsOutMin
     ) external onlyAssetRouter nonReentrant returns (uint256 reward) {
         require(totalDeposits > 0, "NO_LIQUIDITY");
         require(distributionInfo[distributionID - 1].block != block.number, "CANT_CALL_ON_THE_SAME_BLOCK");
@@ -237,7 +239,7 @@ contract UnoFarmTrisolarisStable is Initializable, ReentrancyGuardUpgradeable {
             for (uint256 i = 0; i < tokens.length; i++) {
                 if (tokens[i] != rewardToken) {
                     require(rewardTokenRoutes[i][0] == rewardToken && rewardTokenRoutes[i][rewardTokenRoutes[i].length - 1] == tokens[i], "BAD_REWARD_TOKEN_ROUTES");
-                    trisolarisRouter.swapExactTokensForTokens(rewardTokenFraction, rewardAmountsOutMin[i], rewardTokenRoutes[i], address(this), block.timestamp);
+                    trisolarisRouter.swapExactTokensForTokens(rewardTokenFraction, amountsOutMin[0][i], rewardTokenRoutes[i], address(this), block.timestamp);
                 }
             }
         }
@@ -246,7 +248,7 @@ contract UnoFarmTrisolarisStable is Initializable, ReentrancyGuardUpgradeable {
             for (uint256 i = 0; i < tokens.length; i++) {
                 if (tokens[i] != rewarderToken) {
                     require(rewarderTokenRoutes[i][0] == rewarderToken && rewarderTokenRoutes[i][rewarderTokenRoutes[i].length - 1] == tokens[i], "BAD_REWARDER_TOKEN_ROUTES");
-                    trisolarisRouter.swapExactTokensForTokens(rewarderTokenFraction, rewarderAmountsOutMin[i], rewarderTokenRoutes[i], address(this), block.timestamp);
+                    trisolarisRouter.swapExactTokensForTokens(rewarderTokenFraction, amountsOutMin[1][i], rewarderTokenRoutes[i], address(this), block.timestamp);
                 }
             }
         }

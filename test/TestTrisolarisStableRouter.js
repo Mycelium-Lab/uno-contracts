@@ -167,11 +167,24 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
         });
     });
 
+    describe("getTokens", () => {
+        let _tokens
+        before(async () => {
+            _tokens = await assetRouter.getTokens(swapAddress);
+        });
+        it("Tokens are correct", async () => {
+            for (let i = 0; i < _tokens.length; i++) {
+                const token = (await Swap.getToken(i)).toString();
+                assert.equal(_tokens[i], token, "Token is not correct");
+            }
+        });
+    });
+
     describe("Pausable", () => {
         describe("reverts", () => {
             it("reverts if called not by a pauser", async () => {
-                await expectRevert(assetRouter.pause({ from: account1 }), "CALLER_NOT_PAUSER");
-                await expectRevert(assetRouter.unpause({ from: account1 }), "CALLER_NOT_PAUSER");
+                await expectRevert(assetRouter.pause({ from: account1 }), "CALLER_NOT_AUTHORIZED");
+                await expectRevert(assetRouter.unpause({ from: account1 }), "CALLER_NOT_AUTHORIZED");
             });
         });
 
@@ -202,8 +215,10 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                         swapAddress,
                         [[constants.ZERO_ADDRESS], [constants.ZERO_ADDRESS]],
                         [[constants.ZERO_ADDRESS], [constants.ZERO_ADDRESS]],
-                        [0, 0, 0, 0],
-                        [0, 0, 0, 0],
+                        [
+                            [0, 0, 0, 0],
+                            [0, 0, 0, 0]
+                        ],
                         { from: account1 },
                     ),
                     "Pausable: paused",
@@ -242,11 +257,13 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                         swapAddress,
                         [[constants.ZERO_ADDRESS], [constants.ZERO_ADDRESS]],
                         [[constants.ZERO_ADDRESS], [constants.ZERO_ADDRESS]],
-                        [0, 0, 0, 0],
-                        [0, 0, 0, 0],
+                        [
+                            [0, 0, 0, 0],
+                            [0, 0, 0, 0]
+                        ],
                         { from: account1 },
                     ),
-                    "CALLER_NOT_DISTRIBUTOR",
+                    "CALLER_NOT_AUTHORIZED",
                 );
             });
             it("reverts if called unpause on unpaused contract", async () => {
@@ -954,11 +971,13 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                                 "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                             ],
                         ],
-                        [0, 0, 0, 0],
-                        [0, 0, 0, 0],
+                        [
+                            [0, 0, 0],
+                            [0, 0, 0]
+                        ],
                         { from: pauser },
                     ),
-                    "CALLER_NOT_DISTRIBUTOR",
+                    "CALLER_NOT_AUTHORIZED",
                 );
             });
             it("reverts if pool doesnt exist", async () => {
@@ -1002,8 +1021,10 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                                 "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                             ],
                         ],
-                        [0, 0, 0, 0],
-                        [0, 0, 0, 0],
+                        [
+                            [0, 0, 0],
+                            [0, 0, 0]
+                        ],
                         {
                             from: distributor,
                         },
@@ -1069,8 +1090,10 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             "0x5183e1B1091804BC2602586919E6880ac1cf2896"
                         ]
                     ],
-                    [0, 0, 0, 0],
-                    [0, 0, 0, 0],
+                    [
+                        [0, 0, 0],
+                        [0, 0, 0]
+                    ],
                     { from: distributor },
                 );
             });
@@ -1089,8 +1112,6 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
         describe("bad path reverts", () => {
             before(async () => {
                 await time.increase(5000000);
-
-
             });
             it("reverts if passed wrong reward tokens", async () => {
                 await expectRevert(
@@ -1133,8 +1154,10 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                                 "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                             ],
                         ],
-                        [0, 0, 0, 0],
-                        [0, 0, 0, 0],
+                        [
+                            [0, 0, 0],
+                            [0, 0, 0]
+                        ],
                         { from: distributor },
                     ),
                     "BAD_REWARD_TOKEN_ROUTES",
@@ -1179,8 +1202,10 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                                 "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                             ],
                         ],
-                        [0, 0, 0, 0],
-                        [0, 0, 0, 0],
+                        [
+                            [0, 0, 0],
+                            [0, 0, 0]
+                        ],
                         { from: distributor },
                     ),
                     "BAD_REWARD_TOKEN_ROUTES",
@@ -1225,8 +1250,10 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                                 "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                             ],
                         ],
-                        [0, 0, 0, 0],
-                        [0, 0, 0, 0],
+                        [
+                            [0, 0, 0],
+                            [0, 0, 0]
+                        ],
                         { from: distributor },
                     ),
                     "BAD_REWARD_TOKEN_ROUTES",
@@ -1273,8 +1300,10 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                                 "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                             ],
                         ],
-                        [0, 0, 0, 0],
-                        [0, 0, 0, 0],
+                        [
+                            [0, 0, 0],
+                            [0, 0, 0]
+                        ],
                         { from: distributor },
                     ),
                     "BAD_REWARD_TOKEN_ROUTES",
@@ -1321,8 +1350,10 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                                 "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                             ],
                         ],
-                        [0, 0, 0, 0],
-                        [0, 0, 0, 0],
+                        [
+                            [0, 0, 0],
+                            [0, 0, 0]
+                        ],
                         { from: distributor },
                     ),
                     "BAD_REWARDER_TOKEN_ROUTES",
@@ -1369,8 +1400,10 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                                 "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                             ],
                         ],
-                        [0, 0, 0, 0],
-                        [0, 0, 0, 0],
+                        [
+                            [0, 0, 0],
+                            [0, 0, 0]
+                        ],
                         { from: distributor },
                     ),
                     "BAD_REWARD_TOKEN_ROUTES",
@@ -1462,8 +1495,10 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                                 "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                             ],
                         ],
-                        [0, 0, 0, 0],
-                        [0, 0, 0, 0],
+                        [
+                            [0, 0, 0],
+                            [0, 0, 0]
+                        ],
                         {
                             from: distributor,
                         },

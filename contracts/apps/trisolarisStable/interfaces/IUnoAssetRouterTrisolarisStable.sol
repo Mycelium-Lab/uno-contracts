@@ -21,8 +21,7 @@ interface IUnoAssetRouterTrisolarisStable {
         address swap,
         address[][] calldata rewardTokenRoutes,
         address[][] calldata rewarderTokenRoutes,
-        uint256[] calldata rewardAmountsOutMin,
-        uint256[] calldata rewarderAmountsOutMin
+        uint256[][2] calldata amountsOutMin
     ) external;
 
     function userStake(address _address, address swap) external view returns (uint256 stakeLP);

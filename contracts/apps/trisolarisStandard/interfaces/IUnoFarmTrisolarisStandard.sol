@@ -32,11 +32,8 @@ interface IUnoFarmTrisolarisStandard {
     ) external returns (uint256 amountA, uint256 amountB);
 
     function distribute(
-        address[] calldata rewardTokenToTokenARoute,
-        address[] calldata rewardTokenToTokenBRoute,
-        address[] calldata rewarderTokenToTokenARoute,
-        address[] calldata rewarderTokenToTokenBRoute,
-        uint256[4] memory amountsOutMin
+        address[][4] calldata swapRoutes,
+        uint256[4] calldata amountsOutMin
     ) external returns (uint256 reward);
 
     function userBalance(address _address) external view returns (uint256);

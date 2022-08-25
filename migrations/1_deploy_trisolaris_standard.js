@@ -12,7 +12,7 @@ const AssetRouter = artifacts.require("UnoAssetRouterTrisolarisStandard");
 module.exports = async function (deployer, network, accounts) {
   if (network !== "aurora") return
   // AccessManager deployment, dont deploy if already deployed on this network
-  await deployer.deploy(AccessManager, { overwrite: true, from: accounts[0] });
+  await deployer.deploy(AccessManager, { overwrite: false, from: accounts[0] });
   // Deploy new Farm implementation for factory to deploy
   await deployer.deploy(Farm);
   // Deploy AssetRouter
