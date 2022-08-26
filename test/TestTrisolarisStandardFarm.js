@@ -164,10 +164,12 @@ contract("Test UnoFarmTrisolarisStandard initialization", accounts => {
             );
             await expectRevert(
                 implementation.distribute(
-                    [constants.ZERO_ADDRESS],
-                    [constants.ZERO_ADDRESS],
-                    [constants.ZERO_ADDRESS],
-                    [constants.ZERO_ADDRESS],
+                    [
+                        [constants.ZERO_ADDRESS],
+                        [constants.ZERO_ADDRESS],
+                        [constants.ZERO_ADDRESS],
+                        [constants.ZERO_ADDRESS]
+                    ],
                     [0, 0, 0, 0],
                     { from: accounts[1] },
                 ),

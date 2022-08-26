@@ -184,23 +184,23 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
     });
 
     describe("getTokens", () => {
-        let _tokenA, _tokenB;
+        let _tokens
         before(async () => {
-            ({ tokenA: _tokenA, tokenB: _tokenB } = await assetRouter.getTokens(pool));
+            _tokens = await assetRouter.getTokens(pool)
         });
         it("TokenA is correct", async () => {
-            assert.equal(_tokenA, tokenA.address, "TokenA is not correct");
+            assert.equal(_tokens[0], tokenA.address, "TokenA is not correct");
         });
         it("TokenB is correct", async () => {
-            assert.equal(_tokenB, tokenB.address, "TokenB is not correct");
+            assert.equal(_tokens[1], tokenB.address, "TokenB is not correct");
         });
     });
 
     describe("Pausable", () => {
         describe("reverts", () => {
             it("reverts if called not by a pauser", async () => {
-                await expectRevert(assetRouter.pause({ from: account1 }), "CALLER_NOT_PAUSER");
-                await expectRevert(assetRouter.unpause({ from: account1 }), "CALLER_NOT_PAUSER");
+                await expectRevert(assetRouter.pause({ from: account1 }), "CALLER_NOT_AUTHORIZED");
+                await expectRevert(assetRouter.unpause({ from: account1 }), "CALLER_NOT_AUTHORIZED");
             });
         });
 
@@ -225,7 +225,7 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
                     "Pausable: paused",
                 );
                 await expectRevert(
-                    assetRouter.distribute(pool, [], [], [], [], [0, 0, 0, 0], { from: account1 }),
+                    assetRouter.distribute(pool, [[], [], [], []], [0, 0, 0, 0], { from: account1 }),
                     "Pausable: paused",
                 );
             });
@@ -256,8 +256,8 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
                     "FARM_NOT_EXISTS",
                 );
                 await expectRevert(
-                    assetRouter.distribute(pool, [], [], [], [], [0, 0, 0, 0], { from: account1 }),
-                    "CALLER_NOT_DISTRIBUTOR",
+                    assetRouter.distribute(pool, [[], [], [], []], [0, 0, 0, 0], { from: account1 }),
+                    "CALLER_NOT_AUTHORIZED",
                 );
             });
             it("reverts if called unpause on unpaused contract", async () => {
@@ -854,13 +854,13 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
         describe("reverts", () => {
             it("reverts if called not by distributor", async () => {
                 await expectRevert(
-                    assetRouter.distribute(pool, [], [], [], [], [0, 0, 0, 0], { from: pauser }),
-                    "CALLER_NOT_DISTRIBUTOR",
+                    assetRouter.distribute(pool, [[], [], [], []], [0, 0, 0, 0], { from: pauser }),
+                    "CALLER_NOT_AUTHORIZED",
                 );
             });
             it("reverts if pool doesnt exist", async () => {
                 await expectRevert(
-                    assetRouter.distribute(pool2, [], [], [], [], [0, 0, 0, 0], {
+                    assetRouter.distribute(pool2, [[], [], [], []], [0, 0, 0, 0], {
                         from: distributor,
                     }),
                     "FARM_NOT_EXISTS",
@@ -868,7 +868,7 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
             });
             it("reverts if there is no liquidity in the pool", async () => {
                 await expectRevert(
-                    assetRouter.distribute(pool, [], [], [], [], [0, 0, 0, 0], {
+                    assetRouter.distribute(pool, [[], [], [], []], [0, 0, 0, 0], {
                         from: distributor,
                     }),
                     "NO_LIQUIDITY",
@@ -892,17 +892,19 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
                 receipt = await assetRouter.distribute(
                     pool,
                     [
-                        "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                        "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                        "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                        "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
+                        [
+                            "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                            "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                            "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                            "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
+                        ],
+                        [
+                            "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                            "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                        ],
+                        [constants.ZERO_ADDRESS, "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"],
+                        [constants.ZERO_ADDRESS, "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"]
                     ],
-                    [
-                        "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                        "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
-                    ],
-                    [constants.ZERO_ADDRESS, "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"],
-                    [constants.ZERO_ADDRESS, "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"],
                     [1, 1, 1, 1],
                     { from: distributor },
                 );
@@ -927,17 +929,19 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
                     assetRouter.distribute(
                         pool,
                         [
-                            "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                            "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                            "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                            "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                            [
+                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                            ],
+                            [
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                            ],
+                            [constants.ZERO_ADDRESS, "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"],
+                            [constants.ZERO_ADDRESS, "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"]
                         ],
-                        [
-                            "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                            "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                        ],
-                        [constants.ZERO_ADDRESS, "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"],
-                        [constants.ZERO_ADDRESS, "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"],
                         [1, 1, 1, 1],
                         { from: distributor },
                     ),
@@ -947,17 +951,19 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
                     assetRouter.distribute(
                         pool,
                         [
-                            "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                            "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                            "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                            "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                            [
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                            ],
+                            [
+                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                            ],
+                            [constants.ZERO_ADDRESS, "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"],
+                            [constants.ZERO_ADDRESS, "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"]
                         ],
-                        [
-                            "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                            "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                        ],
-                        [constants.ZERO_ADDRESS, "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"],
-                        [constants.ZERO_ADDRESS, "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"],
                         [1, 1, 1, 1],
                         { from: distributor },
                     ),
@@ -969,17 +975,19 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
                     assetRouter.distribute(
                         pool,
                         [
-                            "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                            "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                            "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                            "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                            [
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                            ],
+                            [
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                            ],
+                            [constants.ZERO_ADDRESS, "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"],
+                            [constants.ZERO_ADDRESS, "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"]
                         ],
-                        [
-                            "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                            "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                        ],
-                        [constants.ZERO_ADDRESS, "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"],
-                        [constants.ZERO_ADDRESS, "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"],
                         [1, 1, 1, 1],
                         { from: distributor },
                     ),
@@ -991,17 +999,19 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
                     assetRouter.distribute(
                         pool,
                         [
-                            "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                            "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                            "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                            "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                            [
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                            ],
+                            [
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                            ],
+                            [constants.ZERO_ADDRESS, "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"],
+                            [constants.ZERO_ADDRESS, "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"]
                         ],
-                        [
-                            "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                            "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                        ],
-                        [constants.ZERO_ADDRESS, "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"],
-                        [constants.ZERO_ADDRESS, "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"],
                         [1, 1, 1, 1],
                         { from: distributor },
                     ),

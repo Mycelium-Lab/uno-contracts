@@ -19,10 +19,7 @@ interface IUnoAssetRouterTrisolarisStandard {
 
     function distribute(
         address lpPair,
-        address[] calldata rewardTokenToTokenARoute,
-        address[] calldata rewardTokenToTokenBRoute, 
-        address[] calldata rewarderTokenToTokenARoute,
-        address[] calldata rewarderTokenToTokenBRoute,
+        address[][4] calldata swapRoutes,
         uint256[4] memory amountsOutMin
     ) external;
 

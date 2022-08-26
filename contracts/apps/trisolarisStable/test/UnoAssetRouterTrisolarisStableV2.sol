@@ -14,50 +14,54 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 contract UnoAssetRouterTrisolarisStableV2 is Initializable, PausableUpgradeable, UUPSUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
-    uint256 public constant version = 2;
-
     /**
      * @dev Contract Variables:
-     * farmFactory - The contract that deploys new Farms and links them to {lpPair}s.
+     * farmFactory - The contract that deploys new Farms and links them to {swap}s.
      * accessManager - Role manager contract.
      */
     IUnoFarmFactory public farmFactory;
     IUnoAccessManager public accessManager;
+
+    bytes32 private ADMIN_ROLE;
     bytes32 private constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
     bytes32 private constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+
+    uint256 public constant version = 2;
 
     event Deposit(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Withdraw(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Distribute(address indexed lpPool, uint256 reward);
 
-    modifier onlyDistributor() {
-        require(accessManager.hasRole(DISTRIBUTOR_ROLE, msg.sender), "CALLER_NOT_DISTRIBUTOR");
-        _;
-    }
-    modifier onlyPauser() {
-        require(accessManager.hasRole(PAUSER_ROLE, msg.sender), "CALLER_NOT_PAUSER");
-        _;
-    }
-    modifier onlyAdmin() {
-        require(accessManager.hasRole(accessManager.ADMIN_ROLE(), msg.sender), "CALLER_NOT_ADMIN");
+    modifier onlyRole(bytes32 role){
+        require(accessManager.hasRole(role, msg.sender), 'CALLER_NOT_AUTHORIZED');
         _;
     }
 
     // ============ Methods ============
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(address _accessManager, address _farmFactory) external initializer {
+        require (_accessManager != address(0), 'BAD_ACCESS_MANAGER');
+        require (_farmFactory != address(0), 'BAD_FARM_FACTORY');
+
         __Pausable_init();
         accessManager = IUnoAccessManager(_accessManager);
         farmFactory = IUnoFarmFactory(_farmFactory);
+        
+        ADMIN_ROLE = accessManager.ADMIN_ROLE();
     }
 
     /**
-     * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpPair} and deposits tokens in it. Emits a {Deposit} event.
+     * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {swap} and deposits tokens in it. Emits a {Deposit} event.
      * @param swap - Address of the Swap contract.
      * @param amounts - Amounts of tokens to deposit.
      * @param minAmountLP - Minimum LP the user will receive from {{amounts}} deposit.
      * @param amountLP - Amount of LP tokens to deposit.
-     * @param recipient - Address which will recieve the deposit.
+     * @param recipient - Address which will receive the deposit.
 
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
@@ -75,14 +79,14 @@ contract UnoAssetRouterTrisolarisStableV2 is Initializable, PausableUpgradeable,
 
         for (uint256 i = 0; i < amounts.length; i++) { 
             if (amounts[i] > 0) {
-                IERC20Upgradeable(farm.tokens(i)).safeTransferFrom(msg.sender, address(farm), amounts[i]);
+                IERC20Upgradeable(farm.tokens(i)).safeTransferFrom(msg.sender, address(farm), amounts[i]); 
             }
         }
 
         if (amountLP > 0) {
             IERC20Upgradeable(farm.lpPair()).safeTransferFrom(msg.sender, address(farm), amountLP);
         }
-
+ 
         liquidity = farm.deposit(amounts, minAmountLP, amountLP, recipient);
         emit Deposit(swap, msg.sender, recipient, liquidity);
     }
@@ -93,7 +97,7 @@ contract UnoAssetRouterTrisolarisStableV2 is Initializable, PausableUpgradeable,
      * @param amount - Amounts of LP tokens to withdraw.
      * @param minAmounts - Minimum amounts of tokens sent to {recipient}.
      * @param withdrawLP - Whether to withdraw or not to withdraw the deposits in LP tokens.
-     * @param recipient - The address which will recieve tokens.
+     * @param recipient - The address which will receive tokens.
 
      * @return amounts - Token amounts sent to {recipient}, an array of zeros if withdrawLP == false.
      */
@@ -114,10 +118,9 @@ contract UnoAssetRouterTrisolarisStableV2 is Initializable, PausableUpgradeable,
     /**
      * @dev Distributes tokens between users.
      * @param swap - Address of the Swap contract.
-     * @param rewardTokenRoutes An array of reward token addresses.
-     * @param rewarderTokenRoutes An array of rewarder token addresses.
-     * @param rewardAmountsOutMin  An array of minimum amounts of reward tokens.
-     * @param rewarderAmountsOutMin An array of minimum amounts of rewarder tokens.
+     * @param rewardTokenRoutes - An array of swap routes describing the path from reward to tokens in {swap}.
+     * @param rewarderTokenRoutes - An array of swap routes describing the path from rewarder to tokens in {swap}.
+     * @param amountsOutMin - Arrays of minimum amounts of output tokens that must be received for the transaction not to revert. [rewardAmountsOutMin, rewarderAmountsOutMin]
      *
      * Note: This function can only be called by the distributor.
      */
@@ -125,23 +128,21 @@ contract UnoAssetRouterTrisolarisStableV2 is Initializable, PausableUpgradeable,
         address swap,
         address[][] calldata rewardTokenRoutes,
         address[][] calldata rewarderTokenRoutes,
-        uint256[] calldata rewardAmountsOutMin,
-        uint256[] calldata rewarderAmountsOutMin
-    ) external whenNotPaused onlyDistributor {
+        uint256[][2] calldata amountsOutMin
+    ) external whenNotPaused onlyRole(DISTRIBUTOR_ROLE) {
         Farm farm = Farm(farmFactory.Farms(swap));
         require(farm != Farm(address(0)), "FARM_NOT_EXISTS");
 
         uint256 reward = farm.distribute(
             rewardTokenRoutes,
             rewarderTokenRoutes,
-            rewardAmountsOutMin,
-            rewarderAmountsOutMin
+            amountsOutMin
         );
         emit Distribute(swap, reward);
     }
 
     /**
-     * @dev Returns tokens staked by the {_address} for the given {lpPair}.
+     * @dev Returns tokens staked by the {_address} for the given {swap}.
      * @param _address - The address to check stakes for.
      * @param swap - Address of the Swap contract.
 
@@ -169,9 +170,9 @@ contract UnoAssetRouterTrisolarisStableV2 is Initializable, PausableUpgradeable,
 
     /**
      * @dev Returns addresses of tokens in {swap}.
-     * @param swap - LP pool to check tokens in.
+     * @param swap - Swap to check tokens in.
 
-     * @return tokens - Token address.
+     * @return tokens - Array of token addresses.
      */  
     function getTokens(address swap) external view returns(address[] memory tokens){
         uint8 tokenCount;
@@ -193,13 +194,13 @@ contract UnoAssetRouterTrisolarisStableV2 is Initializable, PausableUpgradeable,
         return tokens;
     }
 
-    function pause() external onlyPauser {
+    function pause() external onlyRole(PAUSER_ROLE) {
         _pause();
     }
 
-    function unpause() external onlyPauser {
+    function unpause() external onlyRole(PAUSER_ROLE) {
         _unpause();
     }
 
-    function _authorizeUpgrade(address) internal override onlyAdmin {}
+    function _authorizeUpgrade(address) internal override onlyRole(ADMIN_ROLE) {}
 }
