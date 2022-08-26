@@ -18,9 +18,9 @@ contract UnoFarmFactory{
      * lpPools - list of pools that have corresponding deployed Farm contract.
      */
     IUnoAccessManager public accessManager;
-    address public assetRouter;
+    address public immutable assetRouter;
 
-    address public farmBeacon;
+    address public immutable farmBeacon;
     mapping(address => address) public Farms;
     address[] public pools;
 
@@ -29,6 +29,10 @@ contract UnoFarmFactory{
     // ============ Methods ============
 
     constructor (address _implementation, address _accessManager, address _assetRouter) {
+        require (_implementation != address(0), 'BAD_IMPLEMENTATION');
+        require (_accessManager != address(0), 'BAD_ACCESS_MANAGER');
+        require (_assetRouter != address(0), 'BAD_ASSET_ROUTER');
+
         farmBeacon = address(new UpgradeableBeacon(_implementation));
         accessManager = IUnoAccessManager(_accessManager);
         assetRouter = _assetRouter;
