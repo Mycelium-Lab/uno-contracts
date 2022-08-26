@@ -1,18 +1,14 @@
 const { expectRevert, expectEvent, BN, constants, time } = require("@openzeppelin/test-helpers");
-const { deployProxy, upgradeProxy } = require("@openzeppelin/truffle-upgrades");
 
 const timeMachine = require("ganache-time-traveler");
 
 const IERC20 = artifacts.require("IERC20");
-const IUnoAssetRouter = artifacts.require("IUnoAssetRouter");
-const IUnoAssetRouterQuickswap = artifacts.require("IUnoAssetRouterQuickswap");
 
 const AccessManager = artifacts.require("UnoAccessManager");
 
 const AutoStrategy = artifacts.require("UnoAutoStrategy");
 const AutoStrategyV2 = artifacts.require("UnoAutoStrategyV2");
 const AutoStrategyFactory = artifacts.require("UnoAutoStrategyFactory");
-const AutoStrategyFactoryV2 = artifacts.require("UnoAutoStrategyFactoryV2");
 
 const pool1 = "0xafb76771c98351aa7fca13b130c9972181612b54"; // usdt-usdc quickswap
 const pool2 = "0x4b1f1e2435a9c96f7330faea190ef6a7c8d70001"; // usdt-usdc sushiswap
@@ -21,9 +17,6 @@ const assetRouter1 = "0xF5AE5c5151aE25019be8b328603C18153d669461"; // quickswap
 const assetRouter2 = "0xa5eb4E95a92b74f48f8eb118c4675095DcCDe3f8"; // sushiswap
 
 const account1 = "0x477b8D5eF7C2C42DB84deB555419cd817c336b6F"; // -u
-const account2 = "0x72A53cDBBcc1b9efa39c834A540550e23463AAcB"; // -u
-const account3 = "0x7EF2D7B88D43F1831241F0dD63E0bdeF048Ba8aC"; // -u
-const distributor = "0x2aae5d0f3bee441acc1fb2abe9c2672a54f4bb48"; // -u
 
 const amounts = [new BN(1000), new BN(3000), new BN(500), new BN(4000), new BN(4400000000), new BN(5000)];
 
@@ -67,8 +60,8 @@ contract("UnoAutoStrategyFactory", (accounts) => {
                 const factoryAccessManager = await autoStrategyFactory.accessManager();
 
                 assert.equal(
-                    factoryAccessManager.toUpperCase(),
-                    accessManager.address.toUpperCase(),
+                    factoryAccessManager,
+                    accessManager.address,
                     `Access Manager is not set correctly`
                 );
             });
@@ -81,7 +74,7 @@ contract("UnoAutoStrategyFactory", (accounts) => {
                     autoStrategyFactory.approveAssetRouter(assetRouter1, {
                         from: pauser,
                     }),
-                    "CALLER_NOT_ADMIN"
+                    "CALLER_NOT_AUTHORIZED"
                 );
             });
             it("cannot revokeAssetRouter if not administrator", async () => {
@@ -89,7 +82,7 @@ contract("UnoAutoStrategyFactory", (accounts) => {
                     autoStrategyFactory.revokeAssetRouter(assetRouter1, {
                         from: pauser,
                     }),
-                    "CALLER_NOT_ADMIN"
+                    "CALLER_NOT_AUTHORIZED"
                 );
             });
             it("cannot upgradeStrategies if not administrator", async () => {
@@ -97,7 +90,7 @@ contract("UnoAutoStrategyFactory", (accounts) => {
                     autoStrategyFactory.upgradeStrategies(constants.ZERO_ADDRESS, {
                         from: pauser,
                     }),
-                    "CALLER_NOT_ADMIN"
+                    "CALLER_NOT_AUTHORIZED"
                 );
             });
         });
@@ -107,7 +100,7 @@ contract("UnoAutoStrategyFactory", (accounts) => {
                     autoStrategyFactory.pause({
                         from: admin,
                     }),
-                    "CALLER_NOT_PAUSER"
+                    "CALLER_NOT_AUTHORIZED"
                 );
             });
             it("cannot unpause if not pauser", async () => {
@@ -115,7 +108,7 @@ contract("UnoAutoStrategyFactory", (accounts) => {
                     autoStrategyFactory.unpause({
                         from: admin,
                     }),
-                    "CALLER_NOT_PAUSER"
+                    "CALLER_NOT_AUTHORIZED"
                 );
             });
         });
@@ -126,20 +119,21 @@ contract("UnoAutoStrategyFactory", (accounts) => {
             after(async () => {
                 await autoStrategyFactory.unpause({ from: pauser });
             });
-            it("cannot approveAssetRouter when paused", async () => {
+            //passes pausable checks but fails on role check
+            it("can approveAssetRouter when paused", async () => {
                 await expectRevert(
                     autoStrategyFactory.approveAssetRouter(assetRouter1, {
                         from: pauser,
                     }),
-                    "Pausable: paused"
+                    "CALLER_NOT_AUTHORIZED"
                 );
             });
-            it("cannot revokeAssetRouter when paused", async () => {
+            it("can revokeAssetRouter when paused", async () => {
                 await expectRevert(
                     autoStrategyFactory.revokeAssetRouter(assetRouter1, {
                         from: pauser,
                     }),
-                    "Pausable: paused"
+                    "CALLER_NOT_AUTHORIZED"
                 );
             });
             it("can upgradeStrategies when paused", async () => {
@@ -147,9 +141,15 @@ contract("UnoAutoStrategyFactory", (accounts) => {
                     autoStrategyFactory.upgradeStrategies(constants.ZERO_ADDRESS, {
                         from: pauser,
                     }),
-                    "CALLER_NOT_ADMIN"
+                    "CALLER_NOT_AUTHORIZED"
                 );
             });
+            it("cant createStrategy when paused", async () => {
+                await expectRevert(
+                    autoStrategyFactory.createStrategy([]),
+                    "Pausable: paused"
+                );
+            })
         });
     });
     describe("Asset Router Approvals", () => {
@@ -165,12 +165,11 @@ contract("UnoAutoStrategyFactory", (accounts) => {
                     }),
                     "ASSET_ROUTER_ALREADY_APPROVED"
                 );
-
+            });
+            it("cannot revoke if was not approved", async () => {
                 await autoStrategyFactory.revokeAssetRouter(assetRouter1, {
                     from: admin,
                 });
-            });
-            it("cannot revoke if was not approved", async () => {
                 await expectRevert(
                     autoStrategyFactory.revokeAssetRouter(assetRouter1, {
                         from: admin,

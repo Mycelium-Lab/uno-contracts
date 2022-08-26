@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
  
-import '../../interfaces/IWMATIC.sol';
 import "../../interfaces/IVault.sol";
 import "../../interfaces/IBasePool.sol";
 import '../../interfaces/IChildChainLiquidityGaugeFactory.sol';
 import "../../interfaces/IRewardsOnlyGauge.sol"; 
 import "../../interfaces/IChildChainStreamer.sol"; 
 import '@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol';
+import '@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol';
+import '@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 
 contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
+    using SafeERC20Upgradeable for IERC20Upgradeable;
     /**
      * @dev DistributionInfo:
      * {block} - Distribution block number.
@@ -91,6 +93,9 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
     // ============ Methods ============
 
     function initialize(address _lpPool, address _assetRouter) external initializer {
+        require (_lpPool != address(0), 'BAD_LP_POOL');
+        require (_assetRouter != address(0), 'BAD_ASSET_ROUTER');
+
         __ReentrancyGuard_init();
         assetRouter = _assetRouter;
 
@@ -121,8 +126,8 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
      */
     function deposit(uint256[] memory amounts, address[] memory tokens, uint256 minAmountLP, uint256 amountLP,  address recipient) external nonReentrant onlyAssetRouter returns(uint256 liquidity){
         (IERC20[] memory poolTokens, IAsset[] memory assets,) = getTokens();
-        require ((amounts.length == poolTokens.length) && (tokens.length == poolTokens.length), 'BAD_AMOUNTS_LENGTH');
-        require ((amounts.length == poolTokens.length) && (tokens.length == poolTokens.length), 'BAD_TOKENS_LENGTH');
+        require (amounts.length == poolTokens.length, 'BAD_AMOUNTS_LENGTH');
+        require (tokens.length == poolTokens.length, 'BAD_TOKENS_LENGTH');
 
         bool joinPool = false;
         for (uint256 i = 0; i < poolTokens.length; i++) {
@@ -173,7 +178,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
 
         gauge.withdraw(amount);
         if(withdrawLP){
-            IERC20(lpPool).transfer(recipient, amount);
+            IERC20Upgradeable(lpPool).safeTransfer(recipient, amount);
             return;
         }
 
@@ -189,40 +194,30 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
      * 3. It deposits new tokens back to the {gauge}.
      */
     function distribute(
-        IVault.BatchSwapStep[][] memory swaps,
-        IAsset[][] memory assets,
-        int256[][] memory limits
+        IVault.BatchSwapStep[][] calldata swaps,
+        IAsset[][] calldata assets,
+        int256[][] calldata limits
     ) external onlyAssetRouter nonReentrant returns(uint256 reward){
         require(totalDeposits > 0, 'NO_LIQUIDITY');
         require(distributionInfo[distributionID - 1].block != block.number, 'CANT_CALL_ON_THE_SAME_BLOCK');
         require((swaps.length == streamer.reward_count()) && (swaps.length == assets.length) && (swaps.length == limits.length), 'PARAMS_LENGTHS_NOT_MATCH_REWARD_COUNT');
 
         gauge.claim_rewards();
-
-        uint256[] memory balances = new uint256[](swaps.length);
-        IERC20[] memory rewardTokens = new IERC20[](swaps.length);
         for (uint256 i = 0; i < swaps.length; i++) {
-            rewardTokens[i] = IERC20(streamer.reward_tokens(i));
-            balances[i] = IERC20(rewardTokens[i]).balanceOf(address(this));
-
-            require(address(assets[i][swaps[i][0].assetInIndex]) == address(rewardTokens[i]), 'ASSET_NOT_REWARD');
-        }
-        for (uint256 i = 0; i < swaps.length; i++) {
-            if (
-                (balances[i] > 0) && 
-                (address(rewardTokens[i]) != address(gauge)) && 
-                (address(rewardTokens[i]) != address(assets[i][swaps[i][swaps[i].length - 1].assetOutIndex])) 
-            ) {
-                swaps[i][0].amount = balances[i];
-                rewardTokens[i].approve(address(Vault), balances[i]);
-                Vault.batchSwap(
-                    IVault.SwapKind.GIVEN_IN,
-                    swaps[i],
-                    assets[i],
-                    IVault.FundManagement({sender: address(this), fromInternalBalance:false, recipient: payable(address(this)), toInternalBalance:false}),
-                    limits[i],
-                    type(uint256).max
-                );
+            IERC20 rewardToken = IERC20(streamer.reward_tokens(i));
+            if (address(rewardToken) != address(gauge)) {  //can't use LP tokens in swap
+                uint256 balance = rewardToken.balanceOf(address(this));
+                if(balance > 0){
+                    rewardToken.approve(address(Vault), balance);
+                    Vault.batchSwap(
+                        IVault.SwapKind.GIVEN_IN,
+                        swaps[i],
+                        assets[i],
+                        IVault.FundManagement({sender: address(this), fromInternalBalance:false, recipient: payable(address(this)), toInternalBalance:false}),
+                        limits[i],
+                        type(uint256).max
+                    );
+                }
             }
         }
 

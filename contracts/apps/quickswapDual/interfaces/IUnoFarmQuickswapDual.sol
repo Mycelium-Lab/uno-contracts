@@ -15,11 +15,8 @@ interface IUnoFarmQuickswapDual {
     function withdraw(uint256 amount, uint256 amountAMin, uint256 amountBMin, bool withdrawLP, address origin, address recipient) external returns(uint256 amountA, uint256 amountB);
 
     function distribute(
-        address[] calldata rewardTokenAToTokenARoute,
-        address[] calldata rewardTokenAToTokenBRoute,
-        address[] calldata rewardTokenBToTokenARoute,
-        address[] calldata rewardTokenBToTokenBRoute,
-        uint256[4] memory amountsOutMin
+        address[][4] calldata swapRoutes,
+        uint256[4] calldata amountsOutMin
     ) external returns(uint256 reward);
     
     function userBalance(address _address) external view returns (uint256);

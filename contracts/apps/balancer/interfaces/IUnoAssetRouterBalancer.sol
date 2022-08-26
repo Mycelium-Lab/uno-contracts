@@ -20,12 +20,11 @@ interface IUnoAssetRouterBalancer {
 
     function distribute(
       address lpPool,
-      IVault.BatchSwapStep[][] memory swaps,
-      IAsset[][] memory assets,
-      int256[][] memory limits
+      IVault.BatchSwapStep[][] calldata swaps,
+      IAsset[][] calldata assets,
+      int256[][] calldata limits
     ) external;
 
-   
     function userStake(address _address, address lpPool) external view returns(uint256);
     function totalDeposits(address lpPool) external view returns (uint256);
     function getTokens(address lpPool) external view returns(IERC20[] memory tokens);

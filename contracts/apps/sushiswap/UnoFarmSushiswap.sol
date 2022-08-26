@@ -5,7 +5,6 @@ import '../../interfaces/IUniswapV2Pair.sol';
 import '../../interfaces/IUniswapV2Router.sol';
 import '../../interfaces/IMiniChefV2.sol';
 import '../../interfaces/IRewarder.sol';
-import '../../interfaces/IWMATIC.sol';
 import '@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol';
@@ -100,6 +99,9 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
     // ============ Methods ============
 
     function initialize(address _lpPair, address _assetRouter) external initializer {
+        require (_lpPair != address(0), 'BAD_LP_POOL');
+        require (_assetRouter != address(0), 'BAD_ASSET_ROUTER');
+
         __ReentrancyGuard_init();
         assetRouter = _assetRouter;
 
@@ -107,8 +109,13 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
         lpPair = _lpPair;
 
         rewardToken = MiniChef.SUSHI();
-        (IERC20[] memory rewarderTokenArray, ) = IRewarder(MiniChef.rewarder(pid)).pendingTokens(pid, address(0), 0);
-        rewarderToken = address(rewarderTokenArray[0]);
+
+        address Rewarder = MiniChef.rewarder(pid);
+        if (Rewarder != address(0)) {
+            (IERC20[] memory rewarderTokenArray, ) = IRewarder(Rewarder).pendingTokens(pid, address(0), 0);
+            rewarderToken = address(rewarderTokenArray[0]);
+            IERC20(rewarderToken).approve(address(sushiswapRouter), type(uint256).max);
+        }
 
         tokenA = IUniswapV2Pair(lpPair).token0();
         tokenB = IUniswapV2Pair(lpPair).token1();
@@ -124,10 +131,8 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
         IERC20(lpPair).approve(address(MiniChef), type(uint256).max);
         IERC20(lpPair).approve(address(sushiswapRouter), type(uint256).max);
         IERC20(rewardToken).approve(address(sushiswapRouter), type(uint256).max);
-        IERC20(rewarderToken).approve(address(sushiswapRouter), type(uint256).max);
         IERC20(tokenA).approve(address(sushiswapRouter), type(uint256).max);
         IERC20(tokenB).approve(address(sushiswapRouter), type(uint256).max);
-
     }
 
     /**
@@ -184,35 +189,42 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
      * 2. It swaps {rewardToken} token for {tokenA} & {tokenB}.
      * 3. It deposits new LP tokens back to the {MiniChef}.
      */
-    function distribute(address[] calldata rewardTokenToTokenARoute, address[] calldata rewardTokenToTokenBRoute, address[] calldata rewarderTokenToTokenARoute, address[] calldata rewarderTokenToTokenBRoute, uint256[4] memory amountsOutMin) external onlyAssetRouter nonReentrant returns(uint256 reward){
+    function distribute(
+        address[][4] calldata swapRoutes,
+        uint256[4] calldata amountsOutMin
+    ) external onlyAssetRouter nonReentrant returns(uint256 reward){
         require(totalDeposits > 0, 'NO_LIQUIDITY');
         require(distributionInfo[distributionID - 1].block != block.number, 'CANT_CALL_ON_THE_SAME_BLOCK');
 
         MiniChef.harvest(pid, address(this));
         { // scope to avoid stack too deep errors
         uint256 rewardTokenHalf = IERC20(rewardToken).balanceOf(address(this)) / 2;
-        uint256 rewarderTokenHalf = IERC20(rewarderToken).balanceOf(address(this)) / 2;
+        uint256 rewarderTokenHalf;
+        if (rewarderToken != address(0)) {
+            rewarderTokenHalf = IERC20(rewarderToken).balanceOf(address(this)) / 2;
+        }
+        
         if (rewardTokenHalf > 0) {
             if (tokenA != rewardToken) {
-                require(rewardTokenToTokenARoute[0] == rewardToken && rewardTokenToTokenARoute[rewardTokenToTokenARoute.length - 1] == tokenA, 'BAD_REWARD_TOKEN_A_ROUTE');
-                sushiswapRouter.swapExactTokensForTokens(rewardTokenHalf, amountsOutMin[0], rewardTokenToTokenARoute, address(this), block.timestamp);
+                require(swapRoutes[0][0] == rewardToken && swapRoutes[0][swapRoutes[0].length - 1] == tokenA, 'BAD_REWARD_TOKEN_A_ROUTE');
+                sushiswapRouter.swapExactTokensForTokens(rewardTokenHalf, amountsOutMin[0], swapRoutes[0], address(this), block.timestamp);
             }
 
             if (tokenB != rewardToken) {
-                require(rewardTokenToTokenBRoute[0] == rewardToken && rewardTokenToTokenBRoute[rewardTokenToTokenBRoute.length - 1] == tokenB, 'BAD_REWARD_TOKEN_B_ROUTE');
-                sushiswapRouter.swapExactTokensForTokens(rewardTokenHalf, amountsOutMin[1], rewardTokenToTokenBRoute, address(this), block.timestamp);
+                require(swapRoutes[1][0] == rewardToken && swapRoutes[1][swapRoutes[1].length - 1] == tokenB, 'BAD_REWARD_TOKEN_B_ROUTE');
+                sushiswapRouter.swapExactTokensForTokens(rewardTokenHalf, amountsOutMin[1], swapRoutes[1], address(this), block.timestamp);
             }
         }
         
         if (rewarderTokenHalf > 0) {
             if (tokenA != rewarderToken) {
-                require(rewarderTokenToTokenARoute[0] == rewarderToken && rewarderTokenToTokenARoute[rewarderTokenToTokenARoute.length - 1] == tokenA, 'BAD_REWARDER_TOKEN_A_ROUTE');
-                sushiswapRouter.swapExactTokensForTokens(rewarderTokenHalf, amountsOutMin[2], rewarderTokenToTokenARoute, address(this), block.timestamp);
+                require(swapRoutes[2][0] == rewarderToken && swapRoutes[2][swapRoutes[2].length - 1] == tokenA, 'BAD_REWARDER_TOKEN_A_ROUTE');
+                sushiswapRouter.swapExactTokensForTokens(rewarderTokenHalf, amountsOutMin[2], swapRoutes[2], address(this), block.timestamp);
             }
 
             if (tokenB != rewarderToken) {
-                require(rewarderTokenToTokenBRoute[0] == rewarderToken && rewarderTokenToTokenBRoute[rewarderTokenToTokenBRoute.length - 1] == tokenB, 'BAD_REWARDER_TOKEN_B_ROUTE');
-                sushiswapRouter.swapExactTokensForTokens(rewarderTokenHalf, amountsOutMin[3], rewarderTokenToTokenBRoute, address(this), block.timestamp);
+                require(swapRoutes[3][0] == rewarderToken && swapRoutes[3][swapRoutes[3].length - 1] == tokenB, 'BAD_REWARDER_TOKEN_B_ROUTE');
+                sushiswapRouter.swapExactTokensForTokens(rewarderTokenHalf, amountsOutMin[3], swapRoutes[3], address(this), block.timestamp);
             }
         }
         }

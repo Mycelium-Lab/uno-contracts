@@ -14,9 +14,9 @@ interface IUnoFarmBalancer {
     function withdraw(uint256 amount, uint256[] calldata minAmountsOut, bool withdrawLP, address origin, address recipient) external;
 
     function distribute(
-        IVault.BatchSwapStep[][] memory swaps,
-        IAsset[][] memory assets,
-        int256[][] memory limits
+        IVault.BatchSwapStep[][] calldata swaps,
+        IAsset[][] calldata assets,
+        int256[][] calldata limits
     ) external returns(uint256 reward);
 
     function userBalance(address _address) external view returns (uint256);

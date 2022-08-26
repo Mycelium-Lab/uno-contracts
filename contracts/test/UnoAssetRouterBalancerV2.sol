@@ -22,8 +22,10 @@ contract UnoAssetRouterBalancerV2 is Initializable, PausableUpgradeable, UUPSUpg
      */
     IUnoFarmFactory public farmFactory;
     IUnoAccessManager public accessManager;
+
     bytes32 private constant DISTRIBUTOR_ROLE = keccak256('DISTRIBUTOR_ROLE');
     bytes32 private constant PAUSER_ROLE = keccak256('PAUSER_ROLE');
+
     IVault constant private Vault = IVault(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
 
     uint256 public constant version = 2;
@@ -32,22 +34,22 @@ contract UnoAssetRouterBalancerV2 is Initializable, PausableUpgradeable, UUPSUpg
     event Withdraw(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Distribute(address indexed lpPool, uint256 reward);
 
-    modifier onlyDistributor(){
-        require(accessManager.hasRole(DISTRIBUTOR_ROLE, msg.sender), 'CALLER_NOT_DISTRIBUTOR');
-        _;
-    }
-    modifier onlyPauser(){
-        require(accessManager.hasRole(PAUSER_ROLE, msg.sender), 'CALLER_NOT_PAUSER');
-        _;
-    }
-    modifier onlyAdmin(){
-        require(accessManager.hasRole(accessManager.ADMIN_ROLE(), msg.sender), 'CALLER_NOT_ADMIN');
+    modifier onlyRole(bytes32 role){
+        require(accessManager.hasRole(role, msg.sender), 'CALLER_NOT_AUTHORIZED');
         _;
     }
 
     // ============ Methods ============
+    
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
 
     function initialize(address _accessManager, address _farmFactory) external initializer{
+        require (_accessManager != address(0), 'BAD_ACCESS_MANAGER');
+        require (_farmFactory != address(0), 'BAD_FARM_FACTORY');
+
         __Pausable_init();
         accessManager = IUnoAccessManager(_accessManager);
         farmFactory = IUnoFarmFactory(_farmFactory);
@@ -60,7 +62,7 @@ contract UnoAssetRouterBalancerV2 is Initializable, PausableUpgradeable, UUPSUpg
      * @param tokens - Tokens to deposit.
      * @param minAmountLP - Minimum LP the user will receive from {{tokens}} deposit.
      * @param amountLP - Additional amount of LP tokens to deposit.
-     * @param recipient - Address which will recieve the deposit.
+     * @param recipient - Address which will receive the deposit.
 
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
@@ -89,9 +91,9 @@ contract UnoAssetRouterBalancerV2 is Initializable, PausableUpgradeable, UUPSUpg
      * @dev Withdraws tokens from the given pool. 
      * @param lpPool - LP pool to withdraw from.
      * @param amount - LP amount to withdraw. 
-     * @param minAmountsOut - Minimum token amounts the user will recieve.
+     * @param minAmountsOut - Minimum token amounts the user will receive.
      * @param withdrawLP - True: Withdraw in LP tokens, False: Withdraw in normal tokens.
-     * @param recipient - The address which will recieve tokens.
+     * @param recipient - The address which will receive tokens.
      */ 
     function withdraw(address lpPool, uint256 amount, uint256[] calldata minAmountsOut, bool withdrawLP, address recipient) external whenNotPaused { 
         Farm farm = Farm(farmFactory.Farms(lpPool));
@@ -112,10 +114,10 @@ contract UnoAssetRouterBalancerV2 is Initializable, PausableUpgradeable, UUPSUpg
      */
     function distribute(
         address lpPool,
-        IVault.BatchSwapStep[][] memory swaps,
-        IAsset[][] memory assets,
-        int256[][] memory limits
-    ) external whenNotPaused onlyDistributor {
+        IVault.BatchSwapStep[][] calldata swaps,
+        IAsset[][] calldata assets,
+        int256[][] calldata limits
+    ) external whenNotPaused onlyRole(DISTRIBUTOR_ROLE) {
         Farm farm = Farm(farmFactory.Farms(lpPool));
         require(farm != Farm(address(0)), 'FARM_NOT_EXISTS');
 
@@ -163,15 +165,15 @@ contract UnoAssetRouterBalancerV2 is Initializable, PausableUpgradeable, UUPSUpg
         (tokens, , ) = Vault.getPoolTokens(poolId);
     }
  
-    function pause() external onlyPauser {
+    function pause() external onlyRole(PAUSER_ROLE) {
         _pause();
     }
  
-    function unpause() external onlyPauser {
+    function unpause() external onlyRole(PAUSER_ROLE) {
         _unpause();
     }
 
-    function _authorizeUpgrade(address) internal override onlyAdmin {
+    function _authorizeUpgrade(address) internal override onlyRole(accessManager.ADMIN_ROLE()) {
 
     }
 }

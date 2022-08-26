@@ -4,10 +4,10 @@ const { deployProxy, upgradeProxy } = require('@openzeppelin/truffle-upgrades')
 const timeMachine = require('ganache-time-traveler')
 
 const IGaugeFactory = artifacts.require('IChildChainLiquidityGaugeFactory')
+const IGauge = artifacts.require('IGauge')
 const IBasePool = artifacts.require('IBasePool')
 const IVault = artifacts.require('IVault')
 
-//const IStakingDualRewardsFactory = artifacts.require('IStakingDualRewardsFactory')
 const IUniswapV2Pair = artifacts.require('IUniswapV2Pair')
 
 const AccessManager = artifacts.require('UnoAccessManager') 
@@ -156,11 +156,11 @@ contract('UnoAssetRouterBalancer', accounts => {
             it('reverts if called not by a pauser', async () => {
                 await expectRevert(
                     assetRouter.pause({from: account1}),
-                    "CALLER_NOT_PAUSER"
+                    "CALLER_NOT_AUTHORIZED"
                 )
                 await expectRevert(
                     assetRouter.unpause({from: account1}),
-                    "CALLER_NOT_PAUSER"
+                    "CALLER_NOT_AUTHORIZED"
                 )
             })
         })
@@ -229,7 +229,7 @@ contract('UnoAssetRouterBalancer', accounts => {
                 )
                 await expectRevert(
                     assetRouter.distribute(pool, [], [], [], {from: account1}),
-                    "CALLER_NOT_DISTRIBUTOR"
+                    "CALLER_NOT_AUTHORIZED"
                 )
             })
             it('reverts if called unpause on unpaused contract', async () => {
@@ -435,7 +435,7 @@ contract('UnoAssetRouterBalancer', accounts => {
                     await tokenContracts[i].approve(assetRouter.address, amount, {from: account1})
                 }
             })
-            it('reverts if minAmountLP is more than recieved amount', async () => {
+            it('reverts if minAmountLP is more than received amount', async () => {
                 await expectRevert(
                     assetRouter.deposit(pool, _amounts, tokens, constants.MAX_UINT256, 0, account1, {from: account1}),
                     "BAL#208"
@@ -699,7 +699,7 @@ contract('UnoAssetRouterBalancer', accounts => {
             it('reverts if called not by distributor', async () => {
                 await expectRevert(
                     assetRouter.distribute(pool, [], [], [], {from: pauser}),
-                    "CALLER_NOT_DISTRIBUTOR"
+                    "CALLER_NOT_AUTHORIZED"
                 )
             })
             it('reverts if pool doesnt exist', async () => {
@@ -729,9 +729,13 @@ contract('UnoAssetRouterBalancer', accounts => {
 
                 await time.increase(50000)
 
+                const farmAddress = await factory.Farms(pool)////////////////////////////////////////////////////////////////
+                const gaugeContract = await IGauge.at(gauge.address) //this is not a IUniswapV2Pair, however the abi is sufficient for our purposes
+                const rewardAmount = await gaugeContract.claimable_reward_write.call(farmAddress,'0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3')/////////////////
+
                 receipt = await assetRouter.distribute(
                     pool, 
-                    [[{"poolId":"0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006","assetInIndex":0,"assetOutIndex":1,"amount":0,"userData":"0x"}]], //amount can be any number since it is changed to be set to balance in contract
+                    [[{"poolId":"0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006","assetInIndex":0,"assetOutIndex":1,"amount":rewardAmount.toString(),"userData":"0x"}]], //amount can be any number since it is changed to be set to balance in contract
                     [["0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3","0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270"]], //reward token to wmatic
                     [["0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","0"]],
                     {from: distributor}
@@ -782,18 +786,6 @@ contract('UnoAssetRouterBalancer', accounts => {
                         {from: distributor}
                     ),
                     "PARAMS_LENGTHS_NOT_MATCH_REWARD_COUNT"
-                )
-            })
-            it('reverts if assets assetIn is not reward', async() => {
-                await expectRevert(
-                    assetRouter.distribute(
-                        pool, 
-                        [[{"poolId":"0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006","assetInIndex":0,"assetOutIndex":1,"amount":0,"userData":"0x"}]], 
-                        [["0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270", "0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270"]], 
-                        [["0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","0"]],
-                        {from: distributor}
-                    ),
-                    "ASSET_NOT_REWARD"
                 )
             })
         })

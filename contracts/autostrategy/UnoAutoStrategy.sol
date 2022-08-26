@@ -125,7 +125,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      * @param amountB  - Token B amount to deposit.
      * @param amountAMin - Bounds the extent to which the B/A price can go up before the transaction reverts.
      * @param amountBMin - Bounds the extent to which the A/B price can go up before the transaction reverts.
-     * @param recipient - Address which will recieve the deposit.
+     * @param recipient - Address which will receive the deposit.
      
      * @return sentA - Deposited token A amount.
      * @return sentB - Deposited token B amount.
@@ -153,7 +153,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      * @param liquidity - Liquidity to burn from this user.
      * @param amountAMin - The minimum amount of tokenA that must be received from the pool for the transaction not to revert.
      * @param amountBMin - The minimum amount of tokenB that must be received from the pool for the transaction not to revert.
-     * @param recipient - Address which will recieve withdrawn tokens.
+     * @param recipient - Address which will receive withdrawn tokens.
      
      * @return amountA - Token A amount sent to the {recipient}.
      * @return amountB - Token B amount sent to the {recipient}.
@@ -175,7 +175,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
 
     /**
      * @dev Collects leftover tokens left from moveLiquidity() function.
-     * @param recipient - Address which will recieve leftover tokens.
+     * @param recipient - Address which will receive leftover tokens.
      
      * @return leftoverA - Token A amount sent to the {recipient}.
      * @return leftoverB - Token B amount sent to the {recipient}.

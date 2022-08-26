@@ -19,14 +19,10 @@ interface IUnoAssetRouterSushiswap {
 
     function distribute(
         address lpPair,
-        address[] calldata rewardTokenToTokenARoute,
-        address[] calldata rewardTokenToTokenBRoute, 
-        address[] calldata rewarderTokenToTokenARoute,
-        address[] calldata rewarderTokenToTokenBRoute,
+        address[][4] calldata swapRoutes,
         uint256[4] memory amountsOutMin
     ) external;
 
-   
     function userStake(address _address, address lpPair) external view returns (uint256 stakeLP, uint256 stakeA, uint256 stakeB);
     function totalDeposits(address lpPair) external view returns (uint256 totalDepositsLP, uint256 totalDepositsA, uint256 totalDepositsB);
     function getTokens(address lpPair) external view returns(address tokenA, address tokenB);

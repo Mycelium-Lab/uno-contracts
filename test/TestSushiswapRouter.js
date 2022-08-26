@@ -186,11 +186,11 @@ contract('UnoAssetRouterSushiswap', accounts => {
             it('reverts if called not by a pauser', async () => {
                 await expectRevert(
                     assetRouter.pause({from: account1}),
-                    "CALLER_NOT_PAUSER"
+                    "CALLER_NOT_AUTHORIZED"
                 )
                 await expectRevert(
                     assetRouter.unpause({from: account1}),
-                    "CALLER_NOT_PAUSER"
+                    "CALLER_NOT_AUTHORIZED"
                 )
             })
         })
@@ -220,7 +220,7 @@ contract('UnoAssetRouterSushiswap', accounts => {
                     "Pausable: paused"
                 )
                 await expectRevert(
-                    assetRouter.distribute(pool, [constants.ZERO_ADDRESS], [constants.ZERO_ADDRESS], [constants.ZERO_ADDRESS], [constants.ZERO_ADDRESS], [0, 0, 0, 0], {from: account1}),
+                    assetRouter.distribute(pool, [[], [], [], []], [0, 0, 0, 0], {from: account1}),
                     "Pausable: paused"
                 )
             })
@@ -258,8 +258,8 @@ contract('UnoAssetRouterSushiswap', accounts => {
                     "FARM_NOT_EXISTS"
                 )
                 await expectRevert(
-                    assetRouter.distribute(pool, [constants.ZERO_ADDRESS], [constants.ZERO_ADDRESS], [constants.ZERO_ADDRESS], [constants.ZERO_ADDRESS], [0, 0, 0, 0], {from: account1}),
-                    "CALLER_NOT_DISTRIBUTOR"
+                    assetRouter.distribute(pool, [[], [], [], []], [0, 0, 0, 0], {from: account1}),
+                    "CALLER_NOT_AUTHORIZED"
                 )
             })
             it('reverts if called unpause on unpaused contract', async () => {
@@ -769,19 +769,19 @@ contract('UnoAssetRouterSushiswap', accounts => {
         describe('reverts', () => {
             it('reverts if called not by distributor', async () => {
                 await expectRevert(
-                    assetRouter.distribute(pool, [constants.ZERO_ADDRESS], [constants.ZERO_ADDRESS], [constants.ZERO_ADDRESS], [constants.ZERO_ADDRESS], [0, 0, 0, 0], {from: pauser}),
-                    "CALLER_NOT_DISTRIBUTOR"
+                    assetRouter.distribute(pool, [[], [], [], []], [0, 0, 0, 0], {from: pauser}),
+                    "CALLER_NOT_AUTHORIZED"
                 )
             })
             it('reverts if pool doesnt exist', async () => {
                 await expectRevert(
-                    assetRouter.distribute(pool2, [constants.ZERO_ADDRESS], [constants.ZERO_ADDRESS], [constants.ZERO_ADDRESS], [constants.ZERO_ADDRESS], [0, 0, 0, 0], {from: distributor}),
+                    assetRouter.distribute(pool2, [[], [], [], []], [0, 0, 0, 0], {from: distributor}),
                     "FARM_NOT_EXISTS"
                 )
             })
             it('reverts if there is no liquidity in the pool', async () => {
                 await expectRevert(
-                    assetRouter.distribute(pool, [constants.ZERO_ADDRESS], [constants.ZERO_ADDRESS], [constants.ZERO_ADDRESS], [constants.ZERO_ADDRESS], [0, 0, 0, 0], {from: distributor}),
+                    assetRouter.distribute(pool, [[], [], [], []], [0, 0, 0, 0], {from: distributor}),
                     "NO_LIQUIDITY"
                 )
             })
@@ -801,7 +801,7 @@ contract('UnoAssetRouterSushiswap', accounts => {
                 await time.increase(5000000)
                 receipt = await assetRouter.distribute(
                     pool, 
-                    [
+                    [[
                         rewardToken.toString(),
                         '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
                         '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619',
@@ -822,7 +822,7 @@ contract('UnoAssetRouterSushiswap', accounts => {
                         rewarderToken.toString(),
                         '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619',
                         tokenB.address
-                    ], 
+                    ]], 
                     ['0', '0', '0', '0'], 
                     {from: distributor}
                 )
@@ -846,7 +846,7 @@ contract('UnoAssetRouterSushiswap', accounts => {
                 await expectRevert(
                     assetRouter.distribute(
                     pool, 
-                    [
+                    [[
                         constants.ZERO_ADDRESS,
                         "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
                     ], 
@@ -861,7 +861,7 @@ contract('UnoAssetRouterSushiswap', accounts => {
                     [
                         rewarderToken.toString(),
                         tokenB.address
-                    ], 
+                    ]], 
                     [0, 0, 0, 0], 
                     {from: distributor}
                     ),
@@ -870,7 +870,7 @@ contract('UnoAssetRouterSushiswap', accounts => {
                 await expectRevert(
                     assetRouter.distribute(
                     pool, 
-                    [
+                    [[
                         rewardToken.toString(),
                         '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619',
                         '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
@@ -887,7 +887,7 @@ contract('UnoAssetRouterSushiswap', accounts => {
                     [
                         rewarderToken.toString(),
                         tokenB.address
-                    ], 
+                    ]], 
                     [1, 1, 1, 1], 
                     {from: distributor}
                     ),
@@ -898,7 +898,7 @@ contract('UnoAssetRouterSushiswap', accounts => {
                 await expectRevert(
                     assetRouter.distribute(
                     pool, 
-                    [
+                    [[
                         rewardToken.toString(),
                         constants.ZERO_ADDRESS
                     ], 
@@ -914,7 +914,7 @@ contract('UnoAssetRouterSushiswap', accounts => {
                     [
                         rewarderToken.toString(),
                         "0xc2132D05D31c914a87C6611C10748AEb04B58e8F"
-                    ], 
+                    ]], 
                     [1, 1, 1, 1], 
                     {from: distributor}
                     ),
@@ -925,7 +925,7 @@ contract('UnoAssetRouterSushiswap', accounts => {
                 await expectRevert(
                     assetRouter.distribute(
                     pool, 
-                    [
+                    [[
                         rewardToken.toString(),
                         '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619',
                         '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
@@ -942,7 +942,7 @@ contract('UnoAssetRouterSushiswap', accounts => {
                     [
                         rewarderToken.toString(),
                         '0xc2132D05D31c914a87C6611C10748AEb04B58e8F'
-                    ], 
+                    ]], 
                     [1, 1, 1, 1], 
                     {from: distributor}
                     ),
@@ -955,23 +955,25 @@ contract('UnoAssetRouterSushiswap', accounts => {
                         assetRouter.distribute(
                         pool, 
                         [
-                            rewardToken.toString(),
-                            '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619',
-                            '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
-                            "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
-                        ], 
-                        [
-                            rewardToken.toString(),
-                            '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619',
-                            "0xc2132D05D31c914a87C6611C10748AEb04B58e8F"
-                        ], 
-                        [
-                            constants.ZERO_ADDRESS,
-                            "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
-                        ], 
-                        [
-                            rewarderToken.toString(),
-                            "0xc2132D05D31c914a87C6611C10748AEb04B58e8F"
+                            [
+                                rewardToken.toString(),
+                                '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619',
+                                '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
+                                "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
+                            ],
+                            [
+                                rewardToken.toString(),
+                                '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619',
+                                "0xc2132D05D31c914a87C6611C10748AEb04B58e8F"
+                            ],
+                            [
+                                constants.ZERO_ADDRESS,
+                                "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
+                            ],
+                            [
+                                rewarderToken.toString(),
+                                "0xc2132D05D31c914a87C6611C10748AEb04B58e8F"
+                            ]
                         ], 
                         [1, 1, 1, 1], 
                         {from: distributor}
@@ -982,23 +984,25 @@ contract('UnoAssetRouterSushiswap', accounts => {
                         assetRouter.distribute(
                         pool, 
                         [
-                            rewardToken.toString(),
-                            '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619',
-                            '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
-                            "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
-                        ], 
-                        [
-                            rewardToken.toString(),
-                            '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619',
-                            "0xc2132D05D31c914a87C6611C10748AEb04B58e8F"
-                        ], 
-                        [
-                            rewarderToken.toString(),
-                            "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
-                        ], 
-                        [
-                            constants.ZERO_ADDRESS,
-                            "0xc2132D05D31c914a87C6611C10748AEb04B58e8F"
+                            [
+                                rewardToken.toString(),
+                                '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619',
+                                '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
+                                "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
+                            ],
+                            [
+                                rewardToken.toString(),
+                                '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619',
+                                "0xc2132D05D31c914a87C6611C10748AEb04B58e8F"
+                            ],
+                            [
+                                rewarderToken.toString(),
+                                "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
+                            ],
+                            [
+                                constants.ZERO_ADDRESS,
+                                "0xc2132D05D31c914a87C6611C10748AEb04B58e8F"
+                            ]
                         ], 
                         [1, 1, 1, 1], 
                         {from: distributor}
@@ -1011,23 +1015,25 @@ contract('UnoAssetRouterSushiswap', accounts => {
                         assetRouter.distribute(
                         pool, 
                         [
-                            rewardToken.toString(),
-                            '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619',
-                            '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
-                            "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
-                        ], 
-                        [
-                            rewardToken.toString(),
-                            '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619',
-                            "0xc2132D05D31c914a87C6611C10748AEb04B58e8F"
-                        ], 
-                        [
-                            rewardToken.toString(),
-                            constants.ZERO_ADDRESS
-                        ], 
-                        [
-                            rewarderToken.toString(),
-                            "0xc2132D05D31c914a87C6611C10748AEb04B58e8F"
+                            [
+                                rewardToken.toString(),
+                                '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619',
+                                '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
+                                "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
+                            ],
+                            [
+                                rewardToken.toString(),
+                                '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619',
+                                "0xc2132D05D31c914a87C6611C10748AEb04B58e8F"
+                            ],
+                            [
+                                rewardToken.toString(),
+                                constants.ZERO_ADDRESS
+                            ],
+                            [
+                                rewarderToken.toString(),
+                                "0xc2132D05D31c914a87C6611C10748AEb04B58e8F"
+                            ]
                         ], 
                         [1, 1, 1, 1], 
                         {from: distributor}
@@ -1040,24 +1046,26 @@ contract('UnoAssetRouterSushiswap', accounts => {
                         assetRouter.distribute(
                         pool, 
                         [
-                            rewardToken.toString(),
-                            '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619',
-                            '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
-                            "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
-                        ], 
-                        [
-                            rewardToken.toString(),
-                            '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619',
-                            "0xc2132D05D31c914a87C6611C10748AEb04B58e8F"
-                        ], 
-                        [
-                            rewarderToken.toString(),
-                            "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
-                        ], 
-                        [
-                            rewarderToken.toString(),
-                            constants.ZERO_ADDRESS
-                        ], 
+                            [
+                                rewardToken.toString(),
+                                '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619',
+                                '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
+                                "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
+                            ],
+                            [
+                                rewardToken.toString(),
+                                '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619',
+                                "0xc2132D05D31c914a87C6611C10748AEb04B58e8F"
+                            ],
+                            [
+                                rewarderToken.toString(),
+                                "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
+                            ],
+                            [
+                                rewarderToken.toString(),
+                                constants.ZERO_ADDRESS
+                            ]
+                        ],
                         [1, 1, 1, 1], 
                         {from: distributor}
                         ),
