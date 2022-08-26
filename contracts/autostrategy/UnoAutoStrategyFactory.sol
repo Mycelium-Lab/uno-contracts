@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
 
-import '@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol';
-import '@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol';
-import '@openzeppelin/contracts/security/Pausable.sol';
-import '../interfaces/IUnoAccessManager.sol'; 
+import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
+import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+import "../interfaces/IUnoAccessManager.sol";
 
 contract UnoAutoStrategyFactory is Pausable {
     /**
      * @dev PoolInfo:
      * {assetRouter} - UnoAssetRouter contract.
-     * {pool} - Pool address. 
+     * {pool} - Pool address.
      */
     struct PoolInfo {
         address pool;
@@ -26,29 +26,30 @@ contract UnoAutoStrategyFactory is Pausable {
      * autoStrategies - List of deployed AutoStrategy contracts.
      */
     mapping(address => bool) public assetRouterApproved;
+    mapping(address => uint256) public assetRouterTypes;
 
     IUnoAccessManager public accessManager;
     address public autoStrategyBeacon;
     address[] public autoStrategies;
 
-    bytes32 private constant PAUSER_ROLE = keccak256('PAUSER_ROLE');
-    
+    bytes32 private constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+
     event AutoStrategyDeployed(address indexed autoStrategy);
     event AssetRouterApproved(address indexed assetRouter);
     event AssetRouterRevoked(address indexed assetRouter);
 
-    modifier onlyAdmin(){
-        require(accessManager.hasRole(accessManager.ADMIN_ROLE(), msg.sender), 'CALLER_NOT_ADMIN');
+    modifier onlyAdmin() {
+        require(accessManager.hasRole(accessManager.ADMIN_ROLE(), msg.sender), "CALLER_NOT_ADMIN");
         _;
     }
-    modifier onlyPauser(){
-        require(accessManager.hasRole(PAUSER_ROLE, msg.sender), 'CALLER_NOT_PAUSER');
+    modifier onlyPauser() {
+        require(accessManager.hasRole(PAUSER_ROLE, msg.sender), "CALLER_NOT_PAUSER");
         _;
     }
 
     // ============ Methods ============
 
-    constructor (address _implementation, address _accessManager) {
+    constructor(address _implementation, address _accessManager) {
         autoStrategyBeacon = address(new UpgradeableBeacon(_implementation));
         accessManager = IUnoAccessManager(_accessManager);
     }
@@ -57,10 +58,10 @@ contract UnoAutoStrategyFactory is Pausable {
      * @dev Checks if provided assetRouters are approved for use, then deploys new AutoStrategy contract.
      * @param poolInfos - An array of (assetRouter - pool) pairs. AssetRouter needs to be approved for PoolInfo to be valid. poolInfos.length must be >= 2.
      * @return autoStrategy - Deployed Auto Strategy contract address.
-     */  
-    function createStrategy(PoolInfo[] calldata poolInfos) whenNotPaused external returns (address) {
+     */
+    function createStrategy(PoolInfo[] calldata poolInfos) external whenNotPaused returns (address) {
         for (uint256 i = 0; i < poolInfos.length; i++) {
-            require(assetRouterApproved[poolInfos[i].assetRouter] == true, 'ASSET_ROUTER_NOT_APPROVED');
+            require(assetRouterApproved[poolInfos[i].assetRouter] == true, "ASSET_ROUTER_NOT_APPROVED");
         }
         address autoStrategy = _createStrategy(poolInfos);
         autoStrategies.push(autoStrategy);
@@ -72,10 +73,11 @@ contract UnoAutoStrategyFactory is Pausable {
      * @param _assetRouter - Asset router address to approve.
 
      * Note: This function can only be called by an admin.
-     */  
-    function approveAssetRouter(address _assetRouter) whenNotPaused external onlyAdmin {
-        require(assetRouterApproved[_assetRouter] == false, 'ASSET_ROUTER_ALREADY_APPROVED');
+     */
+    function approveAssetRouter(address _assetRouter, uint256 _assetRouterType) external whenNotPaused onlyAdmin {
+        require(assetRouterApproved[_assetRouter] == false, "ASSET_ROUTER_ALREADY_APPROVED");
         assetRouterApproved[_assetRouter] = true;
+        assetRouterTypes[_assetRouter] = _assetRouterType;
         emit AssetRouterApproved(_assetRouter);
     }
 
@@ -84,9 +86,9 @@ contract UnoAutoStrategyFactory is Pausable {
      * @param _assetRouter - Address to revoke approval from.
 
      * Note: This function can only be called by an admin.
-     */ 
-    function revokeAssetRouter(address _assetRouter) whenNotPaused external onlyAdmin {
-        require(assetRouterApproved[_assetRouter] == true, 'ASSET_ROUTER_NOT_APPROVED');
+     */
+    function revokeAssetRouter(address _assetRouter) external whenNotPaused onlyAdmin {
+        require(assetRouterApproved[_assetRouter] == true, "ASSET_ROUTER_NOT_APPROVED");
         assetRouterApproved[_assetRouter] = false;
         emit AssetRouterRevoked(_assetRouter);
     }
@@ -96,7 +98,7 @@ contract UnoAutoStrategyFactory is Pausable {
      * @param newImplementation - New AutoStrategy implementation.
 
      * Note: This function can only be called by an admin.
-     */ 
+     */
     function upgradeStrategies(address newImplementation) external onlyAdmin {
         UpgradeableBeacon(autoStrategyBeacon).upgradeTo(newImplementation);
     }
@@ -105,14 +107,13 @@ contract UnoAutoStrategyFactory is Pausable {
      * @dev Deploys new AutoStrategy contract and calls initialize() on it. Emits {AutoStrategyDeployed} event.
      */
     function _createStrategy(PoolInfo[] calldata poolInfos) internal returns (address) {
-        BeaconProxy proxy = new BeaconProxy(
-            autoStrategyBeacon,
-            abi.encodeWithSelector(
-                bytes4(keccak256('initialize((address,address)[],address)')),
-                poolInfos,
-                accessManager
-            )
-        );
+        uint256[] memory poolTypes = new uint256[](poolInfos.length);
+
+        for (uint256 i = 0; i < poolInfos.length; i++) {
+            poolTypes[i] = assetRouterTypes[poolInfos[i].assetRouter];
+        }
+
+        BeaconProxy proxy = new BeaconProxy(autoStrategyBeacon, abi.encodeWithSelector(bytes4(keccak256("initialize((address,address)[],uint256[],address)")), poolInfos, poolTypes, accessManager));
         emit AutoStrategyDeployed(address(proxy));
         return address(proxy);
     }
