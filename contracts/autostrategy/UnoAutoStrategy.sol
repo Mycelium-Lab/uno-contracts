@@ -25,7 +25,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
     struct PoolInfo {
         address pool;
         IUnoAssetRouter assetRouter;
-        POOL_TYPE poolType;
+        uint8 poolType;
     }
 
     /**
@@ -41,10 +41,8 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         uint256 block;
     }
 
-    enum POOL_TYPE {
-        UNISWAP,
-        BALANCER
-    }
+    uint8 private constant UNISWAP = 0;
+    uint8 private constant BALANCER = 1;
 
     /**
      * @dev Contract Variables:
@@ -102,11 +100,15 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         __ReentrancyGuard_init();
 
         for (uint256 i = 0; i < poolInfos.length; i++) {
-            POOL_TYPE _poolType = POOL_TYPE(poolTypes[i]);
+            uint8 _poolType = uint8(poolTypes[i]);
 
             IERC20Upgradeable[] memory _tokens = IUnoAssetRouter(poolInfos[i].assetRouter).getTokens(poolInfos[i].pool);
 
-            PoolInfo memory pool = PoolInfo({pool: poolInfos[i].pool, assetRouter: IUnoAssetRouter(poolInfos[i].assetRouter), poolType: _poolType});
+            PoolInfo memory pool = PoolInfo({
+                pool: poolInfos[i].pool,
+                assetRouter: IUnoAssetRouter(poolInfos[i].assetRouter),
+                poolType: _poolType
+            });
             pools.push(pool);
 
             for (uint256 j = 0; j < _tokens.length; j++) {
@@ -137,7 +139,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
     function deposit(
         uint256 pid,
         uint256[] calldata amounts,
-        address[] calldata tokens,
+        IERC20Upgradeable[] calldata tokens,
         uint256 minAmountLP,
         uint256[] calldata amountsMin,
         address recipient
@@ -158,13 +160,23 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
             poolTokens[i].safeTransferFrom(msg.sender, address(this), amounts[i]);
         }
 
-        if (pool.poolType == POOL_TYPE.UNISWAP) {
-            (sent[0], sent[1], ) = pool.assetRouter.deposit(pool.pool, amounts[0], amounts[1], amountsMin[0], amountsMin[1], 0, address(this));
+        if (pool.poolType == UNISWAP) {
+            (sent[0], sent[1], ) = pool.assetRouter.deposit(
+                pool.pool,
+                amounts[0],
+                amounts[1],
+                amountsMin[0],
+                amountsMin[1],
+                0,
+                address(this)
+            );
 
             poolTokens[0].safeTransfer(msg.sender, amounts[0] - sent[0]);
             poolTokens[1].safeTransfer(msg.sender, amounts[1] - sent[1]);
-        } else if (pool.poolType == POOL_TYPE.BALANCER) {
+        } else if (pool.poolType == BALANCER) {
             pool.assetRouter.deposit(pool.pool, amounts, tokens, minAmountLP, 0, address(this));
+        } else {
+            revert("UNKNOWN_POOL_TYPE");
         }
 
         liquidity = mint(recipient);
@@ -202,9 +214,9 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
 
         amounts = new uint256[](poolTokens.length);
 
-        if (pool.poolType == POOL_TYPE.UNISWAP) {
+        if (pool.poolType == UNISWAP) {
             pool.assetRouter.withdraw(pool.pool, amountLP, amountsMin[0], amountsMin[1], false, recipient);
-        } else if (pool.poolType == POOL_TYPE.BALANCER) {
+        } else if (pool.poolType == BALANCER) {
             pool.assetRouter.withdraw(pool.pool, amountLP, amountsMin, false, recipient);
         }
 
@@ -233,7 +245,10 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
                 leftovers = new uint256[](poolTokens.length);
 
                 for (uint256 i = 0; i < poolTokens.length; i++) {
-                    leftovers[i] = ((balanceOf(msg.sender) - blockedLiquidty[msg.sender][lastMoveInfo.block]) * lastMoveInfo.leftovers[i]) / lastMoveInfo.totalSupply;
+                    leftovers[i] =
+                        ((balanceOf(msg.sender) - blockedLiquidty[msg.sender][lastMoveInfo.block]) *
+                            lastMoveInfo.leftovers[i]) /
+                        lastMoveInfo.totalSupply;
                     if (leftovers[i] > 0) {
                         poolTokens[i].safeTransfer(recipient, leftovers[i]);
                     }
@@ -246,16 +261,14 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
     /**
      * @dev Moves liquidity from {pools[poolID]} to {pools[_poolID]}. Emits {MoveLiquidity} event.
      * @param _poolID - Pool ID to move liquidity to.
-     * @param swapAData - Data for tokenA swap.
-     * @param swapBData - Data for tokenB swap.
+     * @param swapData - Data for tokens swap.
      * @param amountsMin - The minimum amounts of tokens that must be deposited in {pools[_poolID]} for the transaction not to revert.
      *
      * Note: This function can only be called by LiquidityManager.
      */
     function moveLiquidity(
         uint256 _poolID,
-        bytes calldata swapAData,
-        bytes calldata swapBData,
+        bytes calldata swapData,
         uint256[] calldata amountsMin
     ) external whenNotPaused nonReentrant {
         require(accessManager.hasRole(LIQUIDITY_MANAGER_ROLE, msg.sender), "CALLER_NOT_LIQUIDITY_MANAGER");
@@ -269,32 +282,47 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         IERC20Upgradeable[] memory currentPoolTokens = currentPool.assetRouter.getTokens(currentPool.pool);
         IERC20Upgradeable[] memory newPoolTokens = newPool.assetRouter.getTokens(newPool.pool);
 
-        uint256 _totalDeposits;
-        if (currentPool.poolType == POOL_TYPE.UNISWAP) {
-            (_totalDeposits, , ) = currentPool.assetRouter.userStake(address(this), currentPool.pool);
+        if (currentPool.poolType == UNISWAP) {
+            (uint256 _totalDeposits, , ) = currentPool.assetRouter.userStake(address(this), currentPool.pool);
             currentPool.assetRouter.withdraw(currentPool.pool, _totalDeposits, 0, 0, false, address(this));
-        } else if (currentPool.poolType == POOL_TYPE.BALANCER) {
-            _totalDeposits = IUnoAssetRouterBalancer(address(currentPool.assetRouter)).userStake(address(this), currentPool.pool);
+        } else if (currentPool.poolType == BALANCER) {
+            uint256 _totalDeposits = IUnoAssetRouterBalancer(address(currentPool.assetRouter)).userStake(
+                address(this),
+                currentPool.pool
+            );
             uint256[] memory minAmounts = new uint256[](currentPoolTokens.length); // array of zeros
             currentPool.assetRouter.withdraw(currentPool.pool, _totalDeposits, minAmounts, false, address(this));
         }
 
-        (IOdosRouter.inputToken[] memory inputs, IOdosRouter.outputToken[] memory outputs, , uint256 valueOutMin, address executor, bytes memory pathDefinition) = abi.decode(swapAData[4:], (IOdosRouter.inputToken[], IOdosRouter.outputToken[], uint256, uint256, address, bytes));
+        {
+            (
+                IOdosRouter.inputToken[] memory inputs,
+                IOdosRouter.outputToken[] memory outputs,
+                ,
+                uint256 valueOutMin,
+                address executor,
+                bytes memory pathDefinition
+            ) = abi.decode(
+                    swapData[4:],
+                    (IOdosRouter.inputToken[], IOdosRouter.outputToken[], uint256, uint256, address, bytes)
+                );
 
-        require((inputs.length == currentPoolTokens.length) && (outputs.length == newPoolTokens.length), "BAD_SWAP_TOKENS_LENGTH");
+            require(
+                (inputs.length == currentPoolTokens.length) && (outputs.length == newPoolTokens.length),
+                "BAD_SWAP_TOKENS_LENGTH"
+            );
 
-        for (uint256 i = 0; i < currentPoolTokens.length; i++) {
-            require(inputs[i].tokenAddress == address(currentPoolTokens[i]), "BAD_INPUT_TOKENS");
+            for (uint256 i = 0; i < currentPoolTokens.length; i++) {
+                require(inputs[i].tokenAddress == address(currentPoolTokens[i]), "BAD_INPUT_TOKENS");
+                inputs[i].amountIn = currentPoolTokens[i].balanceOf(address(this));
+            }
+
+            for (uint256 i = 0; i < newPoolTokens.length; i++) {
+                require(outputs[i].tokenAddress == address(newPoolTokens[i]), "BAD_OUTPUT_TOKENS");
+            }
+
+            OdosRouter.swap(inputs, outputs, type(uint256).max, valueOutMin, executor, pathDefinition);
         }
-
-        for (uint256 i = 0; i < newPoolTokens.length; i++) {
-            require(outputs[i].tokenAddress == address(newPoolTokens[i]), "BAD_OUTPUT_TOKENS");
-        }
-
-        for (uint256 i = 0; i < currentPoolTokens.length; i++) {
-            inputs[i].amountIn = currentPoolTokens[i].balanceOf(address(this));
-        }
-        OdosRouter.swap(inputs, outputs, type(uint256).max, valueOutMin, executor, pathDefinition);
 
         uint256[] memory balancesAfter = new uint256[](newPoolTokens.length);
 
@@ -304,21 +332,24 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
 
         uint256[] memory leftovers = new uint256[](newPoolTokens.length); // array of zeros
 
-        if (currentPool.poolType == POOL_TYPE.UNISWAP) {
-            newPool.assetRouter.deposit(newPool.pool, balancesAfter[0], balancesAfter[1], amountsMin[0], amountsMin[1], 0, address(this));
+        if (currentPool.poolType == UNISWAP) {
+            newPool.assetRouter.deposit(
+                newPool.pool,
+                balancesAfter[0],
+                balancesAfter[1],
+                amountsMin[0],
+                amountsMin[1],
+                0,
+                address(this)
+            );
 
             leftovers[0] = newPoolTokens[0].balanceOf(address(this));
             leftovers[1] = newPoolTokens[1].balanceOf(address(this));
-        } else if (currentPool.poolType == POOL_TYPE.BALANCER) {
-            address[] memory tokens = new address[](newPoolTokens.length);
-            for (uint256 i = 0; i < newPoolTokens.length; i++) {
-                tokens[i] = address(newPoolTokens[i]);
-            }
-
-            newPool.assetRouter.deposit(newPool.pool, balancesAfter, tokens, 0, 0, address(this)); // minAmountLP zero?
+        } else if (currentPool.poolType == BALANCER) {
+            newPool.assetRouter.deposit(newPool.pool, balancesAfter, newPoolTokens, 0, 0, address(this)); // minAmountLP zero?
         }
 
-        lastMoveInfo = MoveLiquidityInfo({leftovers: leftovers, totalSupply: totalSupply(), block: block.number});
+        lastMoveInfo = MoveLiquidityInfo({ leftovers: leftovers, totalSupply: totalSupply(), block: block.number });
 
         emit MoveLiquidity(poolID, _poolID);
         poolID = _poolID;
@@ -378,7 +409,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
     }
 
     /**
-     * @dev Returns tokens that currently in use.
+     * @dev Returns tokens that are currently in use.
      */
     function getTokens() external view returns (IERC20Upgradeable[] memory poolTokens) {
         PoolInfo memory pool = pools[poolID];
@@ -391,9 +422,9 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
 
         uint256 balanceLP;
 
-        if (pool.poolType == POOL_TYPE.UNISWAP) {
+        if (pool.poolType == UNISWAP) {
             (balanceLP, , ) = pool.assetRouter.userStake(address(this), pool.pool);
-        } else if (pool.poolType == POOL_TYPE.BALANCER) {
+        } else if (pool.poolType == BALANCER) {
             balanceLP = IUnoAssetRouterBalancer(address(pool.assetRouter)).userStake(address(this), pool.pool);
         }
 
@@ -415,9 +446,9 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
 
         uint256 balanceLP;
 
-        if (pool.poolType == POOL_TYPE.UNISWAP) {
+        if (pool.poolType == UNISWAP) {
             (balanceLP, , ) = pool.assetRouter.userStake(address(this), pool.pool);
-        } else if (pool.poolType == POOL_TYPE.BALANCER) {
+        } else if (pool.poolType == BALANCER) {
             balanceLP = IUnoAssetRouterBalancer(address(pool.assetRouter)).userStake(address(this), pool.pool);
         }
         amountLP = (liquidity * balanceLP) / totalSupply();

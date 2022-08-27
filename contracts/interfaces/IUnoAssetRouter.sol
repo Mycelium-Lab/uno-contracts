@@ -20,7 +20,7 @@ interface IUnoAssetRouter {
     function deposit(address lpPool, uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin, uint256 amountLP, address recipient) external returns(uint256 sentA, uint256 sentB, uint256 liquidity); // UNISWAP
     function withdraw(address lpPool, uint256 amount, uint256 amountAMin, uint256 amountBMin, bool withdrawLP, address recipient) external returns(uint256 amountA, uint256 amountB); // UNISWAP
 
-    function deposit(address lpPool, uint256[] memory amounts, address[] memory tokens, uint256 minAmountLP, uint256 amountLP, address recipient) external returns(uint256 liquidity); // BALANCER
+    function deposit(address lpPool, uint256[] memory amounts, IERC20Upgradeable[] memory tokens, uint256 minAmountLP, uint256 amountLP, address recipient) external returns(uint256 liquidity); // BALANCER
     function withdraw(address lpPool, uint256 amount, uint256[] calldata minAmountsOut, bool withdrawLP, address recipient) external; // BALANCER
 
     function getTokens(address lpPool) external view returns(IERC20Upgradeable[] memory tokens); 
