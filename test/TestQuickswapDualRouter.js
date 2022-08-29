@@ -198,10 +198,6 @@ contract('UnoAssetRouterQuickswapDual', accounts => {
                     "Pausable: paused"
                 )
                 await expectRevert(
-                    assetRouter.withdraw(pool, 0, 0, 0, false, account1, {from: account1}),
-                    "Pausable: paused"
-                )
-                await expectRevert(
                     assetRouter.distribute(pool, [[], [], [], []], [0, 0, 0, 0], {from: account1}),
                     "Pausable: paused"
                 )
@@ -234,10 +230,6 @@ contract('UnoAssetRouterQuickswapDual', accounts => {
                 await expectRevert(
                     assetRouter.deposit(pool, 0, 0, 0, 0, 0, account1, {from: account1}),
                     "NO_LIQUIDITY_PROVIDED"
-                )
-                await expectRevert(
-                    assetRouter.withdraw(pool, 0, 0, 0, false, account1, {from: account1}),
-                    "FARM_NOT_EXISTS"
                 )
                 await expectRevert(
                     assetRouter.distribute(pool, [[], [], [], []], [0, 0 ,0, 0], {from: account1}),

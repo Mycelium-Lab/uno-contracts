@@ -93,7 +93,7 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
      * @param withdrawLP - True: Withdraw in LP tokens, False: Withdraw in normal tokens.
      * @param recipient - The address which will receive tokens.
      */ 
-    function withdraw(address lpPool, uint256 amount, uint256[] calldata minAmountsOut, bool withdrawLP, address recipient) external whenNotPaused { 
+    function withdraw(address lpPool, uint256 amount, uint256[] calldata minAmountsOut, bool withdrawLP, address recipient) external { 
         Farm farm = Farm(farmFactory.Farms(lpPool));
         require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
         

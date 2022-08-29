@@ -186,10 +186,6 @@ contract('UnoAssetRouterBalancer', accounts => {
                     "Pausable: paused"
                 )
                 await expectRevert(
-                    assetRouter.withdraw(pool, 0, [], false, account1, {from: account1}),
-                    "Pausable: paused"
-                )
-                await expectRevert(
                     assetRouter.distribute(pool, [], [], [], {from: account1}),
                     "Pausable: paused"
                 )
@@ -222,10 +218,6 @@ contract('UnoAssetRouterBalancer', accounts => {
                 await expectRevert(
                     assetRouter.deposit(pool, [], [], 0, 0, account1, {from: account1}),
                     "BAD_AMOUNTS_LENGTH"
-                )
-                await expectRevert(
-                    assetRouter.withdraw(pool, 0, [], false, account1, {from: account1}),
-                    "FARM_NOT_EXISTS"
                 )
                 await expectRevert(
                     assetRouter.distribute(pool, [], [], [], {from: account1}),

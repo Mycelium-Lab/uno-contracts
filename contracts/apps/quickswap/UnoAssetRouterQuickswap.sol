@@ -97,7 +97,7 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
      * @return amountA - Token A amount sent to the {recipient}, 0 if withdrawLP == false.
      * @return amountB - Token B amount sent to the {recipient}, 0 if withdrawLP == false.
      */ 
-    function withdraw(address lpStakingPool, uint256 amount, uint256 amountAMin, uint256 amountBMin, bool withdrawLP, address recipient) external whenNotPaused returns(uint256 amountA, uint256 amountB){
+    function withdraw(address lpStakingPool, uint256 amount, uint256 amountAMin, uint256 amountBMin, bool withdrawLP, address recipient) external returns(uint256 amountA, uint256 amountB){
         Farm farm = Farm(farmFactory.Farms(lpStakingPool));
         require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
         
