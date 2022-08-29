@@ -22,24 +22,24 @@ All contracts are deployed on the Aurora Blockchain
 
 ### UnoAccessManager
 
-0x3d9E9cFF89BA8184b31574e8D0C383E6B6Dfcdfd
+0x05404cBA2dBF1EBe965a6f0fe11C58dcabD3eFca
 
 ## Trisolaris Stable
 
 #### UnoAssetRouterTrisolarisStable
 
-0xd275724762f25bb152dC4657F62582C8dd3BF34F
+0xe8B78361C3B7db18116aFc3D145ABB958Ca5a8d0
 
 #### UnoFarmFactory
 
-0x7a6966cdc49b0703ccE1d97c6083ae8E3548E548
+0x552f55dDbCD8a5e2ae6f07b5e369675A62c1F957
 
 ## Trisolaris Standard
 
 #### UnoAssetRouterTrisolarisStandard
 
-0x16c0e00703887d7593Ababa4155B1e21da72b8b6
+0xd19cfA4942E3aE4E94A53dEdee2A0a14F3FB4D97
 
 #### UnoFarmFactory
 
-0xd2dd365Bd448116788853097AaE1eedE78338918
+0x64c9899fcdB6f9565Ba69B0939Aec51e320C5489

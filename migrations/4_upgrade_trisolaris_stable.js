@@ -1,27 +1,17 @@
-const { upgradeProxy } = require("@openzeppelin/truffle-upgrades");
-const FarmFactory = artifacts.require("UnoFarmFactory");
-const { promises: fs } = require("fs");
-const path = require("path");
-
 const Farm = artifacts.require("UnoFarmTrisolarisStable");
 const AssetRouter = artifacts.require("UnoAssetRouterTrisolarisStable");
 
 module.exports = async function (deployer, network) {
-    if (network !== "aurora") return
+    if (network != "polygon") return
+
     //AssetRouter upgrade
-    const assetRouter = await AssetRouter.deployed();
-    const instance = await upgradeProxy(assetRouter.address, AssetRouter, { deployer });
+    const assetRouter = await AssetRouter.deployed()
+    const impl = await prepareUpgrade(assetRouter.address, AssetRouter, { deployer })
+
     //Farm upgrade
-    await deployer.deploy(Farm);
-    const factoryAddress = await readFactoryAddress();
-    const farmFactory = await FarmFactory.at(factoryAddress);
-    await farmFactory.upgradeFarms(Farm.address);
-    console.log("Upgraded", instance.address);
-};
+    await deployer.deploy(Farm) 
 
-async function readFactoryAddress() {
-    const data = await fs.readFile(path.resolve(__dirname, "./addresses/factories.json"));
-    var json = JSON.parse(data);
-
-    return json.trisolarisStable;
+    console.log('New Router implementation:', impl)         //UpgradeTo(newImplementation)
+    console.log('New Farm implementation:', Farm.address)   //UpgradeFarms(newImplementation)
+    //Create proposals using Openzeppelin Defender UI
 }

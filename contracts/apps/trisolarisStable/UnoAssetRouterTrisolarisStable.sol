@@ -105,7 +105,7 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
         uint256[] memory minAmounts,
         bool withdrawLP,
         address recipient
-    ) external whenNotPaused returns (uint256[] memory amounts) {
+    ) external returns (uint256[] memory amounts) {
         Farm farm = Farm(farmFactory.Farms(swap));
         require(farm != Farm(address(0)), "FARM_NOT_EXISTS");
 

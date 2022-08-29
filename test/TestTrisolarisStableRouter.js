@@ -205,12 +205,6 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                     "Pausable: paused",
                 );
                 await expectRevert(
-                    assetRouter.withdraw(swapAddress, 0, [0, 0, 0], false, account1, {
-                        from: account1,
-                    }),
-                    "Pausable: paused",
-                );
-                await expectRevert(
                     assetRouter.distribute(
                         swapAddress,
                         [[constants.ZERO_ADDRESS], [constants.ZERO_ADDRESS]],
@@ -245,12 +239,6 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                 await expectRevert(
                     assetRouter.deposit(swapAddress, [0, 0, 0], 0, 0, account1, { from: account1 }),
                     "NO_LIQUIDITY_PROVIDED",
-                );
-                await expectRevert(
-                    assetRouter.withdraw(swapAddress, 0, [0, 0, 0], false, account1, {
-                        from: account1,
-                    }),
-                    "FARM_NOT_EXISTS",
                 );
                 await expectRevert(
                     assetRouter.distribute(

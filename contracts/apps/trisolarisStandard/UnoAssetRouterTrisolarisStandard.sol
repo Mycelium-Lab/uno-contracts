@@ -122,7 +122,7 @@ contract UnoAssetRouterTrisolarisStandard is Initializable, PausableUpgradeable,
         uint256 amountBMin,
         bool withdrawLP,
         address recipient
-    ) external whenNotPaused returns (uint256 amountA, uint256 amountB) {
+    ) external returns (uint256 amountA, uint256 amountB) {
         Farm farm = Farm(farmFactory.Farms(lpPair));
         require(farm != Farm(address(0)), "FARM_NOT_EXISTS");
 
