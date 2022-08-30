@@ -21,5 +21,6 @@ interface IUnoFarmBalancer {
 
     function userBalance(address _address) external view returns (uint256);
     function getTotalDeposits() external view returns (uint256);
+    function getTokenStakes(uint256 amountLP) external view returns (uint256[] memory stakes);
 }
 

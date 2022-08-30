@@ -128,28 +128,33 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
      * @param _address - The address to check stakes for.
      * @param lpPool - LP pool to check stakes in.
 
-     * @return Total user stake(in LP tokens).
+     * @return stakeLP Total user stake (in LP tokens).
+     * @return stakes Token stakes.
      */
-   function userStake(address _address, address lpPool) external view returns(uint256){
+   function userStake(address _address, address lpPool) external view returns(uint256 stakeLP, uint256[] memory stakes){
         Farm farm = Farm(farmFactory.Farms(lpPool));
         if (farm != Farm(address(0))) {
-            return farm.userBalance(_address);
+            stakeLP = farm.userBalance(_address);
+
+            stakes = farm.getTokenStakes(stakeLP);
         }
-        return 0;
+        
     }
 
     /**
      * @dev Returns total amount locked in the pool. Doesn't take pending rewards into account.
      * @param lpPool - LP pool to check total deposits in.
 
-     * @return Total deposits (in LP tokens).
+     * @return totalDepositsLP Total deposits (in LP tokens).
+     * @return deposits Token deposits.
      */
-    function totalDeposits(address lpPool) external view returns (uint256) {
+    function totalDeposits(address lpPool) external view returns (uint256 totalDepositsLP, uint256[] memory deposits) {
         Farm farm = Farm(farmFactory.Farms(lpPool));
         if (farm != Farm(address(0))) {
-            return farm.getTotalDeposits();
+            totalDepositsLP = farm.getTotalDeposits();
+
+            deposits = farm.getTokenStakes(totalDepositsLP);
         }
-        return 0;
     }
 
     /**
