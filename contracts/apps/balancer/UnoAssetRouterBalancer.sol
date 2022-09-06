@@ -156,7 +156,7 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
      * @dev Returns addresses of tokens in {lpPool}.
      * @param lpPool - LP pool to check tokens in.
 
-     * @return tokens - Token address.
+     * @return tokens - Token addresses.
      */  
     function getTokens(address lpPool) external view returns(IERC20[] memory tokens){
         bytes32 poolId = IBasePool(lpPool).getPoolId();

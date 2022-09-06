@@ -164,13 +164,13 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
      * @dev Returns addresses of pair of tokens in {lpStakingPool}.
      * @param lpStakingPool - LP pool to check tokens in.
 
-     * @return tokenA - Token A address.
-     * @return tokenB - Token B address.
+     * @return tokens - Tokens addresses.
      */  
-    function getTokens(address lpStakingPool) external view returns(address tokenA, address tokenB){
+    function getTokens(address lpStakingPool) external view returns(IERC20Upgradeable[] memory tokens){
+        tokens = new IERC20Upgradeable[](2);
         IUniswapV2Pair stakingToken = IUniswapV2Pair(address(IStakingRewards(lpStakingPool).stakingToken()));
-        tokenA = stakingToken.token0();
-        tokenB = stakingToken.token1();
+        tokens[0] = IERC20Upgradeable(stakingToken.token0());
+        tokens[1] = IERC20Upgradeable(stakingToken.token1());
     }
 
     /**
