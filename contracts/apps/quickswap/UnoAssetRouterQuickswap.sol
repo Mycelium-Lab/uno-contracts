@@ -7,6 +7,7 @@ import '../../interfaces/IUnoAccessManager.sol';
 import '../../interfaces/IUniswapV2Pair.sol';
 import '../../interfaces/IStakingRewards.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol';
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 import '@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol';
@@ -166,11 +167,11 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
 
      * @return tokens - Tokens addresses.
      */  
-    function getTokens(address lpStakingPool) external view returns(IERC20Upgradeable[] memory tokens){
-        tokens = new IERC20Upgradeable[](2);
+    function getTokens(address lpStakingPool) external view returns(IERC20[] memory tokens){
+        tokens = new IERC20[](2);
         IUniswapV2Pair stakingToken = IUniswapV2Pair(address(IStakingRewards(lpStakingPool).stakingToken()));
-        tokens[0] = IERC20Upgradeable(stakingToken.token0());
-        tokens[1] = IERC20Upgradeable(stakingToken.token1());
+        tokens[0] = IERC20(stakingToken.token0());
+        tokens[1] = IERC20(stakingToken.token1());
     }
 
     /**
