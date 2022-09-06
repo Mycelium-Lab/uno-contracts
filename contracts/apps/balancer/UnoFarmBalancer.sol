@@ -263,18 +263,6 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
             _totalDeposits = gauge.balanceOf(address(this));
         }
     }
-
-    /**
-     * @dev Utility function used to create stakes array.
-     */ 
-    function getTokenStakes(uint256 amountLP) external view returns(uint256[] memory stakes){
-        (, uint256[] memory balances, ) = Vault.getPoolTokens(poolId);
-        uint256 totalSupply = IERC20Upgradeable(lpPool).totalSupply();
-        stakes = new uint256[](balances.length);
-        for (uint256 i = 0; i < balances.length; i++) {
-            stakes[i] = balances[i] * amountLP / totalSupply;
-        }
-    }
     
     function _updateDeposit(address _address) internal {
         UserInfo storage user = userInfo[_address];
