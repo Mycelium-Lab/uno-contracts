@@ -39,6 +39,26 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
         uint32 lastDistribution;
         uint256 lastUpdate;
     }
+    /**
+     * @dev SwapInfo:
+     * {swaps} - Data used for token swaps.
+     * {assets} - Assets used in swaps.
+     * {limits} - Swap slippage limits.
+     */
+    struct SwapInfo{
+        IVault.BatchSwapStep[] swaps;
+        IAsset[] assets;
+        int256[] limits;
+    }
+    /**
+     * @dev FeeInfo:
+     * {feeCollector} - Contract to transfer fees to.
+     * {fee} - Fee percentage to collect (10^18 == 100%). 
+     */
+    struct FeeInfo {
+        address feeTo;
+        uint256 fee;
+    }
 
     /**
      * @dev Third Party Contracts:
@@ -194,29 +214,25 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
      * 3. It deposits new tokens back to the {gauge}.
      */
     function distribute(
-        IVault.BatchSwapStep[][] calldata swaps,
-        IAsset[][] calldata assets,
-        int256[][] calldata limits
+        SwapInfo[] calldata swapInfos,
+        SwapInfo[] calldata feeSwapInfos,
+        FeeInfo calldata feeInfo
     ) external onlyAssetRouter nonReentrant returns(uint256 reward){
         require(totalDeposits > 0, 'NO_LIQUIDITY');
         require(distributionInfo[distributionID - 1].block != block.number, 'CANT_CALL_ON_THE_SAME_BLOCK');
-        require((swaps.length == streamer.reward_count()) && (swaps.length == assets.length) && (swaps.length == limits.length), 'PARAMS_LENGTHS_NOT_MATCH_REWARD_COUNT');
+
+        uint256 rewardCount = streamer.reward_count();
+        require((swapInfos.length == rewardCount) && (feeSwapInfos.length == rewardCount), 'PARAMS_LENGTHS_NOT_MATCH_REWARD_COUNT');
 
         gauge.claim_rewards();
-        for (uint256 i = 0; i < swaps.length; i++) {
-            IERC20 rewardToken = IERC20(streamer.reward_tokens(i));
+        for (uint256 i = 0; i < rewardCount; i++) {
+            IERC20Upgradeable rewardToken = IERC20Upgradeable(streamer.reward_tokens(i));
             if (address(rewardToken) != address(gauge)) {  //can't use LP tokens in swap
+                collectFees(feeSwapInfos[i], feeInfo, rewardToken);
                 uint256 balance = rewardToken.balanceOf(address(this));
                 if(balance > 0){
                     rewardToken.approve(address(Vault), balance);
-                    Vault.batchSwap(
-                        IVault.SwapKind.GIVEN_IN,
-                        swaps[i],
-                        assets[i],
-                        IVault.FundManagement({sender: address(this), fromInternalBalance:false, recipient: payable(address(this)), toInternalBalance:false}),
-                        limits[i],
-                        type(uint256).max
-                    );
+                    batchSwap(swapInfos[i], payable(address(this)));
                 }
             }
         }
@@ -228,8 +244,8 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
                 tokens[i].approve(address(Vault), joinAmounts[i]);
             }
         }
-        
         Vault.joinPool(poolId, address(this), address(this), IVault.JoinPoolRequest(joinAssets, joinAmounts, abi.encode(1, joinAmounts, 1), false));
+
         reward = IERC20(lpPool).balanceOf(address(this));
 
         uint256 rewardPerDepositAge = reward * fractionMultiplier / (totalDepositAge + totalDeposits * (block.number - totalDepositLastUpdate));
@@ -246,6 +262,37 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
         totalDepositAge = 0;
 
         gauge.deposit(reward);
+    }
+
+    /**
+     * @dev Swaps and sends fees to feeTo.
+     */
+    function collectFees(SwapInfo calldata feeSwapInfo, FeeInfo calldata feeInfo, IERC20Upgradeable token) internal {
+        if(feeInfo.feeTo != address(0)){
+            uint256 feeAmount = token.balanceOf(address(this)) * feeInfo.fee / fractionMultiplier;
+            if(feeAmount > 0){
+                if(feeSwapInfo.swaps.length > 0){
+                    token.approve(address(Vault), feeAmount);
+                    batchSwap(feeSwapInfo, payable(feeInfo.feeTo));
+                    return;
+                }
+                token.safeTransfer(feeInfo.feeTo, feeAmount);
+            }
+        }
+    }
+
+    /**
+     * @dev Performs balancer batch swap. Separate function to avoid Stack too deep errors.
+     */
+    function batchSwap(SwapInfo calldata swapInfo, address payable recipient) internal {
+        Vault.batchSwap(
+            IVault.SwapKind.GIVEN_IN,
+            swapInfo.swaps,
+            swapInfo.assets,
+            IVault.FundManagement({sender: address(this), fromInternalBalance:false, recipient: recipient, toInternalBalance:false}),
+            swapInfo.limits,
+            type(uint256).max
+        );
     }
 
     /**

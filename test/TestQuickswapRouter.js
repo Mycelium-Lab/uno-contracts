@@ -27,6 +27,8 @@ const account2 = "0x8eB6eAD701b7d378cF62C898a0A7b72639a89201"//has to be unlocke
 
 const amounts = [new BN(1000), new BN(3000), new BN(500), new BN(4000), new BN(700000000000)]
 
+const feeCollector = "0xFFFf795B802CB03FD664092Ab169f5f5c236335c"
+
 approxeq = function(bn1, bn2, epsilon, message) {
     const amountDelta = bn1.sub(bn2).add(epsilon)
     assert.ok(!amountDelta.isNeg(), message);
@@ -193,7 +195,13 @@ contract('UnoAssetRouterQuickswap', accounts => {
                     "Pausable: paused"
                 )
                 await expectRevert(
-                    assetRouter.distribute(pool, [[], []], [0, 0], {from: account1}),
+                    assetRouter.distribute(
+                        pool, 
+                        [{route:[], amountOutMin:0}, {route:[], amountOutMin:0}], 
+                        {route:[], amountOutMin:0}, 
+                        feeCollector,
+                        {from: account1}
+                    ),
                     "Pausable: paused"
                 )
             })
@@ -227,7 +235,13 @@ contract('UnoAssetRouterQuickswap', accounts => {
                     "NO_LIQUIDITY_PROVIDED"
                 )
                 await expectRevert(
-                    assetRouter.distribute(pool, [[], []], [0, 0], {from: account1}),
+                    assetRouter.distribute(
+                        pool,
+                        [{route:[], amountOutMin:0}, {route:[], amountOutMin:0}], 
+                        {route:[], amountOutMin:0}, 
+                        feeCollector, 
+                        {from: account1}
+                    ),
                     "CALLER_NOT_AUTHORIZED"
                 )
             })
@@ -738,19 +752,37 @@ contract('UnoAssetRouterQuickswap', accounts => {
         describe('reverts', () => {
             it('reverts if called not by distributor', async () => {
                 await expectRevert(
-                    assetRouter.distribute(pool, [[], []], [0, 0], {from: pauser}),
+                    assetRouter.distribute(
+                        pool, 
+                        [{route:[], amountOutMin:0}, {route:[], amountOutMin:0}], 
+                        {route:[], amountOutMin:0}, 
+                        feeCollector, 
+                        {from: pauser}
+                    ),
                     "CALLER_NOT_AUTHORIZED"
                 )
             })
             it('reverts if pool doesnt exist', async () => {
                 await expectRevert(
-                    assetRouter.distribute(pool2, [[], []], [0, 0], {from: distributor}),
+                    assetRouter.distribute(
+                        pool2, 
+                        [{route:[], amountOutMin:0}, {route:[], amountOutMin:0}], 
+                        {route:[], amountOutMin:0}, 
+                        feeCollector,
+                        {from: distributor}
+                    ),
                     "FARM_NOT_EXISTS"
                 )
             })
             it('reverts if there is no liquidity in the pool', async () => {
                 await expectRevert(
-                    assetRouter.distribute(pool, [[], []], [0, 0], {from: distributor}),
+                    assetRouter.distribute(
+                        pool, 
+                        [{route:[], amountOutMin:0}, {route:[], amountOutMin:0}], 
+                        {route:[], amountOutMin:0}, 
+                        feeCollector, 
+                        {from: distributor}
+                    ),
                     "NO_LIQUIDITY"
                 )
             })
@@ -772,20 +804,34 @@ contract('UnoAssetRouterQuickswap', accounts => {
                 receipt = await assetRouter.distribute(
                 pool, 
                 [
-                    [
+                    {
+                        route:[
+                            rewardsToken.address,
+                            '0x831753DD7087CaC61aB5644b308642cc1c33Dc13', //rewardsToken is dQUICK so we have to swap it to QUICK first and then to tokenA
+                            tokenA.address
+                        ],
+                        amountOutMin:0
+                    }, 
+                    {
+                        route:[
+                            rewardsToken.address,
+                            '0x831753DD7087CaC61aB5644b308642cc1c33Dc13', //rewardsToken is dQUICK so we have to swap it to QUICK first and then to tokenB
+                            tokenB.address
+                        ], 
+                        amountOutMin:0
+                    }
+                ],
+                {
+                    route:[
                         rewardsToken.address,
-                        '0x831753DD7087CaC61aB5644b308642cc1c33Dc13', //rewardsToken is dQUICK so we have to swap it to QUICK first and then to tokenA
-                        tokenA.address
+                        '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
+                        '0x2791bca1f2de4661ed88a30c99a7a9449aa84174'
                     ],
-                    [
-                        rewardsToken.address,
-                        '0x831753DD7087CaC61aB5644b308642cc1c33Dc13', //rewardsToken is dQUICK so we have to swap it to QUICK first and then to tokenB
-                        tokenB.address
-                    ]
-                ], 
-                [1, 1], 
+                    amountOutMin:0
+                },
+                feeCollector,
                 {from: distributor}
-                )
+            )
             })
             it('emits event', async () => {
                 expectEvent(receipt, 'Distribute', { lpPool:pool })
@@ -808,18 +854,26 @@ contract('UnoAssetRouterQuickswap', accounts => {
                     assetRouter.distribute(
                     pool, 
                     [
-                        [
-                            constants.ZERO_ADDRESS,
-                            '0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063',
-                            tokenA.address
-                        ],
-                        [
-                            rewardsToken.address,
-                            '0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063',
-                            tokenB.address
-                        ]
-                    ], 
-                    [1, 1], 
+                        {
+                            route:[
+                                constants.ZERO_ADDRESS,
+                                tokenA.address
+                            ],
+                            amountOutMin:0
+                        }, 
+                        {
+                            route:[
+                                rewardsToken.address,
+                                tokenB.address
+                            ], 
+                            amountOutMin:0
+                        }
+                    ],
+                    {
+                        route:[],
+                        amountOutMin:0
+                    },
+                    feeCollector,
                     {from: distributor}
                     ),
                     "BAD_REWARD_TOKEN_A_ROUTE"
@@ -828,18 +882,26 @@ contract('UnoAssetRouterQuickswap', accounts => {
                     assetRouter.distribute(
                     pool, 
                     [
-                        [
-                            rewardsToken.address,
-                            '0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063',
-                            tokenA.address
-                        ],
-                        [
-                            constants.ZERO_ADDRESS,
-                            '0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063',
-                            tokenB.address
-                        ]
-                    ], 
-                    [1, 1], 
+                        {
+                            route:[
+                                rewardsToken.address,
+                                tokenA.address
+                            ],
+                            amountOutMin:0
+                        }, 
+                        {
+                            route:[
+                                constants.ZERO_ADDRESS,
+                                tokenB.address
+                            ], 
+                            amountOutMin:0
+                        }
+                    ],
+                    {
+                        route:[],
+                        amountOutMin:0
+                    }, 
+                    feeCollector,
                     {from: distributor}
                     ),
                     "BAD_REWARD_TOKEN_B_ROUTE"
@@ -850,18 +912,26 @@ contract('UnoAssetRouterQuickswap', accounts => {
                     assetRouter.distribute(
                     pool, 
                     [
-                        [
-                            rewardsToken.address,
-                            '0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063',
-                            constants.ZERO_ADDRESS
-                        ],
-                        [
-                            rewardsToken.address,
-                            '0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063',
-                            tokenB.address
-                        ]
-                    ], 
-                    [1, 1], 
+                        {
+                            route:[
+                                rewardsToken.address,
+                                constants.ZERO_ADDRESS
+                            ],
+                            amountOutMin:0
+                        }, 
+                        {
+                            route:[
+                                rewardsToken.address,
+                                tokenB.address
+                            ], 
+                            amountOutMin:0
+                        }
+                    ],
+                    {
+                        route:[],
+                        amountOutMin:0
+                    }, 
+                    feeCollector,
                     {from: distributor}
                     ),
                     "BAD_REWARD_TOKEN_A_ROUTE"
@@ -872,18 +942,26 @@ contract('UnoAssetRouterQuickswap', accounts => {
                     assetRouter.distribute(
                     pool, 
                     [
-                        [
-                            rewardsToken.address,
-                            '0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063',
-                            tokenA.address
-                        ],
-                        [
-                            rewardsToken.address,
-                            '0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063',
-                            constants.ZERO_ADDRESS
-                        ]
-                    ], 
-                    [1, 1], 
+                        {
+                            route:[
+                                rewardsToken.address,
+                                tokenA.address
+                            ],
+                            amountOutMin:0
+                        }, 
+                        {
+                            route:[
+                                rewardsToken.address,
+                                constants.ZERO_ADDRESS
+                            ], 
+                            amountOutMin:0
+                        }
+                    ],
+                    {
+                        route:[],
+                        amountOutMin:0
+                    }, 
+                    feeCollector,
                     {from: distributor}
                     ),
                     "BAD_REWARD_TOKEN_B_ROUTE"

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
 
+import {IUnoFarmQuickswap as Farm} from './IUnoFarmQuickswap.sol'; 
 import '../../../interfaces/IUnoFarmFactory.sol';
 import '../../../interfaces/IUnoAccessManager.sol'; 
 
@@ -9,8 +10,11 @@ interface IUnoAssetRouterQuickswap {
     event Withdraw(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Distribute(address indexed lpPool, uint256 reward);
 
+    event FeeChanged(uint256 previousFee, uint256 newFee);
+
     function farmFactory() external view returns(IUnoFarmFactory);
     function accessManager() external view returns(IUnoAccessManager);
+    function fee() external view returns(uint256);
 
     function initialize(address _accessManager, address _farmFactory) external;
 
@@ -19,13 +23,16 @@ interface IUnoAssetRouterQuickswap {
 
     function distribute(
         address lpStakingPool,
-        address[][2] calldata swapRoutes,
-        uint256[2] memory amountsOutMin
+        Farm.SwapInfo[2] calldata swapInfos,
+        Farm.SwapInfo calldata feeSwapInfo,
+        address feeTo
     ) external;
 
     function userStake(address _address, address lpStakingPool) external view returns (uint256 stakeLP, uint256 stakeA, uint256 stakeB);
     function totalDeposits(address lpStakingPool) external view returns (uint256 totalDepositsLP, uint256 totalDepositsA, uint256 totalDepositsB);
     function getTokens(address lpStakingPool) external view returns(address tokenA, address tokenB);
+
+    function setFee(uint256 _fee) external;
 
     function paused() external view returns(bool);
     function pause() external;

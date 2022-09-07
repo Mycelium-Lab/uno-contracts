@@ -37,6 +37,24 @@ contract UnoFarmQuickswap is Initializable, ReentrancyGuardUpgradeable {
         uint32 lastDistribution;
         uint256 lastUpdate;
     }
+    /**
+     * @dev SwapInfo:
+     * {route} - Array of token addresses describing swap routes.
+     * {amountOutMin} - The minimum amount of output token that must be received for the transaction not to revert.
+     */
+    struct SwapInfo{
+        address[] route;
+        uint256 amountOutMin;
+    }
+    /**
+     * @dev FeeInfo:
+     * {feeTo} - Address to transfer fees to.
+     * {fee} - Fee percentage to collect (10^18 == 100%). 
+     */
+    struct FeeInfo {
+        address feeTo;
+        uint256 fee;
+    }
 
     /**
      * @dev Tokens Used:
@@ -176,25 +194,29 @@ contract UnoFarmQuickswap is Initializable, ReentrancyGuardUpgradeable {
      * 3. It deposits new LP tokens back to the {lpStakingPool}.
      */
     function distribute(
-        address[][2] calldata swapRoutes,
-        uint256[2] calldata amountsOutMin
+        SwapInfo[2] calldata swapInfos,
+        SwapInfo calldata feeSwapInfo,
+        FeeInfo calldata feeInfo
     ) external onlyAssetRouter nonReentrant returns(uint256 reward){
         require(totalDeposits > 0, 'NO_LIQUIDITY');
         require(distributionInfo[distributionID - 1].block != block.number, 'CANT_CALL_ON_THE_SAME_BLOCK');
 
         lpStakingPool.getReward();
+        
+        collectFees(feeSwapInfo, feeInfo);
         uint256 rewardTokenHalf = IERC20(rewardToken).balanceOf(address(this)) / 2;
-
         if (tokenA != rewardToken) {
-            require(swapRoutes[0][0] == rewardToken && swapRoutes[0][swapRoutes[0].length - 1] == tokenA, 'BAD_REWARD_TOKEN_A_ROUTE');
-            quickswapRouter.swapExactTokensForTokens(rewardTokenHalf, amountsOutMin[0], swapRoutes[0], address(this), block.timestamp);
+            address[] calldata route = swapInfos[0].route;
+            require(route[0] == rewardToken && route[route.length - 1] == tokenA, 'BAD_REWARD_TOKEN_A_ROUTE');
+            quickswapRouter.swapExactTokensForTokens(rewardTokenHalf, swapInfos[0].amountOutMin, route, address(this), block.timestamp);
         }
         if (tokenB != rewardToken) {
-            require(swapRoutes[1][0] == rewardToken && swapRoutes[1][swapRoutes[1].length - 1] == tokenB, 'BAD_REWARD_TOKEN_B_ROUTE');
-            quickswapRouter.swapExactTokensForTokens(rewardTokenHalf, amountsOutMin[1], swapRoutes[1], address(this), block.timestamp);
+            address[] calldata route = swapInfos[1].route;
+            require(route[0] == rewardToken && route[route.length - 1] == tokenB, 'BAD_REWARD_TOKEN_B_ROUTE');
+            quickswapRouter.swapExactTokensForTokens(rewardTokenHalf, swapInfos[1].amountOutMin, route, address(this), block.timestamp);
         }
 
-        (,,reward) = quickswapRouter.addLiquidity(tokenA, tokenB, IERC20(tokenA).balanceOf(address(this)), IERC20(tokenB).balanceOf(address(this)), amountsOutMin[0], amountsOutMin[1], address(this), block.timestamp);
+        (,,reward) = quickswapRouter.addLiquidity(tokenA, tokenB, IERC20(tokenA).balanceOf(address(this)), IERC20(tokenB).balanceOf(address(this)), swapInfos[0].amountOutMin, swapInfos[1].amountOutMin, address(this), block.timestamp);
 
         uint256 rewardPerDepositAge = reward * fractionMultiplier / (totalDepositAge + totalDeposits * (block.number - totalDepositLastUpdate));
         uint256 cumulativeRewardAgePerDepositAge = distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge + rewardPerDepositAge * (block.number - distributionInfo[distributionID - 1].block);
@@ -210,6 +232,24 @@ contract UnoFarmQuickswap is Initializable, ReentrancyGuardUpgradeable {
         totalDepositAge = 0;
 
         lpStakingPool.stake(reward);
+    }
+
+    /**
+     * @dev Swaps and sends fees to feeTo.
+     */
+    function collectFees(SwapInfo calldata feeSwapInfo, FeeInfo calldata feeInfo) internal {
+        if(feeInfo.feeTo != address(0)){
+            uint256 feeAmount = IERC20Upgradeable(rewardToken).balanceOf(address(this)) * feeInfo.fee / fractionMultiplier;
+            if(feeAmount > 0){
+                address[] calldata route = feeSwapInfo.route;
+                if(route.length > 0 && route[0] != route[route.length - 1]){
+                    require(route[0] == rewardToken, 'BAD_REWARD_FEE_TOKEN_ROUTE');
+                    quickswapRouter.swapExactTokensForTokens(feeAmount, feeSwapInfo.amountOutMin, route, feeInfo.feeTo, block.timestamp);
+                    return;
+                }
+                IERC20Upgradeable(rewardToken).safeTransfer(feeInfo.feeTo, feeAmount);
+            }
+        }
     }
 
     /**
