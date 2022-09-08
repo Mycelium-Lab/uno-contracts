@@ -2,6 +2,14 @@
 pragma solidity 0.8.10;
 
 interface IUnoFarmTrisolarisStable {
+    struct SwapInfo{
+        address[] route;
+        uint256 amountOutMin;
+    }
+    struct FeeInfo {
+        address feeTo;
+        uint256 fee;
+    }
     function rewardToken() external view returns (address);
     function rewarderToken() external view returns (address);
     function lpPair() external view returns (address);
@@ -30,9 +38,10 @@ interface IUnoFarmTrisolarisStable {
     ) external returns (uint256[] memory amounts);
 
     function distribute(
-        address[][] calldata rewardTokenRoutes,
-        address[][] calldata rewarderTokenRoutes,
-        uint256[][2] calldata amountsOutMin
+        SwapInfo[] calldata rewardSwapInfos,
+        SwapInfo[] calldata rewarderSwapInfos,
+        SwapInfo[2] calldata feeSwapInfos,
+        FeeInfo calldata feeInfo
     ) external returns (uint256 reward);
 
     function userBalance(address _address) external view returns (uint256);

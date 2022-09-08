@@ -29,6 +29,9 @@ const TRIholder = "0x670FBcd11fD54908cabE97384F0D2785d369DCD5" // has to be unlo
 
 const amounts = [new BN(1000), new BN(3000), new BN(500), new BN(2500), new BN(52792912217)];
 
+const feeCollector = "0xFFFf795B802CB03FD664092Ab169f5f5c236335c"
+const fee = new BN('40000000000000000')//4%
+
 approxeq = function (bn1, bn2, epsilon, message) {
     const amountDelta = bn1.sub(bn2).add(epsilon);
     assert.ok(!amountDelta.isNeg(), message);
@@ -221,7 +224,13 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
                     "Pausable: paused",
                 );
                 await expectRevert(
-                    assetRouter.distribute(pool, [[], [], [], []], [0, 0, 0, 0], { from: account1 }),
+                    assetRouter.distribute(
+                        pool, 
+                        [{route:[], amountOutMin:0}, {route:[], amountOutMin:0}, {route:[], amountOutMin:0}, {route:[], amountOutMin:0}],
+                        [{route:[], amountOutMin:0}, {route:[], amountOutMin:0}],
+                        feeCollector,  
+                        { from: account1 }
+                    ),
                     "Pausable: paused",
                 );
             });
@@ -248,7 +257,13 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
                     "NO_LIQUIDITY_PROVIDED",
                 );
                 await expectRevert(
-                    assetRouter.distribute(pool, [[], [], [], []], [0, 0, 0, 0], { from: account1 }),
+                    assetRouter.distribute(
+                        pool, 
+                        [{route:[], amountOutMin:0}, {route:[], amountOutMin:0}, {route:[], amountOutMin:0}, {route:[], amountOutMin:0}],
+                        [{route:[], amountOutMin:0}, {route:[], amountOutMin:0}],
+                        feeCollector,   
+                        { from: account1 }
+                    ),
                     "CALLER_NOT_AUTHORIZED",
                 );
             });
@@ -842,27 +857,75 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
             });
         });
     });
+
+    describe('Sets Fee', () => {
+        describe('reverts', () => {
+            it('reverts if called not by an admin', async () => {
+                await expectRevert(
+                    assetRouter.setFee(fee, {from: account1}),
+                    "CALLER_NOT_AUTHORIZED"
+                )
+            })
+            it('reverts if fee is greater than 100%', async () => {
+                await expectRevert(
+                    assetRouter.setFee('1000000000000000001', {from: admin}),
+                    "BAD_FEE"
+                )
+            })
+        })
+        describe('Sets new fee', () => {
+            let receipt
+            before(async () => {
+                receipt = await assetRouter.setFee(fee, {from: admin})
+            })
+            it('fires events', async () => {
+                expectEvent(receipt, 'FeeChanged', {previousFee:new BN(0), newFee:fee})
+            })
+            it('sets new fee' ,async () => {
+                assert.equal(
+                    (await assetRouter.fee()).toString(),
+                    fee.toString(),
+                    "Fee is not correct"
+                )
+            })
+        })
+    })
+
     describe("Distributions", () => {
         describe("reverts", () => {
             it("reverts if called not by distributor", async () => {
                 await expectRevert(
-                    assetRouter.distribute(pool, [[], [], [], []], [0, 0, 0, 0], { from: pauser }),
+                    assetRouter.distribute(
+                        pool,  
+                        [{route:[], amountOutMin:0}, {route:[], amountOutMin:0}, {route:[], amountOutMin:0}, {route:[], amountOutMin:0}],
+                        [{route:[], amountOutMin:0}, {route:[], amountOutMin:0}],
+                        feeCollector,    
+                        { from: pauser }
+                    ),
                     "CALLER_NOT_AUTHORIZED",
                 );
             });
             it("reverts if pool doesnt exist", async () => {
                 await expectRevert(
-                    assetRouter.distribute(pool2, [[], [], [], []], [0, 0, 0, 0], {
-                        from: distributor,
-                    }),
+                    assetRouter.distribute(
+                        pool2, 
+                        [{route:[], amountOutMin:0}, {route:[], amountOutMin:0}, {route:[], amountOutMin:0}, {route:[], amountOutMin:0}],
+                        [{route:[], amountOutMin:0}, {route:[], amountOutMin:0}],
+                        feeCollector,  
+                        {from: distributor,}
+                    ),
                     "FARM_NOT_EXISTS",
                 );
             });
             it("reverts if there is no liquidity in the pool", async () => {
                 await expectRevert(
-                    assetRouter.distribute(pool, [[], [], [], []], [0, 0, 0, 0], {
-                        from: distributor,
-                    }),
+                    assetRouter.distribute(
+                        pool,                         
+                        [{route:[], amountOutMin:0}, {route:[], amountOutMin:0}, {route:[], amountOutMin:0}, {route:[], amountOutMin:0}],
+                        [{route:[], amountOutMin:0}, {route:[], amountOutMin:0}],
+                        feeCollector,   
+                        {from: distributor,}
+                    ),
                     "NO_LIQUIDITY",
                 );
             });
@@ -870,6 +933,7 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
         describe("distributes", () => {
             let receipt;
             let balance1, balance2;
+            let feeCollectorBalanceBefore
             before(async () => {
                 balance1 = await stakingToken.balanceOf(account1);
                 await stakingToken.approve(assetRouter.address, balance1, { from: account1 });
@@ -879,25 +943,52 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
                 await stakingToken.approve(assetRouter.address, balance2, { from: account2 });
                 await assetRouter.deposit(pool, 0, 0, 0, 0, balance2, account2, { from: account2 });
 
-                await time.increase(5000000);
+                const TOKEN = await IERC20.at('0xB12BFcA5A55806AaF64E99521918A4bf0fC40802')
+                feeCollectorBalanceBefore = await TOKEN.balanceOf(feeCollector)
 
+                await time.increase(5000000);
                 receipt = await assetRouter.distribute(
                     pool,
-                    [
-                        [
-                            "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                            "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                            "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                            "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
-                        ],
-                        [
-                            "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                            "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
-                        ],
-                        [constants.ZERO_ADDRESS, "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"],
-                        [constants.ZERO_ADDRESS, "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"]
+                    [   
+                        {
+                            route:[
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
+                            ], 
+                            amountOutMin:0
+                        }, 
+                        {
+                            route:[
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                            ], 
+                            amountOutMin:0
+                        }, 
+                        {
+                            route:[],
+                            amountOutMin:0
+                        }, 
+                        {
+                            route:[], 
+                            amountOutMin:0
+                        }
                     ],
-                    [1, 1, 1, 1],
+                    [
+                        {
+                            route:[
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                            ], 
+                            amountOutMin:0
+                        },
+                        {   
+                            route:[], 
+                            amountOutMin:0
+                        }
+                    ],
+                    feeCollector,   
                     { from: distributor },
                 );
             });
@@ -911,6 +1002,11 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
                 const { stakeLP: stake2 } = await assetRouter.userStake(account2, pool);
                 assert.isAbove(stake2.toNumber(), balance2.toNumber(), "Stake2 not increased");
             });
+            it('collects fees', async () => {
+                const TOKEN = await IERC20.at('0xB12BFcA5A55806AaF64E99521918A4bf0fC40802')
+                const feeCollectorBalanceAfter = await TOKEN.balanceOf(feeCollector)
+                assert.ok(feeCollectorBalanceAfter.gt(feeCollectorBalanceBefore), "Fee collector balance not increased")
+            })
         });
         describe("bad path reverts", () => {
             before(async () => {
@@ -920,21 +1016,44 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
                 await expectRevert(
                     assetRouter.distribute(
                         pool,
-                        [
-                            [
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                            ],
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                            ],
-                            [constants.ZERO_ADDRESS, "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"],
-                            [constants.ZERO_ADDRESS, "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"]
+                        [   
+                            {
+                                route:[
+                                    constants.ZERO_ADDRESS,
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[], 
+                                amountOutMin:0
+                            }
                         ],
-                        [1, 1, 1, 1],
+                        [
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            },
+                            {   
+                                route:[], 
+                                amountOutMin:0
+                            }
+                        ],
+                        feeCollector,
                         { from: distributor },
                     ),
                     "BAD_REWARD_TOKEN_A_ROUTE",
@@ -942,45 +1061,136 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
                 await expectRevert(
                     assetRouter.distribute(
                         pool,
-                        [
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                            ],
-                            [
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                            ],
-                            [constants.ZERO_ADDRESS, "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"],
-                            [constants.ZERO_ADDRESS, "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"]
+                        [   
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    constants.ZERO_ADDRESS,
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[], 
+                                amountOutMin:0
+                            }
                         ],
-                        [1, 1, 1, 1],
+                        [
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            },
+                            {   
+                                route:[], 
+                                amountOutMin:0
+                            }
+                        ],
+                        feeCollector,
                         { from: distributor },
                     ),
                     "BAD_REWARD_TOKEN_B_ROUTE",
+                );
+                await expectRevert(
+                    assetRouter.distribute(
+                        pool,
+                        [   
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[], 
+                                amountOutMin:0
+                            }
+                        ],
+                        [
+                            {
+                                route:[
+                                    constants.ZERO_ADDRESS,
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            },
+                            {   
+                                route:[], 
+                                amountOutMin:0
+                            }
+                        ],
+                        feeCollector,
+                        { from: distributor },
+                    ),
+                    "BAD_FEE_TOKEN_ROUTE",
                 );
             });
             it("reverts if passed wrong tokenA", async () => {
                 await expectRevert(
                     assetRouter.distribute(
                         pool,
-                        [
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                            ],
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                            ],
-                            [constants.ZERO_ADDRESS, "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"],
-                            [constants.ZERO_ADDRESS, "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"]
+                        [   
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    constants.ZERO_ADDRESS
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[], 
+                                amountOutMin:0
+                            }
                         ],
-                        [1, 1, 1, 1],
+                        [
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            },
+                            {   
+                                route:[], 
+                                amountOutMin:0
+                            }
+                        ],
+                        feeCollector,
                         { from: distributor },
                     ),
                     "BAD_REWARD_TOKEN_A_ROUTE",
@@ -990,21 +1200,44 @@ contract("UnoAssetRouterTrisolarisStandard", accounts => {
                 await expectRevert(
                     assetRouter.distribute(
                         pool,
-                        [
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                            ],
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                            ],
-                            [constants.ZERO_ADDRESS, "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"],
-                            [constants.ZERO_ADDRESS, "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"]
+                        [   
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    constants.ZERO_ADDRESS
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[], 
+                                amountOutMin:0
+                            }
                         ],
-                        [1, 1, 1, 1],
+                        [
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            },
+                            {   
+                                route:[], 
+                                amountOutMin:0
+                            }
+                        ],
+                        feeCollector,
                         { from: distributor },
                     ),
                     "BAD_REWARD_TOKEN_B_ROUTE",

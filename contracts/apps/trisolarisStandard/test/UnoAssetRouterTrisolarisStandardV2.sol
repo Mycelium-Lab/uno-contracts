@@ -26,11 +26,15 @@ contract UnoAssetRouterTrisolarisStandardV2 is Initializable, PausableUpgradeabl
     bytes32 private constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
     bytes32 private constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
+    uint256 public fee;
+
     uint256 public constant version = 2;
 
     event Deposit(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Withdraw(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Distribute(address indexed lpPool, uint256 reward);
+
+    event FeeChanged(uint256 previousFee, uint256 newFee);
 
     modifier onlyRole(bytes32 role){
         require(accessManager.hasRole(role, msg.sender), 'CALLER_NOT_AUTHORIZED');
@@ -84,7 +88,7 @@ contract UnoAssetRouterTrisolarisStandardV2 is Initializable, PausableUpgradeabl
         }
 
         if (amountA > 0) {
-            IERC20Upgradeable(farm.tokenA()).transferFrom(msg.sender, address(farm), amountA);
+            IERC20Upgradeable(farm.tokenA()).safeTransferFrom(msg.sender, address(farm), amountA);
         }
         if (amountB > 0) {
             IERC20Upgradeable(farm.tokenB()).safeTransferFrom(msg.sender, address(farm), amountB);
@@ -142,20 +146,22 @@ contract UnoAssetRouterTrisolarisStandardV2 is Initializable, PausableUpgradeabl
     /**
      * @dev Distributes tokens between users.
      * @param lpPair - LP pool to distribute tokens in.
-     * @param swapRoutes - Arrays of token addresses describing swap routes. [rewardTokenToTokenARoute, rewardTokenToTokenBRoute, rewarderTokenToTokenARoute, rewarderTokenToTokenBRoute].
-     * @param amountsOutMin The minimum amount of output tokens that must be received for the transaction not to revert.
+     * @param swapInfos - Arrays of structs with token arrays describing swap routes (rewardTokenToTokenA, rewardTokenToTokenB, rewarderTokenToTokenA, rewarderTokenToTokenB) and minimum amounts of output tokens that must be received for the transaction not to revert.
+     * @param feeSwapInfos - Arrays of structs with token arrays describing swap routes (rewardTokenToFeeToken, rewarderTokenToFeeToken) and minimum amounts of output tokens that must be received for the transaction not to revert.
+     * @param feeTo - Address to collect fees to.
      *
      * Note: This function can only be called by the distributor.
      */
     function distribute(
         address lpPair,
-        address[][4] calldata swapRoutes,
-        uint256[4] memory amountsOutMin
+        Farm.SwapInfo[4] calldata swapInfos,
+        Farm.SwapInfo[2] calldata feeSwapInfos,
+        address feeTo
     ) external whenNotPaused onlyRole(DISTRIBUTOR_ROLE) {
         Farm farm = Farm(farmFactory.Farms(lpPair));
         require(farm != Farm(address(0)), "FARM_NOT_EXISTS");
 
-        uint256 reward = farm.distribute(swapRoutes,amountsOutMin);
+        uint256 reward = farm.distribute(swapInfos, feeSwapInfos, Farm.FeeInfo(feeTo, fee));
         emit Distribute(lpPair, reward);
     }
 
@@ -216,6 +222,20 @@ contract UnoAssetRouterTrisolarisStandardV2 is Initializable, PausableUpgradeabl
         uint256 totalSupply = IERC20Upgradeable(lpPair).totalSupply();
         amountA = amountLP * IERC20Upgradeable(IUniswapV2Pair(lpPair).token0()).balanceOf(lpPair) / totalSupply;
         amountB = amountLP * IERC20Upgradeable(IUniswapV2Pair(lpPair).token1()).balanceOf(lpPair) / totalSupply;
+    }
+
+    /**
+     * @dev Change fee amount.
+     * @param _fee -New fee to collect from farms. [10^18 == 100%]
+     *
+     * Note: This function can only be called by ADMIN_ROLE.
+     */ 
+    function setFee(uint256 _fee) external onlyRole(accessManager.ADMIN_ROLE()){
+        require (_fee <= 1 ether, "BAD_FEE");
+        if(fee != _fee){
+            emit FeeChanged(fee, _fee); 
+            fee = _fee;
+        }
     }
 
     function pause() external onlyRole(PAUSER_ROLE) {

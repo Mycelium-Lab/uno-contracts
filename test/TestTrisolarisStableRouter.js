@@ -35,7 +35,10 @@ const accountNormalTokens = "0x173c35e1D60f061F2Fd4a0C4a881119d39D51E7a"; // has
 const AURORAholder = "0x0c406517c7B2f86d5935fB0a78511b7498B94413" // has to be unlocked
 const TRIholder = "0x670FBcd11fD54908cabE97384F0D2785d369DCD5" // has to be unlocked
 
-const amounts = [new BN(1000), new BN(3000), new BN(500), new BN(2500), new BN('500000000000000000000')];
+const amounts = [new BN('300000000000000000000'), new BN(300000), new BN(500000), new BN(25000)];
+
+const feeCollector = "0xFFFf795B802CB03FD664092Ab169f5f5c236335c"
+const fee = new BN('500000000000000000')//4%
 
 approxeq = function (bn1, bn2, epsilon, message) {
     const amountDelta = bn1.sub(bn2).add(epsilon);
@@ -207,12 +210,10 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                 await expectRevert(
                     assetRouter.distribute(
                         swapAddress,
-                        [[constants.ZERO_ADDRESS], [constants.ZERO_ADDRESS]],
-                        [[constants.ZERO_ADDRESS], [constants.ZERO_ADDRESS]],
-                        [
-                            [0, 0, 0, 0],
-                            [0, 0, 0, 0]
-                        ],
+                        [{route:[], amountOutMin:0}, {route:[], amountOutMin:0}, {route:[], amountOutMin:0}],
+                        [{route:[], amountOutMin:0}, {route:[], amountOutMin:0}, {route:[], amountOutMin:0}],
+                        [{route:[], amountOutMin:0}, {route:[], amountOutMin:0}],
+                        feeCollector,
                         { from: account1 },
                     ),
                     "Pausable: paused",
@@ -243,12 +244,10 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                 await expectRevert(
                     assetRouter.distribute(
                         swapAddress,
-                        [[constants.ZERO_ADDRESS], [constants.ZERO_ADDRESS]],
-                        [[constants.ZERO_ADDRESS], [constants.ZERO_ADDRESS]],
-                        [
-                            [0, 0, 0, 0],
-                            [0, 0, 0, 0]
-                        ],
+                        [{route:[], amountOutMin:0}, {route:[], amountOutMin:0}, {route:[], amountOutMin:0}],
+                        [{route:[], amountOutMin:0}, {route:[], amountOutMin:0}, {route:[], amountOutMin:0}],
+                        [{route:[], amountOutMin:0}, {route:[], amountOutMin:0}],
+                        feeCollector,
                         { from: account1 },
                     ),
                     "CALLER_NOT_AUTHORIZED",
@@ -916,6 +915,41 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
             });
         });
     });
+
+    describe('Sets Fee', () => {
+        describe('reverts', () => {
+            it('reverts if called not by an admin', async () => {
+                await expectRevert(
+                    assetRouter.setFee(fee, {from: account1}),
+                    "CALLER_NOT_AUTHORIZED"
+                )
+            })
+            it('reverts if fee is greater than 100%', async () => {
+                await expectRevert(
+                    assetRouter.setFee('1000000000000000001', {from: admin}),
+                    "BAD_FEE"
+                )
+            })
+        })
+        describe('Sets new fee', () => {
+            let receipt
+            before(async () => {
+                receipt = await assetRouter.setFee(fee, {from: admin})
+            })
+            it('fires events', async () => {
+                expectEvent(receipt, 'FeeChanged', {previousFee:new BN(0), newFee:fee})
+            })
+            it('sets new fee' ,async () => {
+                assert.equal(
+                    (await assetRouter.fee()).toString(),
+                    fee.toString(),
+                    "Fee is not correct"
+                )
+            })
+        })
+    })
+
+
     describe("Distributions", () => {
         describe("reverts", () => {
             it("reverts if called not by distributor", async () => {
@@ -923,46 +957,44 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                     assetRouter.distribute(
                         swapAddress,
                         [
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                            ],
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                            ],
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0x5183e1B1091804BC2602586919E6880ac1cf2896",
-                            ],
+                            {
+                                route: [], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[],
+                                amountOutMin:0
+                            }
                         ],
                         [
-                            [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                            ],
-                            [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                            ],
-                            [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0x5183e1B1091804BC2602586919E6880ac1cf2896",
-                            ],
+                            {
+                                route:[], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[], 
+                                amountOutMin:0
+                            }
                         ],
                         [
-                            [0, 0, 0],
-                            [0, 0, 0]
+                            {
+                                route:[],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[], 
+                                amountOutMin:0
+                            }
                         ],
+                        feeCollector,
                         { from: pauser },
                     ),
                     "CALLER_NOT_AUTHORIZED",
@@ -973,46 +1005,44 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                     assetRouter.distribute(
                         swap2Address,
                         [
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                            ],
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                            ],
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0x5183e1B1091804BC2602586919E6880ac1cf2896",
-                            ],
+                            {
+                                route: [], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[],
+                                amountOutMin:0
+                            }
                         ],
                         [
-                            [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                            ],
-                            [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                            ],
-                            [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0x5183e1B1091804BC2602586919E6880ac1cf2896",
-                            ],
+                            {
+                                route:[], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[], 
+                                amountOutMin:0
+                            }
                         ],
                         [
-                            [0, 0, 0],
-                            [0, 0, 0]
+                            {
+                                route:[],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[], 
+                                amountOutMin:0
+                            }
                         ],
+                        feeCollector,
                         {
                             from: distributor,
                         },
@@ -1024,6 +1054,7 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
         describe("distributes", () => {
             let receipt;
             let balance1, balance2;
+            let feeCollectorBalanceBefore
             before(async () => {
                 balance1 = await stakingToken.balanceOf(account1);
                 await stakingToken.approve(assetRouter.address, balance1, { from: account1 });
@@ -1037,51 +1068,86 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                     from: account2,
                 });
 
-                await time.increase(50000);
+                const TOKEN = await IERC20.at('0xB12BFcA5A55806AaF64E99521918A4bf0fC40802')
+                feeCollectorBalanceBefore = await TOKEN.balanceOf(feeCollector)
 
+                await time.increase(50000);
                 receipt = await assetRouter.distribute(
                     swapAddress,
                     [
-                        [
-                            "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                            "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
-                        ],
-                        [
-                            "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                            "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                            "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                            "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
-                        ],
-                        [
-                            "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                            "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                            "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                            "0x5183e1B1091804BC2602586919E6880ac1cf2896"
-                        ]
+                        {
+                            route: [
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                            ], 
+                            amountOutMin:0
+                        }, 
+                        {
+                            route:[
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                            ],
+                            amountOutMin:0
+                        }, 
+                        {
+                            route:[
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                "0x5183e1B1091804BC2602586919E6880ac1cf2896",
+                            ],
+                            amountOutMin:0
+                        }
                     ],
                     [
-                        [
-                            "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                            "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                            "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                            "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
-                        ],
-                        [
-                            "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                            "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                            "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                            "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
-                        ],
-                        [
-                            "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                            "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                            "0x5183e1B1091804BC2602586919E6880ac1cf2896"
-                        ]
+                        {
+                            route:[
+                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                            ], 
+                            amountOutMin:0
+                        }, 
+                        {
+                            route:[
+                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
+                            ],
+                            amountOutMin:0
+                        }, 
+                        {
+                            route:[
+                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                "0x5183e1B1091804BC2602586919E6880ac1cf2896"
+                            ], 
+                            amountOutMin:0
+                        }
                     ],
                     [
-                        [0, 0, 0],
-                        [0, 0, 0]
+                        {
+                            route:[
+                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                            ],
+                            amountOutMin:0
+                        }, 
+                        {
+                            route:[
+                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                            ], 
+                            amountOutMin:0
+                        }
                     ],
+                    feeCollector,
                     { from: distributor },
                 );
             });
@@ -1096,6 +1162,11 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
 
                 assert.ok(stake2.gt(balance2), "Stake2 not increased");
             });
+            it('collects fees', async () => {
+                const TOKEN = await IERC20.at('0xB12BFcA5A55806AaF64E99521918A4bf0fC40802')
+                const feeCollectorBalanceAfter = await TOKEN.balanceOf(feeCollector)
+                assert.ok(feeCollectorBalanceAfter.gt(feeCollectorBalanceBefore), "Fee collector balance not increased")
+            })
         });
         describe("bad path reverts", () => {
             before(async () => {
@@ -1106,46 +1177,68 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                     assetRouter.distribute(
                         swapAddress,
                         [
-                            [
-                                "0x5183e1B1091804BC2602586919E6880ac1cf2896",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                            ],
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                            ],
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0x5183e1B1091804BC2602586919E6880ac1cf2896",
-                            ],
+                            {
+                                route: [
+                                    constants.ZERO_ADDRESS,
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x5183e1B1091804BC2602586919E6880ac1cf2896",
+                                ],
+                                amountOutMin:0
+                            }
                         ],
                         [
-                            [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                            ],
-                            [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                            ],
-                            [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0x5183e1B1091804BC2602586919E6880ac1cf2896",
-                            ],
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0x5183e1B1091804BC2602586919E6880ac1cf2896"
+                                ], 
+                                amountOutMin:0
+                            }
                         ],
                         [
-                            [0, 0, 0],
-                            [0, 0, 0]
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }
                         ],
+                        feeCollector,
                         { from: distributor },
                     ),
                     "BAD_REWARD_TOKEN_ROUTES",
@@ -1154,46 +1247,68 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                     assetRouter.distribute(
                         swapAddress,
                         [
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                            ],
-                            [
-                                "0x5183e1B1091804BC2602586919E6880ac1cf2896",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                            ],
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0x5183e1B1091804BC2602586919E6880ac1cf2896",
-                            ],
+                            {
+                                route: [
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    constants.ZERO_ADDRESS,
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x5183e1B1091804BC2602586919E6880ac1cf2896",
+                                ],
+                                amountOutMin:0
+                            }
                         ],
                         [
-                            [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                            ],
-                            [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                            ],
-                            [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0x5183e1B1091804BC2602586919E6880ac1cf2896",
-                            ],
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0x5183e1B1091804BC2602586919E6880ac1cf2896"
+                                ], 
+                                amountOutMin:0
+                            }
                         ],
                         [
-                            [0, 0, 0],
-                            [0, 0, 0]
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }
                         ],
+                        feeCollector,
                         { from: distributor },
                     ),
                     "BAD_REWARD_TOKEN_ROUTES",
@@ -1202,96 +1317,210 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                     assetRouter.distribute(
                         swapAddress,
                         [
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                            ],
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                            ],
-                            [
-                                "0x5183e1B1091804BC2602586919E6880ac1cf2896",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0x5183e1B1091804BC2602586919E6880ac1cf2896",
-                            ],
+                            {
+                                route: [
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    constants.ZERO_ADDRESS,
+                                    "0x5183e1B1091804BC2602586919E6880ac1cf2896",
+                                ],
+                                amountOutMin:0
+                            }
                         ],
                         [
-                            [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                            ],
-                            [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                            ],
-                            [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0x5183e1B1091804BC2602586919E6880ac1cf2896",
-                            ],
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0x5183e1B1091804BC2602586919E6880ac1cf2896"
+                                ], 
+                                amountOutMin:0
+                            }
                         ],
                         [
-                            [0, 0, 0],
-                            [0, 0, 0]
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }
                         ],
+                        feeCollector,
                         { from: distributor },
                     ),
                     "BAD_REWARD_TOKEN_ROUTES",
                 ); // token 3
+                await expectRevert(
+                    assetRouter.distribute(
+                        swapAddress,
+                        [
+                            {
+                                route: [
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x5183e1B1091804BC2602586919E6880ac1cf2896",
+                                ],
+                                amountOutMin:0
+                            }
+                        ],
+                        [
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0x5183e1B1091804BC2602586919E6880ac1cf2896"
+                                ], 
+                                amountOutMin:0
+                            }
+                        ],
+                        [
+                            {
+                                route:[
+                                    constants.ZERO_ADDRESS,
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }
+                        ],
+                        feeCollector,
+                        { from: distributor },
+                    ),
+                    "BAD_FEE_TOKEN_ROUTE",
+                ); // fee
             });
             it("reverts if passed wrong token1", async () => {
                 await expectRevert(
                     assetRouter.distribute(
                         swapAddress,
                         [
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",//
-                            ],
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                            ],
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0x5183e1B1091804BC2602586919E6880ac1cf2896",
-                            ],
+                            {
+                                route: [
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    constants.ZERO_ADDRESS,
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x5183e1B1091804BC2602586919E6880ac1cf2896",
+                                ],
+                                amountOutMin:0
+                            }
                         ],
                         [
-                            [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                            ],
-                            [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                            ],
-                            [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0x5183e1B1091804BC2602586919E6880ac1cf2896",
-                            ],
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0x5183e1B1091804BC2602586919E6880ac1cf2896"
+                                ], 
+                                amountOutMin:0
+                            }
                         ],
                         [
-                            [0, 0, 0],
-                            [0, 0, 0]
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }
                         ],
+                        feeCollector,
                         { from: distributor },
                     ),
                     "BAD_REWARD_TOKEN_ROUTES",
@@ -1302,46 +1531,68 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                     assetRouter.distribute(
                         swapAddress,
                         [
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                            ],
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                            ],
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0x5183e1B1091804BC2602586919E6880ac1cf2896",
-                            ],
+                            {
+                                route: [
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x5183e1B1091804BC2602586919E6880ac1cf2896",
+                                ],
+                                amountOutMin:0
+                            }
                         ],
                         [
-                            [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                            ],
-                            [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                            ],
-                            [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0x5183e1B1091804BC2602586919E6880ac1cf2896",
-                            ],
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    constants.ZERO_ADDRESS
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0x5183e1B1091804BC2602586919E6880ac1cf2896"
+                                ], 
+                                amountOutMin:0
+                            }
                         ],
                         [
-                            [0, 0, 0],
-                            [0, 0, 0]
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }
                         ],
+                        feeCollector,
                         { from: distributor },
                     ),
                     "BAD_REWARDER_TOKEN_ROUTES",
@@ -1352,51 +1603,355 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                     assetRouter.distribute(
                         swapAddress,
                         [
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                            ],
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                            ],
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                            ],
+                            {
+                                route: [
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    constants.ZERO_ADDRESS,
+                                ],
+                                amountOutMin:0
+                            }
                         ],
                         [
-                            [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                            ],
-                            [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                            ],
-                            [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0x5183e1B1091804BC2602586919E6880ac1cf2896",
-                            ],
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0x5183e1B1091804BC2602586919E6880ac1cf2896"
+                                ], 
+                                amountOutMin:0
+                            }
                         ],
                         [
-                            [0, 0, 0],
-                            [0, 0, 0]
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }
                         ],
+                        feeCollector,
                         { from: distributor },
                     ),
                     "BAD_REWARD_TOKEN_ROUTES",
                 );
             });
+            it("reverts if passed wrong rewarder", async () => {
+                await expectRevert(
+                    assetRouter.distribute(
+                        swapAddress,
+                        [
+                            {
+                                route: [
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x5183e1B1091804BC2602586919E6880ac1cf2896",
+                                ],
+                                amountOutMin:0
+                            }
+                        ],
+                        [
+                            {
+                                route:[
+                                    constants.ZERO_ADDRESS,
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0x5183e1B1091804BC2602586919E6880ac1cf2896"
+                                ], 
+                                amountOutMin:0
+                            }
+                        ],
+                        [
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }
+                        ],
+                        feeCollector,
+                        { from: distributor },
+                    ),
+                    "BAD_REWARD_TOKEN_ROUTES",
+                ); // token1
+                await expectRevert(
+                    assetRouter.distribute(
+                        swapAddress,
+                        [
+                            {
+                                route: [
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x5183e1B1091804BC2602586919E6880ac1cf2896",
+                                ],
+                                amountOutMin:0
+                            }
+                        ],
+                        [
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    constants.ZERO_ADDRESS,
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0x5183e1B1091804BC2602586919E6880ac1cf2896"
+                                ], 
+                                amountOutMin:0
+                            }
+                        ],
+                        [
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }
+                        ],
+                        feeCollector,
+                        { from: distributor },
+                    ),
+                    "BAD_REWARD_TOKEN_ROUTES",
+                ); // token 2
+                await expectRevert(
+                    assetRouter.distribute(
+                        swapAddress,
+                        [
+                            {
+                                route: [
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x5183e1B1091804BC2602586919E6880ac1cf2896",
+                                ],
+                                amountOutMin:0
+                            }
+                        ],
+                        [
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    constants.ZERO_ADDRESS,
+                                    "0x5183e1B1091804BC2602586919E6880ac1cf2896"
+                                ], 
+                                amountOutMin:0
+                            }
+                        ],
+                        [
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }
+                        ],
+                        feeCollector,
+                        { from: distributor },
+                    ),
+                    "BAD_REWARD_TOKEN_ROUTES",
+                ); // token 3
+                await expectRevert(
+                    assetRouter.distribute(
+                        swapAddress,
+                        [
+                            {
+                                route: [
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x5183e1B1091804BC2602586919E6880ac1cf2896",
+                                ],
+                                amountOutMin:0
+                            }
+                        ],
+                        [
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0x5183e1B1091804BC2602586919E6880ac1cf2896"
+                                ], 
+                                amountOutMin:0
+                            }
+                        ],
+                        [
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    constants.ZERO_ADDRESS,
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }
+                        ],
+                        feeCollector,
+                        { from: distributor },
+                    ),
+                    "BAD_FEE_TOKEN_ROUTE",
+                ); // fee
+            })
         });
         describe("withdraws", () => {
             it("withdraws all tokens for account1", async () => {
@@ -1447,46 +2002,44 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                     assetRouter.distribute(
                         swapAddress,
                         [
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                            ],
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                            ],
-                            [
-                                "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0x5183e1B1091804BC2602586919E6880ac1cf2896",
-                            ],
+                            {
+                                route: [], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[],
+                                amountOutMin:0
+                            }
                         ],
                         [
-                            [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
-                            ],
-                            [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
-                                "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                            ],
-                            [
-                                "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
-                                "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
-                                "0x5183e1B1091804BC2602586919E6880ac1cf2896",
-                            ],
+                            {
+                                route:[], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[], 
+                                amountOutMin:0
+                            }
                         ],
                         [
-                            [0, 0, 0],
-                            [0, 0, 0]
+                            {
+                                route:[],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[], 
+                                amountOutMin:0
+                            }
                         ],
+                        feeCollector,
                         {
                             from: distributor,
                         },

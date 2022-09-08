@@ -39,6 +39,24 @@ contract UnoFarmTrisolarisStable is Initializable, ReentrancyGuardUpgradeable {
         uint32 lastDistribution;
         uint256 lastUpdate;
     }
+    /**
+     * @dev SwapInfo:
+     * {route} - Array of token addresses describing swap routes.
+     * {amountOutMin} - The minimum amount of output token that must be received for the transaction not to revert.
+     */
+    struct SwapInfo{
+        address[] route;
+        uint256 amountOutMin;
+    }
+    /**
+     * @dev FeeInfo:
+     * {feeTo} - Address to transfer fees to.
+     * {fee} - Fee percentage to collect (10^18 == 100%). 
+     */
+    struct FeeInfo {
+        address feeTo;
+        uint256 fee;
+    }
 
     /**
      * @dev Tokens Used:
@@ -219,16 +237,21 @@ contract UnoFarmTrisolarisStable is Initializable, ReentrancyGuardUpgradeable {
      * 3. It deposits new LP tokens back to the {MasterChef}.
      */
     function distribute(
-        address[][] calldata rewardTokenRoutes,
-        address[][] calldata rewarderTokenRoutes,
-        uint256[][2] calldata amountsOutMin
+        SwapInfo[] calldata rewardSwapInfos,
+        SwapInfo[] calldata rewarderSwapInfos,
+        SwapInfo[2] calldata feeSwapInfos,
+        FeeInfo calldata feeInfo
     ) external onlyAssetRouter nonReentrant returns (uint256 reward) {
         require(totalDeposits > 0, "NO_LIQUIDITY");
         require(distributionInfo[distributionID - 1].block != block.number, "CANT_CALL_ON_THE_SAME_BLOCK");
-        require(rewardTokenRoutes.length == tokens.length, "BAD_REWARD_ROUTES_LENGTH");
-        require(rewarderTokenRoutes.length == tokens.length, "BAD_REWARDER_ROUTES_LENGTH");
+
+        require(rewardSwapInfos.length == tokens.length, "BAD_REWARD_SWAP_INFOS_LENGTH");
+        require(rewarderSwapInfos.length == tokens.length, "BAD_REWARDER_SWAP_INFOS_LENGTH");
 
         MasterChef.harvest(pid, address(this));
+
+        collectFees(feeSwapInfos[0], feeInfo, IERC20Upgradeable(rewardToken));
+        collectFees(feeSwapInfos[1], feeInfo, IERC20Upgradeable(rewarderToken));
         { // scope to avoid stack too deep errors
         uint256 rewardTokenFraction = IERC20(rewardToken).balanceOf(address(this)) / tokens.length;
         uint256 rewarderTokenFraction;
@@ -238,8 +261,9 @@ contract UnoFarmTrisolarisStable is Initializable, ReentrancyGuardUpgradeable {
         if (rewardTokenFraction > 0) {
             for (uint256 i = 0; i < tokens.length; i++) {
                 if (tokens[i] != rewardToken) {
-                    require(rewardTokenRoutes[i][0] == rewardToken && rewardTokenRoutes[i][rewardTokenRoutes[i].length - 1] == tokens[i], "BAD_REWARD_TOKEN_ROUTES");
-                    trisolarisRouter.swapExactTokensForTokens(rewardTokenFraction, amountsOutMin[0][i], rewardTokenRoutes[i], address(this), block.timestamp);
+                    address[] calldata route = rewardSwapInfos[i].route;
+                    require(route[0] == rewardToken && route[route.length - 1] == tokens[i], "BAD_REWARD_TOKEN_ROUTES");
+                    trisolarisRouter.swapExactTokensForTokens(rewardTokenFraction, rewardSwapInfos[i].amountOutMin, route, address(this), block.timestamp);
                 }
             }
         }
@@ -247,8 +271,9 @@ contract UnoFarmTrisolarisStable is Initializable, ReentrancyGuardUpgradeable {
         if (rewarderTokenFraction > 0) {
             for (uint256 i = 0; i < tokens.length; i++) {
                 if (tokens[i] != rewarderToken) {
-                    require(rewarderTokenRoutes[i][0] == rewarderToken && rewarderTokenRoutes[i][rewarderTokenRoutes[i].length - 1] == tokens[i], "BAD_REWARDER_TOKEN_ROUTES");
-                    trisolarisRouter.swapExactTokensForTokens(rewarderTokenFraction, amountsOutMin[1][i], rewarderTokenRoutes[i], address(this), block.timestamp);
+                    address[] calldata route = rewarderSwapInfos[i].route;
+                    require(route[0] == rewarderToken && route[route.length - 1] == tokens[i], "BAD_REWARDER_TOKEN_ROUTES");
+                    trisolarisRouter.swapExactTokensForTokens(rewarderTokenFraction, rewarderSwapInfos[i].amountOutMin, route, address(this), block.timestamp);
                 }
             }
         }
@@ -273,6 +298,24 @@ contract UnoFarmTrisolarisStable is Initializable, ReentrancyGuardUpgradeable {
         totalDepositAge = 0;
 
         MasterChef.deposit(pid, reward, address(this));
+    }
+
+    /**
+     * @dev Swaps and sends fees to feeTo.
+     */
+    function collectFees(SwapInfo calldata feeSwapInfo, FeeInfo calldata feeInfo, IERC20Upgradeable token) internal {
+        if(address(token) != address(0) && feeInfo.feeTo != address(0)){
+            uint256 feeAmount = token.balanceOf(address(this)) * feeInfo.fee / fractionMultiplier;
+            if(feeAmount > 0){
+                address[] calldata route = feeSwapInfo.route;
+                if(route.length > 0 && route[0] != route[route.length - 1]){
+                    require(route[0] == address(token), 'BAD_FEE_TOKEN_ROUTE');
+                    trisolarisRouter.swapExactTokensForTokens(feeAmount, feeSwapInfo.amountOutMin, route, feeInfo.feeTo, block.timestamp);
+                    return;
+                }
+                token.safeTransfer(feeInfo.feeTo, feeAmount);
+            }
+        }
     }
 
     /**
