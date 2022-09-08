@@ -243,7 +243,7 @@ contract UnoFarmQuickswap is Initializable, ReentrancyGuardUpgradeable {
             if(feeAmount > 0){
                 address[] calldata route = feeSwapInfo.route;
                 if(route.length > 0 && route[0] != route[route.length - 1]){
-                    require(route[0] == rewardToken, 'BAD_REWARD_FEE_TOKEN_ROUTE');
+                    require(route[0] == rewardToken, 'BAD_FEE_TOKEN_ROUTE');
                     quickswapRouter.swapExactTokensForTokens(feeAmount, feeSwapInfo.amountOutMin, route, feeInfo.feeTo, block.timestamp);
                     return;
                 }

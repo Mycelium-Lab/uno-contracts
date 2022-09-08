@@ -30,6 +30,7 @@ const account2 = "0x531d7e9Fbb690B76d9462a06d9036B24f2F3Ff12"//has to be unlocke
 const amounts = [new BN(1000000), new BN(3000000), new BN(500000), new BN(4000000), new BN('1000000000000000')]
 
 const feeCollector = "0xFFFf795B802CB03FD664092Ab169f5f5c236335c"
+const fee = new BN('40000000000000000')//4%
 
 contract('UnoAssetRouterQuickswapDual', accounts => {
     const admin = accounts[0]
@@ -761,6 +762,40 @@ contract('UnoAssetRouterQuickswapDual', accounts => {
             })
         })
     })
+
+    describe('Sets Fee', () => {
+        describe('reverts', () => {
+            it('reverts if called not by an admin', async () => {
+                await expectRevert(
+                    assetRouter.setFee(fee, {from: account1}),
+                    "CALLER_NOT_AUTHORIZED"
+                )
+            })
+            it('reverts if fee is greater than 100%', async () => {
+                await expectRevert(
+                    assetRouter.setFee('1000000000000000001', {from: admin}),
+                    "BAD_FEE"
+                )
+            })
+        })
+        describe('Sets new fee', () => {
+            let receipt
+            before(async () => {
+                receipt = await assetRouter.setFee(fee, {from: admin})
+            })
+            it('fires events', async () => {
+                expectEvent(receipt, 'FeeChanged', {previousFee:new BN(0), newFee:fee})
+            })
+            it('sets new fee' ,async () => {
+                assert.equal(
+                    (await assetRouter.fee()).toString(),
+                    fee.toString(),
+                    "Fee is not correct"
+                )
+            })
+        })
+    })
+
     describe('Distributions', () => {
         describe('reverts', () => {
             it('reverts if called not by distributor', async () => {
@@ -803,6 +838,7 @@ contract('UnoAssetRouterQuickswapDual', accounts => {
         describe('distributes', () => {
             let receipt
             let balance1, balance2
+            let feeCollectorBalanceBefore
             before(async () => {
                 balance1 = await stakingToken.balanceOf(account1)
                 await stakingToken.approve(assetRouter.address, balance1, {from: account1})
@@ -811,6 +847,9 @@ contract('UnoAssetRouterQuickswapDual', accounts => {
                 balance2 = await stakingToken.balanceOf(account2)
                 await stakingToken.approve(assetRouter.address, balance2, {from: account2})
                 await assetRouter.deposit(pool, 0, 0, 0, 0, balance2, account2, {from: account2})
+
+                const USDC = await IUniswapV2Pair.at('0x2791bca1f2de4661ed88a30c99a7a9449aa84174')
+                feeCollectorBalanceBefore = await USDC.balanceOf(feeCollector)
 
                 await time.increase(50000)
 
@@ -877,6 +916,11 @@ contract('UnoAssetRouterQuickswapDual', accounts => {
 
                 const {stakeLP: stake2} = await assetRouter.userStake(account2, pool)
                 assert.ok(stake2.gt(balance2), "Stake1 not increased")
+            })
+            it('collects fees', async () => {
+                const USDC = await IUniswapV2Pair.at('0x2791bca1f2de4661ed88a30c99a7a9449aa84174')
+                const feeCollectorBalanceAfter = await USDC.balanceOf(feeCollector)
+                assert.ok(feeCollectorBalanceAfter.gt(feeCollectorBalanceBefore), "Fee collector balance not increased")
             })
         })
         describe('bad path reverts', () => {
@@ -977,6 +1021,59 @@ contract('UnoAssetRouterQuickswapDual', accounts => {
                         {from: distributor}
                     ),
                     "BAD_REWARD_A_TOKEN_B_ROUTE"
+                )
+                await expectRevert(
+                    assetRouter.distribute(
+                        pool, 
+                        [
+                            {
+                                route:[
+                                    rewardsTokenA.address,//dQuick
+                                    tokenA.address//WMATIC
+                                ], 
+                                amountOutMin:0
+                            },
+                            {   
+                                route:[
+                                    rewardsTokenA.address,
+                                    tokenA.address//USDC
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+
+                                ], 
+                                amountOutMin:0
+                            },
+                            {
+                                route:[                    
+                                    rewardsTokenB.address,//WMATIC
+                                    tokenB.address//USDC
+                                ], 
+                                amountOutMin:0
+                            }
+                        ],
+                        [
+                            {
+                                route:[
+                                    constants.ZERO_ADDRESS,
+                                    '0x2791bca1f2de4661ed88a30c99a7a9449aa84174'
+                                ], 
+                                amountOutMin:0
+                            },
+                            {
+                                route:[
+                                    rewardsTokenB.address,
+                                    '0x2791bca1f2de4661ed88a30c99a7a9449aa84174'
+                                ], 
+                                amountOutMin:0
+                            }
+                        ],
+                        feeCollector,
+                        {from: distributor}
+                    ),
+                    "BAD_FEE_TOKEN_ROUTE"
                 )
             })
             it('reverts if passed wrong tokenA', async () => {
@@ -1124,7 +1221,6 @@ contract('UnoAssetRouterQuickswapDual', accounts => {
                     "BAD_REWARD_B_TOKEN_B_ROUTE"
                 )
             })
-
             it('reverts if passed wrong reward B token', async () => {
                 await expectRevert(
                     assetRouter.distribute(
@@ -1172,6 +1268,59 @@ contract('UnoAssetRouterQuickswapDual', accounts => {
                         {from: distributor}
                     ),
                     "BAD_REWARD_B_TOKEN_B_ROUTE"
+                )
+                await expectRevert(
+                    assetRouter.distribute(
+                        pool, 
+                        [
+                            {
+                                route:[
+                                    rewardsTokenA.address,//dQuick
+                                    tokenA.address//WMATIC
+                                ], 
+                                amountOutMin:0
+                            },
+                            {   
+                                route:[
+                                    rewardsTokenA.address,
+                                    tokenA.address//USDC
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+
+                                ], 
+                                amountOutMin:0
+                            },
+                            {
+                                route:[                    
+                                    rewardsTokenB.address,//WMATIC
+                                    tokenB.address//USDC
+                                ], 
+                                amountOutMin:0
+                            }
+                        ],
+                        [
+                            {
+                                route:[
+                                    rewardsTokenA.address,
+                                    '0x2791bca1f2de4661ed88a30c99a7a9449aa84174'
+                                ], 
+                                amountOutMin:0
+                            },
+                            {
+                                route:[
+                                    constants.ZERO_ADDRESS,
+                                    '0x2791bca1f2de4661ed88a30c99a7a9449aa84174'
+                                ], 
+                                amountOutMin:0
+                            }
+                        ],
+                        feeCollector,
+                        {from: distributor}
+                    ),
+                    "BAD_FEE_TOKEN_ROUTE"
                 )
             })
         })

@@ -28,6 +28,7 @@ const account2 = "0x8eB6eAD701b7d378cF62C898a0A7b72639a89201"//has to be unlocke
 const amounts = [new BN(1000), new BN(3000), new BN(500), new BN(4000), new BN(700000000000)]
 
 const feeCollector = "0xFFFf795B802CB03FD664092Ab169f5f5c236335c"
+const fee = new BN('40000000000000000')//4%
 
 approxeq = function(bn1, bn2, epsilon, message) {
     const amountDelta = bn1.sub(bn2).add(epsilon)
@@ -748,6 +749,40 @@ contract('UnoAssetRouterQuickswap', accounts => {
             })
         })
     })
+
+    describe('Sets Fee', () => {
+        describe('reverts', () => {
+            it('reverts if called not by an admin', async () => {
+                await expectRevert(
+                    assetRouter.setFee(fee, {from: account1}),
+                    "CALLER_NOT_AUTHORIZED"
+                )
+            })
+            it('reverts if fee is greater than 100%', async () => {
+                await expectRevert(
+                    assetRouter.setFee('1000000000000000001', {from: admin}),
+                    "BAD_FEE"
+                )
+            })
+        })
+        describe('Sets new fee', () => {
+            let receipt
+            before(async () => {
+                receipt = await assetRouter.setFee(fee, {from: admin})
+            })
+            it('fires events', async () => {
+                expectEvent(receipt, 'FeeChanged', {previousFee:new BN(0), newFee:fee})
+            })
+            it('sets new fee' ,async () => {
+                assert.equal(
+                    (await assetRouter.fee()).toString(),
+                    fee.toString(),
+                    "Fee is not correct"
+                )
+            })
+        })
+    })
+
     describe('Distributions', () => {
         describe('reverts', () => {
             it('reverts if called not by distributor', async () => {
@@ -790,6 +825,7 @@ contract('UnoAssetRouterQuickswap', accounts => {
         describe('distributes', () => {
             let receipt
             let balance1, balance2
+            let feeCollectorBalanceBefore
             before(async () => {
                 balance1 = await stakingToken.balanceOf(account1)
                 await stakingToken.approve(assetRouter.address, balance1, {from: account1})
@@ -798,6 +834,9 @@ contract('UnoAssetRouterQuickswap', accounts => {
                 balance2 = await stakingToken.balanceOf(account2)
                 await stakingToken.approve(assetRouter.address, balance2, {from: account2})
                 await assetRouter.deposit(pool, 0, 0, 0, 0, balance2, account2, {from: account2})
+
+                const USDC = await IUniswapV2Pair.at('0x2791bca1f2de4661ed88a30c99a7a9449aa84174')
+                feeCollectorBalanceBefore = await USDC.balanceOf(feeCollector)
 
                 await time.increase(50000)
 
@@ -842,6 +881,11 @@ contract('UnoAssetRouterQuickswap', accounts => {
 
                 const {stakeLP: stake2} = await assetRouter.userStake(account2, pool)
                 assert.ok(stake2.gt(balance2), "Stake2 not increased")
+            })
+            it('collects fees', async () => {
+                const USDC = await IUniswapV2Pair.at('0x2791bca1f2de4661ed88a30c99a7a9449aa84174')
+                const feeCollectorBalanceAfter = await USDC.balanceOf(feeCollector)
+                assert.ok(feeCollectorBalanceAfter.gt(feeCollectorBalanceBefore), "Fee collector balance not increased")
             })
         })
         
@@ -905,6 +949,37 @@ contract('UnoAssetRouterQuickswap', accounts => {
                     {from: distributor}
                     ),
                     "BAD_REWARD_TOKEN_B_ROUTE"
+                )
+                await expectRevert(
+                    assetRouter.distribute(
+                    pool, 
+                    [
+                        {
+                            route:[
+                                rewardsToken.address,
+                                tokenA.address
+                            ],
+                            amountOutMin:0
+                        }, 
+                        {
+                            route:[
+                                rewardsToken.address,
+                                tokenB.address
+                            ], 
+                            amountOutMin:0
+                        }
+                    ],
+                    {
+                        route:[
+                            constants.ZERO_ADDRESS,
+                            '0x2791bca1f2de4661ed88a30c99a7a9449aa84174'
+                        ],
+                        amountOutMin:0
+                    }, 
+                    feeCollector,
+                    {from: distributor}
+                    ),
+                    "BAD_FEE_TOKEN_ROUTE"
                 )
             })
             it('reverts if passed wrong tokenA', async () => {
