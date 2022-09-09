@@ -1172,7 +1172,7 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
             before(async () => {
                 await time.increase(5000000);
             });
-            it("reverts if passed wrong reward tokens", async () => {
+            it("reverts if passed wrong number of routes", async () => {
                 await expectRevert(
                     assetRouter.distribute(
                         swapAddress,
@@ -1188,13 +1188,6 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                                 route:[
                                     "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
                                     "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
-                                ],
-                                amountOutMin:0
-                            }, 
-                            {
-                                route:[
-                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
-                                    "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                                 ],
                                 amountOutMin:0
                             }
@@ -1233,6 +1226,154 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }
+                        ],
+                        feeCollector,
+                        { from: distributor },
+                    ),
+                    "BAD_REWARD_SWAP_INFOS_LENGTH",
+                ); 
+                await expectRevert(
+                    assetRouter.distribute(
+                        swapAddress,
+                        [
+                            {
+                                route: [
+                                    constants.ZERO_ADDRESS,
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0x5183e1B1091804BC2602586919E6880ac1cf2896",
+                                ],
+                                amountOutMin:0
+                            }
+                        ],
+                        [
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
+                                ],
+                                amountOutMin:0
+                            }
+                        ],
+                        [
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }
+                        ],
+                        feeCollector,
+                        { from: distributor },
+                    ),
+                    "BAD_REWARDER_SWAP_INFOS_LENGTH",
+                ); 
+            })
+            it("reverts if passed wrong reward tokens", async () => {
+                await expectRevert(
+                    assetRouter.distribute(
+                        swapAddress,
+                        [
+                            {
+                                route: [
+                                    constants.ZERO_ADDRESS,
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0x5183e1B1091804BC2602586919E6880ac1cf2896",
+                                ],
+                                amountOutMin:0
+                            }
+                        ],
+                        [
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ], 
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0x5183e1B1091804BC2602586919E6880ac1cf2896"
+                                ], 
+                                amountOutMin:0
+                            }
+                        ],
+                        [
+                            {
+                                route:[
+                                    "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
+                                ],
+                                amountOutMin:0
+                            }, 
+                            {
+                                route:[
+                                    "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
                                 ], 
                                 amountOutMin:0
@@ -1264,6 +1405,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                     "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                                 ],
                                 amountOutMin:0
@@ -1273,6 +1416,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
                                 ], 
                                 amountOutMin:0
@@ -1280,6 +1425,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
                                 ],
                                 amountOutMin:0
@@ -1287,6 +1434,7 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                     "0x5183e1B1091804BC2602586919E6880ac1cf2896"
                                 ], 
                                 amountOutMin:0
@@ -1303,6 +1451,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
                                 ], 
                                 amountOutMin:0
@@ -1327,6 +1477,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                                 ],
                                 amountOutMin:0
@@ -1343,6 +1495,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
                                 ], 
                                 amountOutMin:0
@@ -1350,6 +1504,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
                                 ],
                                 amountOutMin:0
@@ -1357,6 +1513,7 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                     "0x5183e1B1091804BC2602586919E6880ac1cf2896"
                                 ], 
                                 amountOutMin:0
@@ -1373,6 +1530,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
                                 ], 
                                 amountOutMin:0
@@ -1397,6 +1556,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                                 ],
                                 amountOutMin:0
@@ -1404,6 +1565,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                     "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                                 ],
                                 amountOutMin:0
@@ -1413,6 +1576,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
                                 ], 
                                 amountOutMin:0
@@ -1420,6 +1585,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
                                 ],
                                 amountOutMin:0
@@ -1427,6 +1594,7 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                     "0x5183e1B1091804BC2602586919E6880ac1cf2896"
                                 ], 
                                 amountOutMin:0
@@ -1443,6 +1611,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
                                 ], 
                                 amountOutMin:0
@@ -1469,6 +1639,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                                 ],
                                 amountOutMin:0
@@ -1476,6 +1648,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                     "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                                 ],
                                 amountOutMin:0
@@ -1485,6 +1659,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
                                 ], 
                                 amountOutMin:0
@@ -1492,6 +1668,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
                                 ],
                                 amountOutMin:0
@@ -1499,6 +1677,7 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                     "0x5183e1B1091804BC2602586919E6880ac1cf2896"
                                 ], 
                                 amountOutMin:0
@@ -1515,6 +1694,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
                                 ], 
                                 amountOutMin:0
@@ -1541,6 +1722,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                                 ],
                                 amountOutMin:0
@@ -1548,6 +1731,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                     "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                                 ],
                                 amountOutMin:0
@@ -1557,6 +1742,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
                                 ], 
                                 amountOutMin:0
@@ -1571,6 +1758,7 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                     "0x5183e1B1091804BC2602586919E6880ac1cf2896"
                                 ], 
                                 amountOutMin:0
@@ -1587,6 +1775,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
                                 ], 
                                 amountOutMin:0
@@ -1613,6 +1803,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                                 ],
                                 amountOutMin:0
@@ -1629,6 +1821,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
                                 ], 
                                 amountOutMin:0
@@ -1636,6 +1830,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
                                 ],
                                 amountOutMin:0
@@ -1643,6 +1839,7 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                     "0x5183e1B1091804BC2602586919E6880ac1cf2896"
                                 ], 
                                 amountOutMin:0
@@ -1659,6 +1856,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
                                 ], 
                                 amountOutMin:0
@@ -1685,6 +1884,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                                 ],
                                 amountOutMin:0
@@ -1692,6 +1893,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                     "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                                 ],
                                 amountOutMin:0
@@ -1708,6 +1911,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
                                 ],
                                 amountOutMin:0
@@ -1715,6 +1920,7 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                     "0x5183e1B1091804BC2602586919E6880ac1cf2896"
                                 ], 
                                 amountOutMin:0
@@ -1731,6 +1937,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
                                 ], 
                                 amountOutMin:0
@@ -1739,7 +1947,7 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                         feeCollector,
                         { from: distributor },
                     ),
-                    "BAD_REWARD_TOKEN_ROUTES",
+                    "BAD_REWARDER_TOKEN_ROUTES",
                 ); // token1
                 await expectRevert(
                     assetRouter.distribute(
@@ -1755,6 +1963,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                                 ],
                                 amountOutMin:0
@@ -1762,6 +1972,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                     "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                                 ],
                                 amountOutMin:0
@@ -1771,6 +1983,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
                                 ], 
                                 amountOutMin:0
@@ -1785,6 +1999,7 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                     "0x5183e1B1091804BC2602586919E6880ac1cf2896"
                                 ], 
                                 amountOutMin:0
@@ -1801,6 +2016,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
                                 ], 
                                 amountOutMin:0
@@ -1809,7 +2026,7 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                         feeCollector,
                         { from: distributor },
                     ),
-                    "BAD_REWARD_TOKEN_ROUTES",
+                    "BAD_REWARDER_TOKEN_ROUTES",
                 ); // token 2
                 await expectRevert(
                     assetRouter.distribute(
@@ -1825,6 +2042,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                                 ],
                                 amountOutMin:0
@@ -1832,6 +2051,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                     "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                                 ],
                                 amountOutMin:0
@@ -1841,6 +2062,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
                                 ], 
                                 amountOutMin:0
@@ -1848,6 +2071,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
                                 ],
                                 amountOutMin:0
@@ -1871,6 +2096,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
                                 ], 
                                 amountOutMin:0
@@ -1879,7 +2106,7 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                         feeCollector,
                         { from: distributor },
                     ),
-                    "BAD_REWARD_TOKEN_ROUTES",
+                    "BAD_REWARDER_TOKEN_ROUTES",
                 ); // token 3
                 await expectRevert(
                     assetRouter.distribute(
@@ -1895,6 +2122,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
                                 ],
                                 amountOutMin:0
@@ -1902,6 +2131,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0xFa94348467f64D5A457F75F8bc40495D33c65aBB",
+                                    "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                     "0x5183e1B1091804BC2602586919E6880ac1cf2896",
                                 ],
                                 amountOutMin:0
@@ -1911,6 +2142,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0xB12BFcA5A55806AaF64E99521918A4bf0fC40802"
                                 ], 
                                 amountOutMin:0
@@ -1918,6 +2151,8 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
+                                    "0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB",
                                     "0x4988a896b1227218e4A686fdE5EabdcAbd91571f"
                                 ],
                                 amountOutMin:0
@@ -1925,6 +2160,7 @@ contract("UnoAssetRouterTrisolarisStable", accounts => {
                             {
                                 route:[
                                     "0x8BEc47865aDe3B172A928df8f990Bc7f2A3b9f79",
+                                    "0xC42C30aC6Cc15faC9bD938618BcaA1a1FaE8501d",
                                     "0x5183e1B1091804BC2602586919E6880ac1cf2896"
                                 ], 
                                 amountOutMin:0
