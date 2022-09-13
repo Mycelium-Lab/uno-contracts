@@ -6,6 +6,7 @@ import '../../interfaces/IUnoFarmFactory.sol';
 import '../../interfaces/IUnoAccessManager.sol'; 
 import '../../interfaces/IUniswapV2Pair.sol';
 import '../../interfaces/IStakingRewards.sol';
+import '../../interfaces/IWMATIC.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
@@ -25,6 +26,8 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
 
     bytes32 private constant DISTRIBUTOR_ROLE = keccak256('DISTRIBUTOR_ROLE');
     bytes32 private constant PAUSER_ROLE = keccak256('PAUSER_ROLE');
+
+    address public WMATIC;
 
     event Deposit(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Withdraw(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
@@ -49,6 +52,59 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
         __Pausable_init();
         accessManager = IUnoAccessManager(_accessManager);
         farmFactory = IUnoFarmFactory(_farmFactory);
+        WMATIC = 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270;
+    }
+
+    receive() external payable {
+        assert(msg.sender == WMATIC); // only accept ETH via fallback from the WMATIC contract
+    }
+    
+    /**
+     * @dev Autoconverts MATIC into WMATIC and deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool} and deposits tokens in it. Emits a {Deposit} event.
+     * @param lpStakingPool - Address of the pool to deposit tokens in.
+     * @param amountToken  - Token amount to deposit.
+     * @param amountTokenMin - Bounds the extent to which the (TOKEN/WMATIC or TOKEN/WMATIC) price can go up before the transaction reverts.
+     * @param amountETHMin - Minimum amount of Matic to deposit.
+     * @param amountLP - Additional LP Token amount to deposit.
+     * @param recipient - Address which will receive the deposit.
+     
+     * @return sentETH - WMATIC amount sent to the farm.
+     * @return sentToken - Token amount sent to the farm.
+     * @return liquidity - Total liquidity sent to the farm (in lpTokens).
+     */
+    function depositETH(address lpStakingPool, uint256 amountToken, uint256 amountTokenMin, uint256 amountETHMin, uint256 amountLP, address recipient) external payable whenNotPaused returns(uint256 sentETH, uint256 sentToken, uint256 liquidity){
+        Farm farm = Farm(farmFactory.Farms(lpStakingPool));
+        if(farm == Farm(address(0))){
+            farm = Farm(farmFactory.createFarm(lpStakingPool));
+        }
+        
+        require(farm.tokenA() == WMATIC || farm.tokenB() == WMATIC, "NO_WMATIC_IN_POOL");
+        require(msg.value > 0, "NO_MATIC_SENT");
+
+        IWMATIC(WMATIC).deposit{value: msg.value}();
+        IERC20Upgradeable(WMATIC).safeTransfer(address(farm), msg.value);
+
+        if(amountLP > 0){
+            IERC20Upgradeable(farm.lpPair()).safeTransferFrom(msg.sender, address(farm), amountLP);
+        }
+
+        if (farm.tokenA() == WMATIC) {
+            if (amountToken > 0) {
+                IERC20Upgradeable(farm.tokenB()).safeTransferFrom(msg.sender, address(farm), amountToken);
+            }
+            (sentETH, sentToken, liquidity) = _deposit(lpStakingPool, msg.value, amountToken, amountETHMin, amountTokenMin, amountLP, address(this), recipient);
+            IERC20Upgradeable(farm.tokenB()).safeTransfer(msg.sender, amountToken - sentToken);
+        } else {
+            if (amountToken > 0) {
+                IERC20Upgradeable(farm.tokenA()).safeTransferFrom(msg.sender, address(farm), amountToken);
+            }
+            (sentToken, sentETH, liquidity) = _deposit(lpStakingPool, amountToken, msg.value, amountTokenMin, amountETHMin, amountLP, address(this), recipient);
+            IERC20Upgradeable(farm.tokenA()).safeTransfer(msg.sender, amountToken - sentToken);
+        }
+
+        IWMATIC(WMATIC).withdraw(msg.value - sentETH);
+        payable(msg.sender).transfer(msg.value - sentETH);
+        emit Deposit(lpStakingPool, msg.sender, recipient, liquidity);
     }
 
     /**
@@ -79,10 +135,41 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
         }
         if(amountLP > 0){
             IERC20Upgradeable(farm.lpPair()).safeTransferFrom(msg.sender, address(farm), amountLP);
-        }
-        
-        (sentA, sentB, liquidity) = farm.deposit(amountA, amountB, amountAMin, amountBMin, amountLP, msg.sender, recipient);
-        emit Deposit(lpStakingPool, msg.sender, recipient, liquidity); 
+        } 
+
+        (sentA, sentB, liquidity) = _deposit(lpStakingPool, amountA, amountB, amountAMin, amountBMin, amountLP, msg.sender, recipient);
+        emit Deposit(lpStakingPool, msg.sender, recipient, liquidity);
+    }
+
+    /** 
+     * @dev Withdraws tokens from the given pool. Emits a {Withdraw} event.
+     * @param lpStakingPool - LP pool to withdraw from.
+     * @param amount - LP amount to withdraw. 
+     * @param amountTokenMin - The minimum amount of token that must be received for the transaction not to revert.
+     * @param amountETHMin - The minimum amount of MATIC that must be received for the transaction not to revert.
+     * @param recipient - The address which will receive tokens.
+
+     * @return amountETH - MATIC amount sent to the {recipient}.
+     * @return amountToken - Token amount sent to the {recipient}.
+     */ 
+    function withdrawETH(address lpStakingPool, uint256 amount, uint256 amountTokenMin, uint256 amountETHMin, address recipient) external payable returns(uint256 amountETH, uint256 amountToken){
+        Farm farm = Farm(farmFactory.Farms(lpStakingPool));
+        require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
+
+        require(farm.tokenA() == address(WMATIC) || farm.tokenB() == address(WMATIC), "NO_WMATIC_IN_POOL");
+
+        if (farm.tokenA() == address(WMATIC)) {
+            (amountETH, amountToken) = _withdraw(lpStakingPool, amount, amountETHMin, amountTokenMin, false, address(this));
+            IERC20Upgradeable(farm.tokenB()).safeTransfer(recipient, amountToken);
+        } else {
+            (amountToken, amountETH) = _withdraw(lpStakingPool, amount, amountTokenMin, amountETHMin, false, address(this));
+            IERC20Upgradeable(farm.tokenA()).safeTransfer(recipient, amountToken);
+            
+        } 
+
+        IWMATIC(WMATIC).withdraw(amountETH);
+        payable(recipient).transfer(amountETH);
+        emit Withdraw(lpStakingPool, msg.sender, recipient, amount);
     }
 
     /** 
@@ -101,7 +188,7 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
         Farm farm = Farm(farmFactory.Farms(lpStakingPool));
         require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
         
-        (amountA, amountB) = farm.withdraw(amount, amountAMin, amountBMin, withdrawLP, msg.sender, recipient); 
+        (amountA, amountB) = _withdraw(lpStakingPool, amount, amountAMin, amountBMin, withdrawLP, recipient);
         emit Withdraw(lpStakingPool, msg.sender, recipient, amount);  
     }
 
@@ -123,6 +210,18 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
 
         uint256 reward = farm.distribute(swapRoutes, amountsOutMin);
         emit Distribute(lpStakingPool, reward);
+    }
+
+    function _deposit(address lpStakingPool, uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin, uint256 amountLP, address origin, address recipient) internal returns (uint256 sentA, uint256 sentB, uint256 liquidity) {
+        Farm farm = Farm(farmFactory.Farms(lpStakingPool));
+
+        (sentA, sentB, liquidity) = farm.deposit(amountA, amountB, amountAMin, amountBMin, amountLP, origin, recipient);
+    }
+
+    function _withdraw(address lpStakingPool, uint256 amount, uint256 amountAMin, uint256 amountBMin, bool withdrawLP, address recipient) internal returns(uint256 amountA, uint256 amountB) {
+        Farm farm = Farm(farmFactory.Farms(lpStakingPool));
+
+        (amountA, amountB) = farm.withdraw(amount, amountAMin, amountBMin, withdrawLP, msg.sender, recipient); 
     }
 
     /**
@@ -172,6 +271,7 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
         tokenA = stakingToken.token0();
         tokenB = stakingToken.token1();
     }
+
 
     /**
      * @dev Converts LP tokens to normal tokens, value(amountA) == value(amountB) == 0.5*amountLP

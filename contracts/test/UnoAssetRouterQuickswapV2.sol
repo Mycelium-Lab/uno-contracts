@@ -27,6 +27,7 @@ contract UnoAssetRouterQuickswapV2 is Initializable, PausableUpgradeable, UUPSUp
     bytes32 private constant PAUSER_ROLE = keccak256('PAUSER_ROLE');
 
     uint256 public constant version = 2;
+    address private WMATIC;
 
     event Deposit(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Withdraw(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
