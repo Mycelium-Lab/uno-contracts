@@ -142,7 +142,7 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
     }
 
     /** 
-     * @dev Withdraws tokens from the given pool. Emits a {Withdraw} event.
+     * @dev Autoconverts WMATIC into MATIC and withdraws tokens from the pool. Emits a {Withdraw} event.
      * @param lpStakingPool - LP pool to withdraw from.
      * @param amount - LP amount to withdraw. 
      * @param amountTokenMin - The minimum amount of token that must be received for the transaction not to revert.
