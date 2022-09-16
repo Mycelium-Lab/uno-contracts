@@ -20,8 +20,6 @@ const quickswapRouter = "0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff";
 const pool = "0xAFB76771C98351Aa7fCA13B130c9972181612b54"; //usdt usdc
 const pool2 = "0x28b833473e047f6116C46d8ed5117708eeb151F9"; // wmatic wone
 
-const wmaticPool = "0x14977e7E263FF79c4c3159F497D9551fbE769625"; // wmatic usdc
-
 const DQuickHolder = "0xcf0b86f9944a60a0ba22b51a33c11d9e4de1ce9f"; //has to be unlocked and hold 0xf28164A485B0B2C90639E47b0f377b4a438a16B1
 const stakingRewardsOwner = "0x476307dac3fd170166e007fcaa14f0a129721463"; //has to be unlocked
 

@@ -28,6 +28,8 @@ contract UnoAssetRouterQuickswapDualV2 is Initializable, PausableUpgradeable, UU
 
     uint256 public constant version = 2;
 
+    address public WMATIC;
+
     event Deposit(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Withdraw(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Distribute(address indexed lpPool, uint256 reward);
@@ -51,6 +53,7 @@ contract UnoAssetRouterQuickswapDualV2 is Initializable, PausableUpgradeable, UU
         __Pausable_init();
         accessManager = IUnoAccessManager(_accessManager);
         farmFactory = IUnoFarmFactory(_farmFactory);
+        WMATIC = 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270;
     }
 
     /**
