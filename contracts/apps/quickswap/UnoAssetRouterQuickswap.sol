@@ -102,8 +102,10 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
             IERC20Upgradeable(farm.tokenA()).safeTransfer(msg.sender, amountToken - sentToken);
         }
 
-        IWMATIC(WMATIC).withdraw(msg.value - sentETH);
-        payable(msg.sender).transfer(msg.value - sentETH);
+        if (msg.value - sentETH > 0){
+            IWMATIC(WMATIC).withdraw(msg.value - sentETH);
+            payable(msg.sender).transfer(msg.value - sentETH);
+        }
         emit Deposit(lpStakingPool, msg.sender, recipient, liquidity);
     }
 

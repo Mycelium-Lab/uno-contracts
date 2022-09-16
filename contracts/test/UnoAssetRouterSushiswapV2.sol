@@ -27,6 +27,8 @@ contract UnoAssetRouterSushiswapV2 is Initializable, PausableUpgradeable, UUPSUp
 
     uint256 public constant version = 2;
 
+    address public WMATIC;
+
     event Deposit(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Withdraw(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Distribute(address indexed lpPool, uint256 reward);
