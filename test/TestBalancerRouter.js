@@ -28,6 +28,8 @@ const account2 = "0x78D799BE3Fd3D96f0e024b9B35ADb4479a9556f5"//has to be unlocke
 
 const amounts = [new BN(1000000), new BN(3000000), new BN(500000), new BN(4000000), new BN('1000000000000000')]
 
+const feeCollector = "0xFFFf795B802CB03FD664092Ab169f5f5c236335c"
+const fee = new BN('40000000000000000')//4%
 
 contract('UnoAssetRouterBalancer', accounts => {
     const admin = accounts[0]
@@ -186,7 +188,7 @@ contract('UnoAssetRouterBalancer', accounts => {
                     "Pausable: paused"
                 )
                 await expectRevert(
-                    assetRouter.distribute(pool, [], [], [], {from: account1}),
+                    assetRouter.distribute(pool, [{swaps:[],assets:[],limits:[]}], [{swaps:[],assets:[],limits:[]}], feeCollector, {from: account1}),
                     "Pausable: paused"
                 )
             })
@@ -220,7 +222,7 @@ contract('UnoAssetRouterBalancer', accounts => {
                     "BAD_AMOUNTS_LENGTH"
                 )
                 await expectRevert(
-                    assetRouter.distribute(pool, [], [], [], {from: account1}),
+                    assetRouter.distribute(pool, [{swaps:[],assets:[],limits:[]}], [{swaps:[],assets:[],limits:[]}], feeCollector, {from: account1}),
                     "CALLER_NOT_AUTHORIZED"
                 )
             })
@@ -686,23 +688,57 @@ contract('UnoAssetRouterBalancer', accounts => {
             })
         })
     })
+
+    describe('Sets Fee', () => {
+        describe('reverts', () => {
+            it('reverts if called not by an admin', async () => {
+                await expectRevert(
+                    assetRouter.setFee(fee, {from: account1}),
+                    "CALLER_NOT_AUTHORIZED"
+                )
+            })
+            it('reverts if fee is greater than 100%', async () => {
+                await expectRevert(
+                    assetRouter.setFee('1000000000000000001', {from: admin}),
+                    "BAD_FEE"
+                )
+            })
+        })
+        describe('Sets new fee', () => {
+            let receipt
+            before(async () => {
+                receipt = await assetRouter.setFee(fee, {from: admin})
+            })
+            it('fires events', async () => {
+                expectEvent(receipt, 'FeeChanged', {previousFee:new BN(0), newFee:fee})
+            })
+            it('sets new fee' ,async () => {
+                assert.equal(
+                    (await assetRouter.fee()).toString(),
+                    fee.toString(),
+                    "Fee is not correct"
+                )
+            })
+        })
+    })
+
     describe('Distributions', () => {
         describe('reverts', () => {
             it('reverts if called not by distributor', async () => {
                 await expectRevert(
-                    assetRouter.distribute(pool, [], [], [], {from: pauser}),
+                    assetRouter.distribute(pool, [{swaps:[],assets:[],limits:[]}], [{swaps:[],assets:[],limits:[]}], feeCollector, {from: pauser}),
                     "CALLER_NOT_AUTHORIZED"
                 )
             })
             it('reverts if pool doesnt exist', async () => {
                 await expectRevert(
-                    assetRouter.distribute(pool2, [], [], [], {from: distributor}),
+                    assetRouter.distribute(pool2, [{swaps:[],assets:[],limits:[]}], [{swaps:[],assets:[],limits:[]}], feeCollector, {from: distributor}),
                     "FARM_NOT_EXISTS"
                 )
             })
             it('reverts if there is no liquidity in the pool', async () => {
                 await expectRevert(
-                    assetRouter.distribute(pool, [], [], [], {from: distributor}),
+                    assetRouter.distribute(pool, [{swaps:[],assets:[],limits:[]}], [{swaps:[],assets:[],limits:[]}], feeCollector, {from: distributor}),
                     "NO_LIQUIDITY"
                 )
             })
@@ -710,6 +746,7 @@ contract('UnoAssetRouterBalancer', accounts => {
         describe('distributes', () => {
             let receipt
             let balance1, balance2
+            let feeCollectorBalanceBefore
             before(async () => {
                 balance1 = await stakingToken.balanceOf(account1)
                 await stakingToken.approve(assetRouter.address, balance1, {from: account1})
@@ -719,17 +756,30 @@ contract('UnoAssetRouterBalancer', accounts => {
                 await stakingToken.approve(assetRouter.address, balance2, {from: account2})
                 await assetRouter.deposit(pool, zeroAmounts, tokens, 0, balance2, account2, {from: account2})
 
-                await time.increase(50000)
+                await time.increase(5000)
 
-                const farmAddress = await factory.Farms(pool)////////////////////////////////////////////////////////////////
+                const farmAddress = await factory.Farms(pool)
                 const gaugeContract = await IGauge.at(gauge.address) //this is not a IUniswapV2Pair, however the abi is sufficient for our purposes
-                const rewardAmount = await gaugeContract.claimable_reward_write.call(farmAddress,'0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3')/////////////////
+                const rewardAmount = await gaugeContract.claimable_reward_write.call(farmAddress,'0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3')
+                const WMATIC = await IUniswapV2Pair.at('0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270')
+                feeCollectorBalanceBefore = await WMATIC.balanceOf(feeCollector)
+
+                const reward = rewardAmount.mul(new BN(96)).div(new BN(100))
+                const fee = rewardAmount.mul(new BN(4)).div(new BN(100))
 
                 receipt = await assetRouter.distribute(
                     pool, 
-                    [[{"poolId":"0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006","assetInIndex":0,"assetOutIndex":1,"amount":rewardAmount.toString(),"userData":"0x"}]], //amount can be any number since it is changed to be set to balance in contract
-                    [["0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3","0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270"]], //reward token to wmatic
-                    [["0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","0"]],
+                    [{
+                        swaps: [{"poolId":"0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006","assetInIndex":0,"assetOutIndex":1,"amount":reward.toString(),"userData":"0x"}],
+                        assets: ["0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3","0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270"],//reward token to wmatic
+                        limits: ["0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","0"]
+                    }],
+                    [{
+                        swaps: [{"poolId":"0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006","assetInIndex":0,"assetOutIndex":1,"amount":fee.toString(),"userData":"0x"}],
+                        assets: ["0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3","0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270"],//reward token to wmatic
+                        limits: ["0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","0"]
+                    }],
+                    feeCollector,
                     {from: distributor}
                 )
             })
@@ -743,7 +793,13 @@ contract('UnoAssetRouterBalancer', accounts => {
                 const stake2 = await assetRouter.userStake(account2, pool)
                 assert.ok(stake2.gt(balance2), "Stake1 not increased")
             })
+            it('collects fees', async () => {
+                const WMATIC = await IUniswapV2Pair.at('0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270')
+                const feeCollectorBalanceAfter = await WMATIC.balanceOf(feeCollector)
+                assert.ok(feeCollectorBalanceAfter.gt(feeCollectorBalanceBefore), "Fee collector balance not increased")
+            })
         })
+        
         describe('bad path reverts', () => {
             before(async () => {
                 await time.increase(50000)
@@ -752,9 +808,22 @@ contract('UnoAssetRouterBalancer', accounts => {
                 await expectRevert(
                     assetRouter.distribute(
                         pool, 
-                        [[{"poolId":"0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006","assetInIndex":0,"assetOutIndex":1,"amount":0,"userData":"0x"}],[{"poolId":"0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006","assetInIndex":0,"assetOutIndex":1,"amount":0,"userData":"0x"}]],
-                        [["0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3","0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270"]],
-                        [["0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","0"]],
+                        [{
+                            swaps: [{"poolId":"0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006","assetInIndex":0,"assetOutIndex":1,"amount":0,"userData":"0x"}],
+                            assets: ["0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3","0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270"],//reward token to wmatic
+                            limits: ["0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","0"]
+                        },
+                        {
+                            swaps: [{"poolId":"0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006","assetInIndex":0,"assetOutIndex":1,"amount":0,"userData":"0x"}],
+                            assets: ["0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3","0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270"],//reward token to wmatic
+                            limits: ["0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","0"]
+                        }],
+                        [{
+                            swaps: [{"poolId":"0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006","assetInIndex":0,"assetOutIndex":1,"amount":0,"userData":"0x"}],
+                            assets: ["0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3","0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270"],//reward token to wmatic
+                            limits: ["0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","0"]
+                        }],
+                        feeCollector,
                         {from: distributor}
                     ),
                     "PARAMS_LENGTHS_NOT_MATCH_REWARD_COUNT"
@@ -762,19 +831,22 @@ contract('UnoAssetRouterBalancer', accounts => {
                 await expectRevert(
                     assetRouter.distribute(
                         pool, 
-                        [[{"poolId":"0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006","assetInIndex":0,"assetOutIndex":1,"amount":0,"userData":"0x"}]],
-                        [["0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3","0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270"], ["0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3","0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270"]],
-                        [["0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","0"]],
-                        {from: distributor}
-                    ),
-                    "PARAMS_LENGTHS_NOT_MATCH_REWARD_COUNT"
-                )
-                await expectRevert(
-                    assetRouter.distribute(
-                        pool, 
-                        [[{"poolId":"0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006","assetInIndex":0,"assetOutIndex":1,"amount":0,"userData":"0x"}]],
-                        [["0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3","0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270"]],
-                        [["0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","0"],["0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","0"]],
+                        [{
+                            swaps: [{"poolId":"0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006","assetInIndex":0,"assetOutIndex":1,"amount":0,"userData":"0x"}],
+                            assets: ["0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3","0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270"],//reward token to wmatic
+                            limits: ["0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","0"]
+                        }],
+                        [{
+                            swaps: [{"poolId":"0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006","assetInIndex":0,"assetOutIndex":1,"amount":0,"userData":"0x"}],
+                            assets: ["0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3","0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270"],//reward token to wmatic
+                            limits: ["0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","0"]
+                        },
+                        {
+                            swaps: [{"poolId":"0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006","assetInIndex":0,"assetOutIndex":1,"amount":0,"userData":"0x"}],
+                            assets: ["0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3","0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270"],//reward token to wmatic
+                            limits: ["0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","0"]
+                        }],
+                        feeCollector,
                         {from: distributor}
                     ),
                     "PARAMS_LENGTHS_NOT_MATCH_REWARD_COUNT"

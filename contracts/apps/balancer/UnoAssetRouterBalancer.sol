@@ -28,9 +28,13 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
 
     IVault constant private Vault = IVault(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
 
+    uint256 public fee;
+
     event Deposit(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Withdraw(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Distribute(address indexed lpPool, uint256 reward);
+
+    event FeeChanged(uint256 previousFee, uint256 newFee);
 
     modifier onlyRole(bytes32 role){
         require(accessManager.hasRole(role, msg.sender), 'CALLER_NOT_AUTHORIZED');
@@ -104,22 +108,22 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
     /**
      * @dev Distributes tokens between users for a single {Farms[lpPool]}.
      * @param lpPool - The pool to distribute. 
-     * @param swaps - The data used to swap reward tokens for the needed tokens.
-     * @param assets - The data used to swap reward tokens for the needed tokens.
-     * @param limits - The data used to swap reward tokens for the needed tokens.
+     * @param swapInfos - The data used to swap reward tokens for the needed tokens.
+     * @param feeSwapInfos - The data used to swap reward tokens for fees.
+     * @param feeTo - Address to collect fees to.
      *
      * Note: This function can only be called by the distributor.
      */
     function distribute(
         address lpPool,
-        IVault.BatchSwapStep[][] calldata swaps,
-        IAsset[][] calldata assets,
-        int256[][] calldata limits
+        Farm.SwapInfo[] calldata swapInfos,
+        Farm.SwapInfo[] calldata feeSwapInfos,
+        address feeTo
     ) external whenNotPaused onlyRole(DISTRIBUTOR_ROLE) {
         Farm farm = Farm(farmFactory.Farms(lpPool));
         require(farm != Farm(address(0)), 'FARM_NOT_EXISTS');
 
-        uint256 reward = farm.distribute(swaps, assets, limits);
+        uint256 reward = farm.distribute(swapInfos, feeSwapInfos, Farm.FeeInfo(feeTo, fee));
         emit Distribute(lpPool, reward);
     }
 
@@ -161,6 +165,20 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
     function getTokens(address lpPool) external view returns(IERC20[] memory tokens){
         bytes32 poolId = IBasePool(lpPool).getPoolId();
         (tokens, , ) = Vault.getPoolTokens(poolId);
+    }
+
+    /**
+     * @dev Change fee amount.
+     * @param _fee -New fee to collect from farms. [10^18 == 100%]
+     *
+     * Note: This function can only be called by ADMIN_ROLE.
+     */ 
+    function setFee(uint256 _fee) external onlyRole(accessManager.ADMIN_ROLE()){
+        require (_fee <= 1 ether, "BAD_FEE");
+        if(fee != _fee){
+            emit FeeChanged(fee, _fee); 
+            fee = _fee;
+        }
     }
  
     function pause() external onlyRole(PAUSER_ROLE) {
