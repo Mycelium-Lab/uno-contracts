@@ -145,20 +145,20 @@ contract('UnoAssetRouterQuickswapDual', accounts => {
     })
 
     describe('getTokens', () => {
-        let _tokenA, _tokenB
+        let tokens
         before(async () => {
-            ({tokenA:_tokenA, tokenB:_tokenB} = await assetRouter.getTokens(pool));
+            tokens = await assetRouter.getTokens(pool);
         })
         it('TokenA is correct', async () => {
             assert.equal(
-                _tokenA,
+                tokens[0],
                 tokenA.address,
                 "TokenA is not correct"
             )
         })
         it('TokenB is correct', async () => {
             assert.equal(
-                _tokenB,
+                tokens[1],
                 tokenB.address,
                 "TokenB is not correct"
             )

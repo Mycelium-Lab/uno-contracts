@@ -4,7 +4,8 @@ pragma solidity 0.8.10;
 import {IUnoFarmBalancer as Farm} from './IUnoFarmBalancer.sol'; 
 import '../../../interfaces/IUnoFarmFactory.sol';
 import '../../../interfaces/IUnoAccessManager.sol'; 
-import '../../../interfaces/IVault.sol'; 
+import '../../../interfaces/IVault.sol';
+import '@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol';
 
 interface IUnoAssetRouterBalancer {
     event Deposit(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
@@ -31,7 +32,7 @@ interface IUnoAssetRouterBalancer {
 
     function userStake(address _address, address lpPool) external view returns(uint256);
     function totalDeposits(address lpPool) external view returns (uint256);
-    function getTokens(address lpPool) external view returns(IERC20[] memory tokens);
+    function getTokens(address lpPool) external view returns(IERC20Upgradeable[] memory tokens);
 
     function setFee(uint256 _fee) external;
 
