@@ -837,18 +837,26 @@ contract("UnoAutoStrategy", (accounts) => {
                 await assetRouter.distribute(
                     data.pool, 
                     [
-                        [
-                            "0xf28164A485B0B2C90639E47b0f377b4a438a16B1",
-                            '0x831753DD7087CaC61aB5644b308642cc1c33Dc13', //rewardsToken is dQUICK so we have to swap it to QUICK first and then to tokenA
-                            data.tokenA
-                        ], 
-                        [
-                            "0xf28164A485B0B2C90639E47b0f377b4a438a16B1",
-                            '0x831753DD7087CaC61aB5644b308642cc1c33Dc13', //rewardsToken is dQUICK so we have to swap it to QUICK first and then to tokenB
-                            data.tokenB
-                        ]
-                    ], 
-                    [1, 1], 
+                        {
+                            route:[
+                                "0xf28164A485B0B2C90639E47b0f377b4a438a16B1",
+                                '0x831753DD7087CaC61aB5644b308642cc1c33Dc13', //rewardsToken is dQUICK so we have to swap it to QUICK first and then to tokenA
+                                data.tokenA
+                            ], 
+                            amountOutMin:1
+                        },
+
+                        {
+                            route:[
+                                "0xf28164A485B0B2C90639E47b0f377b4a438a16B1",
+                                '0x831753DD7087CaC61aB5644b308642cc1c33Dc13', //rewardsToken is dQUICK so we have to swap it to QUICK first and then to tokenB
+                                data.tokenB
+                            ], 
+                            amountOutMin:1
+                        }
+                    ],
+                    {route:[],amountOutMin:0},
+                    constants.ZERO_ADDRESS,
                     {from: distributor}
                 )
             });

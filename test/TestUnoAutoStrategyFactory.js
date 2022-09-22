@@ -1,6 +1,11 @@
-const { expectRevert, expectEvent, BN, constants, time } = require("@openzeppelin/test-helpers");
+const { expectRevert, expectEvent, BN, constants } = require("@openzeppelin/test-helpers");
+const { deployProxy } = require("@openzeppelin/truffle-upgrades");
 
-const timeMachine = require("ganache-time-traveler");
+const UnoAssetRouterQuickswap = artifacts.require("UnoAssetRouterQuickswap");
+const UnoFarmQuickswap = artifacts.require("UnoFarmQuickswap");
+const UnoAssetRouterSushiswap = artifacts.require("UnoAssetRouterSushiswap");
+const UnoFarmSushiswap = artifacts.require("UnoFarmSushiswap");
+const FarmFactory = artifacts.require('UnoFarmFactory') 
 
 const IERC20 = artifacts.require("IERC20");
 
@@ -12,9 +17,6 @@ const AutoStrategyFactory = artifacts.require("UnoAutoStrategyFactory");
 
 const pool1 = "0xafb76771c98351aa7fca13b130c9972181612b54"; // usdt-usdc quickswap
 const pool2 = "0x4b1f1e2435a9c96f7330faea190ef6a7c8d70001"; // usdt-usdc sushiswap
-
-const assetRouter1 = "0xF5AE5c5151aE25019be8b328603C18153d669461"; // quickswap
-const assetRouter2 = "0xa5eb4E95a92b74f48f8eb118c4675095DcCDe3f8"; // sushiswap
 
 const account1 = "0x477b8D5eF7C2C42DB84deB555419cd817c336b6F"; // -u
 
@@ -33,11 +35,8 @@ contract("UnoAutoStrategyFactory", (accounts) => {
     let accessManager;
 
     let autoStrategyFactory;
-    let autoStrategy;
-
-    let strategyToken;
-    let snapshotId;
-    let snapshotIdBeforeDeposit;
+    let assetRouterQuickswap
+    let assetRouterSushiswap
     before(async () => {
         accessManager = await AccessManager.new({ from: admin }); //accounts[0] is admin
 
@@ -50,8 +49,21 @@ contract("UnoAutoStrategyFactory", (accounts) => {
             from: admin,
         }); //PAUSER_ROLE
 
-        const autoStrategyImplementation = await AutoStrategy.new();
+        assetRouterQuickswap = await deployProxy(
+            UnoAssetRouterQuickswap,
+            { kind: 'uups', initializer: false }
+        )
+        const farmImplementationQuickswap = await UnoFarmQuickswap.new()
+        await FarmFactory.new(farmImplementationQuickswap.address, accessManager.address, assetRouterQuickswap.address)
 
+        assetRouterSushiswap = await deployProxy(
+            UnoAssetRouterSushiswap,
+            { kind: 'uups', initializer: false }
+        )
+        const farmImplementationSushiswap = await UnoFarmSushiswap.new()
+        await FarmFactory.new(farmImplementationSushiswap.address, accessManager.address, assetRouterSushiswap.address)
+
+        const autoStrategyImplementation = await AutoStrategy.new();
         autoStrategyFactory = await AutoStrategyFactory.new(autoStrategyImplementation.address, accessManager.address);
     });
     describe("Init Values", () => {
@@ -71,7 +83,7 @@ contract("UnoAutoStrategyFactory", (accounts) => {
         describe("onlyAdmin revokes", () => {
             it("cannot approveAssetRouter if not administrator", async () => {
                 await expectRevert(
-                    autoStrategyFactory.approveAssetRouter(assetRouter1, {
+                    autoStrategyFactory.approveAssetRouter(assetRouterQuickswap.address, {
                         from: pauser,
                     }),
                     "CALLER_NOT_AUTHORIZED"
@@ -79,7 +91,7 @@ contract("UnoAutoStrategyFactory", (accounts) => {
             });
             it("cannot revokeAssetRouter if not administrator", async () => {
                 await expectRevert(
-                    autoStrategyFactory.revokeAssetRouter(assetRouter1, {
+                    autoStrategyFactory.revokeAssetRouter(assetRouterQuickswap.address, {
                         from: pauser,
                     }),
                     "CALLER_NOT_AUTHORIZED"
@@ -122,7 +134,7 @@ contract("UnoAutoStrategyFactory", (accounts) => {
             //passes pausable checks but fails on role check
             it("can approveAssetRouter when paused", async () => {
                 await expectRevert(
-                    autoStrategyFactory.approveAssetRouter(assetRouter1, {
+                    autoStrategyFactory.approveAssetRouter(assetRouterQuickswap.address, {
                         from: pauser,
                     }),
                     "CALLER_NOT_AUTHORIZED"
@@ -130,7 +142,7 @@ contract("UnoAutoStrategyFactory", (accounts) => {
             });
             it("can revokeAssetRouter when paused", async () => {
                 await expectRevert(
-                    autoStrategyFactory.revokeAssetRouter(assetRouter1, {
+                    autoStrategyFactory.revokeAssetRouter(assetRouterQuickswap.address, {
                         from: pauser,
                     }),
                     "CALLER_NOT_AUTHORIZED"
@@ -155,23 +167,23 @@ contract("UnoAutoStrategyFactory", (accounts) => {
     describe("Asset Router Approvals", () => {
         describe("revokes", () => {
             it("cannot approve twice", async () => {
-                await autoStrategyFactory.approveAssetRouter(assetRouter1, {
+                await autoStrategyFactory.approveAssetRouter(assetRouterQuickswap.address, {
                     from: admin,
                 });
 
                 await expectRevert(
-                    autoStrategyFactory.approveAssetRouter(assetRouter1, {
+                    autoStrategyFactory.approveAssetRouter(assetRouterQuickswap.address, {
                         from: admin,
                     }),
                     "ASSET_ROUTER_ALREADY_APPROVED"
                 );
             });
             it("cannot revoke if was not approved", async () => {
-                await autoStrategyFactory.revokeAssetRouter(assetRouter1, {
+                await autoStrategyFactory.revokeAssetRouter(assetRouterQuickswap.address, {
                     from: admin,
                 });
                 await expectRevert(
-                    autoStrategyFactory.revokeAssetRouter(assetRouter1, {
+                    autoStrategyFactory.revokeAssetRouter(assetRouterQuickswap.address, {
                         from: admin,
                     }),
                     "ASSET_ROUTER_NOT_APPROVED"
@@ -181,46 +193,46 @@ contract("UnoAutoStrategyFactory", (accounts) => {
         describe("approves", () => {
             let receipt;
             before(async () => {
-                receipt = await autoStrategyFactory.approveAssetRouter(assetRouter1, {
+                receipt = await autoStrategyFactory.approveAssetRouter(assetRouterQuickswap.address, {
                     from: admin,
                 });
             });
             after(async () => {
-                await autoStrategyFactory.revokeAssetRouter(assetRouter1, {
+                await autoStrategyFactory.revokeAssetRouter(assetRouterQuickswap.address, {
                     from: admin,
                 });
             });
             it("assetRouterApproved", async () => {
                 assert.ok(
-                    await autoStrategyFactory.assetRouterApproved(assetRouter1),
-                    `${assetRouter1} was not approved`
+                    await autoStrategyFactory.assetRouterApproved(assetRouterQuickswap.address),
+                    `${assetRouterQuickswap.address} was not approved`
                 );
             });
             it("fires event", async () => {
                 expectEvent(receipt, "AssetRouterApproved", {
-                    assetRouter: assetRouter1,
+                    assetRouter: assetRouterQuickswap.address,
                 });
             });
         });
         describe("revokes", () => {
             let receipt;
             before(async () => {
-                await autoStrategyFactory.approveAssetRouter(assetRouter1, {
+                await autoStrategyFactory.approveAssetRouter(assetRouterQuickswap.address, {
                     from: admin,
                 });
-                receipt = await autoStrategyFactory.revokeAssetRouter(assetRouter1, {
+                receipt = await autoStrategyFactory.revokeAssetRouter(assetRouterQuickswap.address, {
                     from: admin,
                 });
             });
             it("assetRouterApproved", async () => {
                 assert.ok(
-                    !(await autoStrategyFactory.assetRouterApproved(assetRouter1)),
-                    `${assetRouter1} was not approved`
+                    !(await autoStrategyFactory.assetRouterApproved(assetRouterQuickswap.address)),
+                    `${assetRouterQuickswap.address} was not approved`
                 );
             });
             it("fires event", async () => {
                 expectEvent(receipt, "AssetRouterRevoked", {
-                    assetRouter: assetRouter1,
+                    assetRouter: assetRouterQuickswap.address,
                 });
             });
         });
@@ -228,12 +240,12 @@ contract("UnoAutoStrategyFactory", (accounts) => {
     describe("Strategies", () => {
         describe("revokes", () => {
             before(async () => {
-                await autoStrategyFactory.approveAssetRouter(assetRouter1, {
+                await autoStrategyFactory.approveAssetRouter(assetRouterQuickswap.address, {
                     from: admin,
                 });
             });
             after(async () => {
-                await autoStrategyFactory.revokeAssetRouter(assetRouter1, {
+                await autoStrategyFactory.revokeAssetRouter(assetRouterQuickswap.address, {
                     from: admin,
                 });
             });
@@ -241,8 +253,8 @@ contract("UnoAutoStrategyFactory", (accounts) => {
                 await expectRevert(
                     autoStrategyFactory.createStrategy(
                         [
-                            { pool: pool1, assetRouter: assetRouter1 },
-                            { pool: pool2, assetRouter: assetRouter2 },
+                            { pool: pool1, assetRouter: assetRouterQuickswap.address },
+                            { pool: pool2, assetRouter: assetRouterSushiswap.address },
                         ],
                         {
                             from: admin,
@@ -255,26 +267,26 @@ contract("UnoAutoStrategyFactory", (accounts) => {
         describe("createStrategy", () => {
             let receipt;
             before(async () => {
-                await autoStrategyFactory.approveAssetRouter(assetRouter1, {
+                await autoStrategyFactory.approveAssetRouter(assetRouterQuickswap.address, {
                     from: admin,
                 });
-                await autoStrategyFactory.approveAssetRouter(assetRouter2, {
+                await autoStrategyFactory.approveAssetRouter(assetRouterSushiswap.address, {
                     from: admin,
                 });
             });
             after(async () => {
-                await autoStrategyFactory.revokeAssetRouter(assetRouter1, {
+                await autoStrategyFactory.revokeAssetRouter(assetRouterQuickswap.address, {
                     from: admin,
                 });
-                await autoStrategyFactory.revokeAssetRouter(assetRouter2, {
+                await autoStrategyFactory.revokeAssetRouter(assetRouterSushiswap.address, {
                     from: admin,
                 });
             });
             it("can createStrategy", async () => {
                 receipt = await autoStrategyFactory.createStrategy(
                     [
-                        { pool: pool1, assetRouter: assetRouter1 },
-                        { pool: pool2, assetRouter: assetRouter2 },
+                        { pool: pool1, assetRouter: assetRouterQuickswap.address },
+                        { pool: pool2, assetRouter: assetRouterSushiswap.address },
                     ],
                     {
                         from: admin,
