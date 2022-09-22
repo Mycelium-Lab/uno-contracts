@@ -6,6 +6,7 @@ import '../../interfaces/IUnoFarmFactory.sol';
 import '../../interfaces/IUnoAccessManager.sol'; 
 import '../../interfaces/IVault.sol'; 
 import "../../interfaces/IBasePool.sol";
+import '../../interfaces/IWMATIC.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
@@ -25,6 +26,8 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
 
     bytes32 private constant DISTRIBUTOR_ROLE = keccak256('DISTRIBUTOR_ROLE');
     bytes32 private constant PAUSER_ROLE = keccak256('PAUSER_ROLE');
+
+    address public WMATIC;
 
     IVault constant private Vault = IVault(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
 
@@ -51,6 +54,56 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
         __Pausable_init();
         accessManager = IUnoAccessManager(_accessManager);
         farmFactory = IUnoFarmFactory(_farmFactory);
+        WMATIC = 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270;
+    }
+
+    receive() external payable {
+        assert(msg.sender == WMATIC); // only accept ETH via fallback from the WMATIC contract
+    }
+
+        /**
+     * @dev Autoconverts MATIC into WMATIC and deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpPool} and deposits tokens in it.
+     * @param lpPool - Address of the pool to deposit tokens in.
+     * @param amounts - Amounts of tokens to deposit.
+     * @param tokens - Tokens to deposit.
+     * @param minAmountLP - Minimum LP the user will receive from {{tokens}} deposit.
+     * @param amountLP - Additional amount of LP tokens to deposit.
+     * @param recipient - Address which will receive the deposit.
+
+     * @return liquidity - Total liquidity sent to the farm (in lpTokens).
+     */
+    function depositETH(address lpPool, uint256[] memory amounts, address[] memory tokens, uint256 minAmountLP, uint256 amountLP, address recipient) external payable whenNotPaused returns(uint256 liquidity){
+        require (amounts.length == tokens.length, 'AMOUNTS_AND_TOKENS_LENGTHS_NOT_MATCH');
+
+        Farm farm = Farm(farmFactory.Farms(lpPool));
+        if(farm == Farm(address(0))){
+            farm = Farm(farmFactory.createFarm(lpPool));
+        }
+
+        require(msg.value > 0, "NO_MATIC_SENT");
+
+        bool wmaticInTokens = false;
+        for (uint256 i = 0; i < tokens.length; i++) {
+            if(tokens[i] == WMATIC){
+                wmaticInTokens = true;
+            }
+        }
+        require(wmaticInTokens, "NO_WMATIC_IN_TOKENS");
+
+        IWMATIC(WMATIC).deposit{value: msg.value}();
+        IERC20Upgradeable(WMATIC).safeTransfer(address(farm), msg.value);
+
+        for (uint256 i = 0; i < tokens.length; i++) {
+            if(amounts[i] > 0 && tokens[i] != WMATIC){
+                IERC20Upgradeable(tokens[i]).safeTransferFrom(msg.sender, address(farm), amounts[i]);
+            }
+        }
+        if(amountLP > 0){
+            IERC20Upgradeable(lpPool).safeTransferFrom(msg.sender, address(farm), amountLP);
+        }
+        
+        liquidity = farm.deposit(amounts, tokens, minAmountLP, amountLP, recipient);
+        emit Deposit(lpPool, msg.sender, recipient, liquidity); 
     }
 
     /**
@@ -83,6 +136,39 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
         
         liquidity = farm.deposit(amounts, tokens, minAmountLP, amountLP, recipient);
         emit Deposit(lpPool, msg.sender, recipient, liquidity); 
+    }
+
+    /** 
+     * @dev Autoconverts WMATIC into MATIC and withdraws tokens from the given pool. 
+     * @param lpPool - LP pool to withdraw from.
+     * @param amount - LP amount to withdraw. 
+     * @param minAmountsOut - Minimum token amounts the user will receive.
+     * @param recipient - The address which will receive tokens.
+     */ 
+    function withdrawETH(address lpPool, uint256 amount, uint256[] calldata minAmountsOut, address recipient) external { 
+        Farm farm = Farm(farmFactory.Farms(lpPool));
+        require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
+
+        IERC20[] memory tokens = this.getTokens(lpPool);
+        uint256[] memory balancesBefore = new uint256[](tokens.length);
+        for (uint256 i = 0; i < tokens.length; i++) {
+            balancesBefore[i] = IERC20Upgradeable(address(tokens[i])).balanceOf(address(this));
+        }
+
+        farm.withdraw(amount, minAmountsOut, false, msg.sender, address(this));
+        require(this.getTokens(lpPool).length == tokens.length, "NUMBER_OF_TOKENS_CHANGED");
+
+        for (uint256 i = 0; i < tokens.length; i++) {
+            uint256 balanceAfter = IERC20Upgradeable(address(tokens[i])).balanceOf(address(this));
+            uint256 amountWithdrawn = balanceAfter - balancesBefore[i];
+            if (address(tokens[i]) != WMATIC) {
+                IERC20Upgradeable(address(tokens[i])).safeTransfer(recipient, amountWithdrawn);
+            } else {
+                IWMATIC(WMATIC).withdraw(amountWithdrawn);
+                payable(recipient).transfer(amountWithdrawn);
+            }
+        } 
+        emit Withdraw(lpPool, msg.sender, recipient, amount);  
     }
 
     /** 
