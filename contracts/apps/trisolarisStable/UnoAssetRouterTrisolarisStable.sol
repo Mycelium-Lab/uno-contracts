@@ -180,7 +180,7 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
 
      * @return tokens - Array of token addresses.
      */  
-    function getTokens(address swap) external view returns(address[] memory tokens){
+    function getTokens(address swap) external view returns(IERC20[] memory tokens){
         uint8 tokenCount;
         address[] memory _tokens = new address[](type(uint8).max);
         for (uint8 i = 0; i < type(uint8).max; i++) {
@@ -193,9 +193,9 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
         }
         require(tokenCount > 0, "NO_TOKENS_IN_SWAP");
 
-        tokens = new address[](tokenCount);
+        tokens = new IERC20[](tokenCount);
         for (uint8 i = 0; i < tokenCount; i++) {
-            tokens[i] = _tokens[i];
+            tokens[i] = IERC20(_tokens[i]);
         }
         return tokens;
     }
