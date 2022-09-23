@@ -14,7 +14,7 @@ module.exports = {
       timeoutBlocks: 2000,
       provider: () => new HDWalletProvider({
         privateKeys:  [process.env.PRIVATE_KEY],
-        providerOrUrl: "https://mainnet.aurora.dev",
+        providerOrUrl: `https://mainnet.aurora.dev/${process.env.AURORA_PLUS}`,
         chainId: 1313161554,
         pollingInterval: 30000
       }),

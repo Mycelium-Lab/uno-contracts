@@ -229,7 +229,7 @@ contract UnoAssetRouterTrisolarisStandard is Initializable, PausableUpgradeable,
      *
      * Note: This function can only be called by ADMIN_ROLE.
      */ 
-    function setFee(uint256 _fee) external onlyRole(accessManager.ADMIN_ROLE()){
+    function setFee(uint256 _fee) external onlyRole(ADMIN_ROLE){
         require (_fee <= 1 ether, "BAD_FEE");
         if(fee != _fee){
             emit FeeChanged(fee, _fee); 

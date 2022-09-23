@@ -1,8 +1,9 @@
+const { prepareUpgrade } = require("@openzeppelin/truffle-upgrades");
 const Farm = artifacts.require("UnoFarmTrisolarisStable");
 const AssetRouter = artifacts.require("UnoAssetRouterTrisolarisStable");
 
 module.exports = async function (deployer, network) {
-    if (network != "polygon") return
+    if (network != "aurora") return
 
     //AssetRouter upgrade
     const assetRouter = await AssetRouter.deployed()
