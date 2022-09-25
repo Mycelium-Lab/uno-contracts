@@ -86,6 +86,8 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
         for (uint256 i = 0; i < tokens.length; i++) {
             if(tokens[i] == WMATIC){
                 wmaticInTokens = true;
+                amounts[i] = msg.value;
+                break;
             }
         }
         require(wmaticInTokens, "NO_WMATIC_IN_TOKENS");
@@ -102,7 +104,7 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
             IERC20Upgradeable(lpPool).safeTransferFrom(msg.sender, address(farm), amountLP);
         }
         
-        liquidity = farm.deposit(amounts, tokens, minAmountLP, amountLP, recipient);
+        liquidity = _deposit(lpPool, amounts, tokens, minAmountLP, amountLP, recipient);
         emit Deposit(lpPool, msg.sender, recipient, liquidity); 
     }
 
@@ -134,7 +136,7 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
             IERC20Upgradeable(lpPool).safeTransferFrom(msg.sender, address(farm), amountLP);
         }
         
-        liquidity = farm.deposit(amounts, tokens, minAmountLP, amountLP, recipient);
+        liquidity = _deposit(lpPool, amounts, tokens, minAmountLP, amountLP, recipient);
         emit Deposit(lpPool, msg.sender, recipient, liquidity); 
     }
 
@@ -155,7 +157,7 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
             balancesBefore[i] = IERC20Upgradeable(address(tokens[i])).balanceOf(address(this));
         }
 
-        farm.withdraw(amount, minAmountsOut, false, msg.sender, address(this));
+        _withdraw(lpPool, amount, minAmountsOut, false, address(this));
         require(this.getTokens(lpPool).length == tokens.length, "NUMBER_OF_TOKENS_CHANGED");
 
         for (uint256 i = 0; i < tokens.length; i++) {
@@ -182,9 +184,20 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
     function withdraw(address lpPool, uint256 amount, uint256[] calldata minAmountsOut, bool withdrawLP, address recipient) external { 
         Farm farm = Farm(farmFactory.Farms(lpPool));
         require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
-        
-        farm.withdraw(amount, minAmountsOut, withdrawLP, msg.sender, recipient); 
+
+        _withdraw(lpPool, amount, minAmountsOut, withdrawLP, recipient); 
         emit Withdraw(lpPool, msg.sender, recipient, amount);  
+    }
+
+    function _deposit(address lpPool, uint256[] memory amounts, address[] memory tokens, uint256 minAmountLP, uint256 amountLP, address recipient) internal returns(uint256 liquidity){
+        Farm farm = Farm(farmFactory.Farms(lpPool));
+        liquidity = farm.deposit(amounts, tokens, minAmountLP, amountLP, recipient);
+    }
+
+
+    function _withdraw(address lpPool, uint256 amount, uint256[] calldata minAmountsOut, bool withdrawLP, address recipient) internal {
+        Farm farm = Farm(farmFactory.Farms(lpPool));
+        farm.withdraw(amount, minAmountsOut, withdrawLP, msg.sender, recipient); 
     }
 
     /**

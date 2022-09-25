@@ -17,15 +17,15 @@ const AssetRouter = artifacts.require("UnoAssetRouterQuickswap");
 const AssetRouterV2 = artifacts.require("UnoAssetRouterQuickswapV2");
 
 const quickswapRouter = "0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff";
-const pool = "0xAFB76771C98351Aa7fCA13B130c9972181612b54"; //usdt usdc
+const pool = "0xAFB76771C98351Aa7fCA13B130c9972181612b54"; // usdt usdc
 const pool2 = "0x28b833473e047f6116C46d8ed5117708eeb151F9"; // wmatic wone
 
-const DQuickHolder = "0xcf0b86f9944a60a0ba22b51a33c11d9e4de1ce9f"; //has to be unlocked and hold 0xf28164A485B0B2C90639E47b0f377b4a438a16B1
-const stakingRewardsOwner = "0x476307dac3fd170166e007fcaa14f0a129721463"; //has to be unlocked
+const DQuickHolder = "0xcf0b86f9944a60a0ba22b51a33c11d9e4de1ce9f"; // has to be unlocked and hold 0xf28164A485B0B2C90639E47b0f377b4a438a16B1
+const stakingRewardsOwner = "0x476307dac3fd170166e007fcaa14f0a129721463"; // has to be unlocked
 
-const account1 = "0xdDdd9E9D429ebe7235514B9Addc25bd772a8eEe2"; //has to be unlocked and hold 0x2cF7252e74036d1Da831d11089D326296e64a728
-const account2 = "0x8eB6eAD701b7d378cF62C898a0A7b72639a89201"; //has to be unlocked and hold 0x2cF7252e74036d1Da831d11089D326296e64a728
-const account3 = "0xB3Eb833853b3d7B4bdAD7defB1e869372A2c6767"; //has to be unlocked and hold 0x80c0CBDB8d0B190238795d376f0bD57fd40525F2 (WONE)
+const account1 = "0xdDdd9E9D429ebe7235514B9Addc25bd772a8eEe2"; // has to be unlocked and hold 0x2cF7252e74036d1Da831d11089D326296e64a728
+const account2 = "0x8eB6eAD701b7d378cF62C898a0A7b72639a89201"; // has to be unlocked and hold 0x2cF7252e74036d1Da831d11089D326296e64a728
+const account3 = "0xB3Eb833853b3d7B4bdAD7defB1e869372A2c6767"; // has to be unlocked and hold 0x80c0CBDB8d0B190238795d376f0bD57fd40525F2 (WONE)
 
 const amounts = [new BN(1000), new BN(3000), new BN(500), new BN(4000), new BN(700000000000)];
 
@@ -39,28 +39,32 @@ contract("UnoAssetRouterQuickswap", accounts => {
   const pauser = accounts[1];
   const distributor = accounts[2];
 
-  let accessManager, assetRouter, factory;
+  let accessManager;
+  let assetRouter;
+  let factory;
 
-  let stakingRewards, stakingToken;
+  let stakingRewards;
+  let stakingToken;
   let rewardsToken;
   let snapshotId;
 
-  let tokenA, tokenB;
+  let tokenA;
+  let tokenB;
 
-  let initReceipt = {};
+  const initReceipt = {};
   before(async () => {
     const snapshot = await timeMachine.takeSnapshot();
-    snapshotId = snapshot["result"];
+    snapshotId = snapshot.result;
 
     const implementation = await Farm.new({ from: account1 });
-    accessManager = await AccessManager.new({ from: admin }); //accounts[0] is admin
+    accessManager = await AccessManager.new({ from: admin }); // accounts[0] is admin
 
     await accessManager.grantRole("0xfbd454f36a7e1a388bd6fc3ab10d434aa4578f811acbbcf33afb1c697486313c", distributor, {
       from: admin,
-    }); //DISTRIBUTOR_ROLE
+    }); // DISTRIBUTOR_ROLE
     await accessManager.grantRole("0x65d7a28e3265b37a6474929f336521b332c1681b933f6cb9f3376673440d862a", pauser, {
       from: admin,
-    }); //PAUSER_ROLE
+    }); // PAUSER_ROLE
 
     assetRouter = await deployProxy(AssetRouter, { kind: "uups", initializer: false });
 
@@ -73,7 +77,7 @@ contract("UnoAssetRouterQuickswap", accounts => {
       fromBlock: _receipt.block,
       toBlock: _receipt.block,
     });
-    //convert web3's receipt to truffle's format
+    // convert web3's receipt to truffle's format
     initReceipt.tx = _receipt.transactionHash;
     initReceipt.receipt = _receipt;
     initReceipt.logs = events;
@@ -86,8 +90,8 @@ contract("UnoAssetRouterQuickswap", accounts => {
     const tokenAAddress = await stakingToken.token0();
     const tokenBAddress = await stakingToken.token1();
 
-    tokenA = await IUniswapV2Pair.at(tokenAAddress); //should be ERC20 but IUniswapV2Pair has everything we need
-    tokenB = await IUniswapV2Pair.at(tokenBAddress); //should be ERC20 but IUniswapV2Pair has everything we need
+    tokenA = await IUniswapV2Pair.at(tokenAAddress); // should be ERC20 but IUniswapV2Pair has everything we need
+    tokenB = await IUniswapV2Pair.at(tokenBAddress); // should be ERC20 but IUniswapV2Pair has everything we need
 
     const stakingRewardsFactoryAddress = await stakingRewards.rewardsDistribution();
     const stakingRewardsFactory = await IStakingRewardsFactory.at(stakingRewardsFactoryAddress);
@@ -95,7 +99,7 @@ contract("UnoAssetRouterQuickswap", accounts => {
     const rewardsTokenAddress = await stakingRewards.rewardsToken();
     rewardsToken = await IUniswapV2Pair.at(rewardsTokenAddress);
 
-    //add rewards to pool
+    // add rewards to pool
     const rewardAmount = await rewardsToken.balanceOf(DQuickHolder);
     await rewardsToken.transfer(stakingRewardsFactory.address, rewardAmount, { from: DQuickHolder });
     await stakingRewardsFactory.update(stakingToken.address, rewardAmount, 1000000, { from: stakingRewardsOwner });
@@ -135,7 +139,8 @@ contract("UnoAssetRouterQuickswap", accounts => {
   });
 
   describe("getTokens", () => {
-    let _tokenA, _tokenB;
+    let _tokenA;
+    let _tokenB;
     before(async () => {
       ({ tokenA: _tokenA, tokenB: _tokenB } = await assetRouter.getTokens(pool));
     });
@@ -187,7 +192,7 @@ contract("UnoAssetRouterQuickswap", accounts => {
         assert.equal(await assetRouter.paused(), false, "Paused");
       });
       it("allows function calls", async () => {
-        //Pausable: paused check passes. revert for a different reason
+        // Pausable: paused check passes. revert for a different reason
         await expectRevert(
           assetRouter.deposit(pool, 0, 0, 0, 0, 0, account1, { from: account1 }),
           "NO_LIQUIDITY_PROVIDED",
@@ -220,7 +225,12 @@ contract("UnoAssetRouterQuickswap", accounts => {
         farm = await Farm.at(farmAddress);
       });
       it("fires events", async () => {
-        expectEvent(receipt, "Deposit", { lpPool: pool, sender: account1, recipient: account1, amount: amounts[0] });
+        expectEvent(receipt, "Deposit", {
+          lpPool: pool,
+          sender: account1,
+          recipient: account1,
+          amount: amounts[0],
+        });
       });
       it("updates stakes", async () => {
         const { stakeLP } = await assetRouter.userStake(account1, pool);
@@ -249,7 +259,12 @@ contract("UnoAssetRouterQuickswap", accounts => {
         receipt = await assetRouter.deposit(pool, 0, 0, 0, 0, amounts[1], account1, { from: account1 });
       });
       it("fires events", async () => {
-        expectEvent(receipt, "Deposit", { lpPool: pool, sender: account1, recipient: account1, amount: amounts[1] });
+        expectEvent(receipt, "Deposit", {
+          lpPool: pool,
+          sender: account1,
+          recipient: account1,
+          amount: amounts[1],
+        });
       });
       it("updates stakes", async () => {
         const { stakeLP } = await assetRouter.userStake(account1, pool);
@@ -278,7 +293,12 @@ contract("UnoAssetRouterQuickswap", accounts => {
         receipt = await assetRouter.deposit(pool, 0, 0, 0, 0, amounts[2], account2, { from: account2 });
       });
       it("fires events", async () => {
-        expectEvent(receipt, "Deposit", { lpPool: pool, sender: account2, recipient: account2, amount: amounts[2] });
+        expectEvent(receipt, "Deposit", {
+          lpPool: pool,
+          sender: account2,
+          recipient: account2,
+          amount: amounts[2],
+        });
       });
       it("doesn't change stakes for account[0]", async () => {
         const { stakeLP } = await assetRouter.userStake(account1, pool);
@@ -315,7 +335,12 @@ contract("UnoAssetRouterQuickswap", accounts => {
         receipt = await assetRouter.deposit(pool, 0, 0, 0, 0, amounts[3], account2, { from: account1 });
       });
       it("fires event", async () => {
-        expectEvent(receipt, "Deposit", { lpPool: pool, sender: account1, recipient: account2, amount: amounts[3] });
+        expectEvent(receipt, "Deposit", {
+          lpPool: pool,
+          sender: account1,
+          recipient: account2,
+          amount: amounts[3],
+        });
       });
       it("doesnt change stakes for account1", async () => {
         const { stakeLP } = await assetRouter.userStake(account1, pool);
@@ -342,10 +367,13 @@ contract("UnoAssetRouterQuickswap", accounts => {
       });
     });
     describe("deposit normal tokens", () => {
-      let balanceAbefore, balanceBbefore;
-      let stakeABefore, stakeBBefore;
+      let balanceAbefore;
+      let balanceBbefore;
+      let stakeABefore;
+      let stakeBBefore;
 
-      let amountA, amountB;
+      let amountA;
+      let amountB;
 
       before(async () => {
         const routerContract = await IUniswapV2Router01.at(quickswapRouter);
@@ -360,12 +388,12 @@ contract("UnoAssetRouterQuickswap", accounts => {
           "16415710000",
           { from: account1 },
         );
-        const event = tx.receipt.rawLogs.find(l => {
-          return l.topics[0] == "0xdccd412f0b1252819cb1fd330b93224ca42612892bb3f4f789976e6d81936496";
-        });
+        const event = tx.receipt.rawLogs.find(
+          l => l.topics[0] == "0xdccd412f0b1252819cb1fd330b93224ca42612892bb3f4f789976e6d81936496",
+        );
 
         amountA = web3.utils.hexToNumberString(event.data.substring(0, 66));
-        amountB = web3.utils.hexToNumberString("0x" + event.data.substring(66, 130));
+        amountB = web3.utils.hexToNumberString(`0x${event.data.substring(66, 130)}`);
 
         balanceAbefore = await tokenA.balanceOf(account1);
         balanceBbefore = await tokenB.balanceOf(account1);
@@ -452,10 +480,13 @@ contract("UnoAssetRouterQuickswap", accounts => {
       });
     });
     describe("withdraws for multiple accs", () => {
-      let balance1before, balance2before;
-      let stake1before, stake2before;
+      let balance1before;
+      let balance2before;
+      let stake1before;
+      let stake2before;
 
-      let receipt1, receipt2;
+      let receipt1;
+      let receipt2;
 
       before(async () => {
         balance1before = await stakingToken.balanceOf(account1);
@@ -468,8 +499,18 @@ contract("UnoAssetRouterQuickswap", accounts => {
         receipt2 = await assetRouter.withdraw(pool, amounts[2], 0, 0, true, account2, { from: account2 });
       });
       it("fires events", async () => {
-        expectEvent(receipt1, "Withdraw", { lpPool: pool, sender: account1, recipient: account1, amount: amounts[0] });
-        expectEvent(receipt2, "Withdraw", { lpPool: pool, sender: account2, recipient: account2, amount: amounts[2] });
+        expectEvent(receipt1, "Withdraw", {
+          lpPool: pool,
+          sender: account1,
+          recipient: account1,
+          amount: amounts[0],
+        });
+        expectEvent(receipt2, "Withdraw", {
+          lpPool: pool,
+          sender: account2,
+          recipient: account2,
+          amount: amounts[2],
+        });
       });
 
       it("correctly updates userStake for account1", async () => {
@@ -504,8 +545,10 @@ contract("UnoAssetRouterQuickswap", accounts => {
       });
     });
     describe("withdraws for different acc", () => {
-      let balance1before, balance2before;
-      let stake1before, stake2before;
+      let balance1before;
+      let balance2before;
+      let stake1before;
+      let stake2before;
 
       let receipt;
       before(async () => {
@@ -518,7 +561,12 @@ contract("UnoAssetRouterQuickswap", accounts => {
         receipt = await assetRouter.withdraw(pool, amounts[1], 0, 0, true, account2, { from: account1 });
       });
       it("fires events", async () => {
-        expectEvent(receipt, "Withdraw", { lpPool: pool, sender: account1, recipient: account2, amount: amounts[1] });
+        expectEvent(receipt, "Withdraw", {
+          lpPool: pool,
+          sender: account1,
+          recipient: account2,
+          amount: amounts[1],
+        });
       });
       it("correctly changes userStake for account1", async () => {
         const { stakeLP } = await assetRouter.userStake(account1, pool);
@@ -540,10 +588,15 @@ contract("UnoAssetRouterQuickswap", accounts => {
       });
     });
     describe("withdraws normal tokens", () => {
-      let balanceAbefore, balanceBbefore;
+      let balanceAbefore;
+      let balanceBbefore;
 
-      let stakeLP1, stakeA1, stakeB1;
-      let stakeLP2, stakeA2, stakeB2;
+      let stakeLP1;
+      let stakeA1;
+      let stakeB1;
+      let stakeLP2;
+      let stakeA2;
+      let stakeB2;
 
       let receipt;
       before(async () => {
@@ -555,7 +608,12 @@ contract("UnoAssetRouterQuickswap", accounts => {
         receipt = await assetRouter.withdraw(pool, stakeLP1, 0, 0, false, account1, { from: account1 });
       });
       it("fires events", async () => {
-        expectEvent(receipt, "Withdraw", { lpPool: pool, sender: account1, recipient: account1, amount: stakeLP1 });
+        expectEvent(receipt, "Withdraw", {
+          lpPool: pool,
+          sender: account1,
+          recipient: account1,
+          amount: stakeLP1,
+        });
       });
       it("correctly updates account1 stake", async () => {
         const { stakeLP, stakeA, stakeB } = await assetRouter.userStake(account1, pool);
@@ -586,22 +644,31 @@ contract("UnoAssetRouterQuickswap", accounts => {
       });
     });
     describe("withdraws normal tokens for a different user", () => {
-      let balanceAbefore, balanceBbefore;
+      let balanceAbefore;
+      let balanceBbefore;
 
-      let stakeLP2, stakeA2, stakeB2;
-      let stakeLP1, stakeA1, stakeB1;
+      let stakeLP2;
+      let stakeA2;
+      let stakeB2;
+      let stakeLP1;
+      let stakeA1;
+      let stakeB1;
 
       let receipt;
       before(async () => {
         balanceAbefore = await tokenA.balanceOf(account1);
         balanceBbefore = await tokenB.balanceOf(account1);
-
         ({ stakeLP: stakeLP1, stakeA: stakeA1, stakeB: stakeB1 } = await assetRouter.userStake(account1, pool));
         ({ stakeLP: stakeLP2, stakeA: stakeA2, stakeB: stakeB2 } = await assetRouter.userStake(account2, pool));
         receipt = await assetRouter.withdraw(pool, stakeLP2, 0, 0, false, account1, { from: account2 });
       });
       it("fires events", async () => {
-        expectEvent(receipt, "Withdraw", { lpPool: pool, sender: account2, recipient: account1, amount: stakeLP2 });
+        expectEvent(receipt, "Withdraw", {
+          lpPool: pool,
+          sender: account2,
+          recipient: account1,
+          amount: stakeLP2,
+        });
       });
       it("correctly updates account2 stake", async () => {
         const { stakeLP, stakeA, stakeB } = await assetRouter.userStake(account2, pool);
@@ -646,7 +713,8 @@ contract("UnoAssetRouterQuickswap", accounts => {
     });
     describe("distributes", () => {
       let receipt;
-      let balance1, balance2;
+      let balance1;
+      let balance2;
       before(async () => {
         balance1 = await stakingToken.balanceOf(account1);
         await stakingToken.approve(assetRouter.address, balance1, { from: account1 });
@@ -663,12 +731,12 @@ contract("UnoAssetRouterQuickswap", accounts => {
           [
             [
               rewardsToken.address,
-              "0x831753DD7087CaC61aB5644b308642cc1c33Dc13", //rewardsToken is dQUICK so we have to swap it to QUICK first and then to tokenA
+              "0x831753DD7087CaC61aB5644b308642cc1c33Dc13", // rewardsToken is dQUICK so we have to swap it to QUICK first and then to tokenA
               tokenA.address,
             ],
             [
               rewardsToken.address,
-              "0x831753DD7087CaC61aB5644b308642cc1c33Dc13", //rewardsToken is dQUICK so we have to swap it to QUICK first and then to tokenB
+              "0x831753DD7087CaC61aB5644b308642cc1c33Dc13", // rewardsToken is dQUICK so we have to swap it to QUICK first and then to tokenB
               tokenB.address,
             ],
           ],
@@ -773,13 +841,14 @@ contract("UnoAssetRouterQuickswap", accounts => {
       let stakeABefore, stakeBBefore, stakeLPBefore;
       let totalDepositsLPBefore;
 
-      let amountETH, amountToken;
+      let amountETH;
+      let amountToken;
       let tokenAAddress, tokenBAddress;
-      let token, tokenBalanceBefore;
+      let token;
+      let tokenBalanceBefore;
       let stakingRewardsBalanceBefore;
       let ethBalanceBefore;
       let ETHSpentOnGas;
-
       before(async () => {
         amountETH = new BN(4000);
         amountToken = new BN(4000);
@@ -887,14 +956,12 @@ contract("UnoAssetRouterQuickswap", accounts => {
     describe("withdraw ETH", () => {
       let stakeABefore, stakeBBefore, stakeLPBefore;
 
-      let amountETH, amountToken;
       let tokenAAddress, tokenBAddress;
       let token;
       let tokenBalanceBefore;
       let totalDepositsLPBefore;
       let stakingRewardsBalanceBefore;
       let ethBalanceBefore, ETHSpentOnGas;
-
       before(async () => {
         amountETH = new BN(4000);
         amountToken = new BN(4000);
@@ -984,16 +1051,16 @@ contract("UnoAssetRouterQuickswap", accounts => {
   });
   describe("Upgradeability", () => {
     describe("updates", () => {
-      let receipt = {};
+      const receipt = {};
       before(async () => {
         const instance = await upgradeProxy(assetRouter.address, AssetRouterV2);
-        //we get last transaction's hash by finding the last event because upgradeProxy returns contract instance instead of transaction receipt object
+        // we get last transaction's hash by finding the last event because upgradeProxy returns contract instance instead of transaction receipt object
         const events = await instance.getPastEvents("AllEvents", {
           fromBlock: "latest",
           toBlock: "latest",
         });
         const _receipt = await web3.eth.getTransactionReceipt(events[0].transactionHash);
-        //convert web3's receipt to truffle's format
+        // convert web3's receipt to truffle's format
         receipt.tx = _receipt.transactionHash;
         receipt.receipt = _receipt;
         receipt.logs = events;
