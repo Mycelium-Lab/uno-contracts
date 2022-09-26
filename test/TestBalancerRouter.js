@@ -41,8 +41,8 @@ contract('UnoAssetRouterBalancer', (accounts) => {
     const pauser = accounts[1]
     const distributor = accounts[2]
 
-    let accessManager 
-    let assetRouter 
+    let accessManager
+    let assetRouter
     let factory
 
     let stakingToken
@@ -50,11 +50,11 @@ contract('UnoAssetRouterBalancer', (accounts) => {
 
     const initReceipt = {}
 
-    let poolId 
+    let poolId
     let gauge
 
     let Vault
-    let tokens 
+    let tokens
     let zeroAmounts
 
     const tokenContracts = []
@@ -223,7 +223,10 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             })
             it('fires events', async () => {
                 expectEvent(receipt, 'Deposit', {
-                    lpPool: pool, sender: account1, recipient: account1, amount: amounts[0]
+                    lpPool: pool,
+                    sender: account1,
+                    recipient: account1,
+                    amount: amounts[0]
                 })
             })
             it('updates stakes', async () => {
@@ -254,7 +257,10 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             })
             it('fires events', async () => {
                 expectEvent(receipt, 'Deposit', {
-                    lpPool: pool, sender: account1, recipient: account1, amount: amounts[1]
+                    lpPool: pool,
+                    sender: account1,
+                    recipient: account1,
+                    amount: amounts[1]
                 })
             })
             it('updates stakes', async () => {
@@ -285,7 +291,10 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             })
             it('fires events', async () => {
                 expectEvent(receipt, 'Deposit', {
-                    lpPool: pool, sender: account2, recipient: account2, amount: amounts[2]
+                    lpPool: pool,
+                    sender: account2,
+                    recipient: account2,
+                    amount: amounts[2]
                 })
             })
             it("doesn't change stakes for account[0]", async () => {
@@ -324,7 +333,10 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             })
             it('fires event', async () => {
                 expectEvent(receipt, 'Deposit', {
-                    lpPool: pool, sender: account1, recipient: account2, amount: amounts[3]
+                    lpPool: pool,
+                    sender: account1,
+                    recipient: account2,
+                    amount: amounts[3]
                 })
             })
             it('doesnt change stakes for account1', async () => {
@@ -455,12 +467,12 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             })
         })
         describe('withdraws for multiple accs', () => {
-            let balance1before 
+            let balance1before
             let balance2before
-            let stake1before 
+            let stake1before
             let stake2before
 
-            let receipt1 
+            let receipt1
             let receipt2
 
             before(async () => {
@@ -475,10 +487,16 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             })
             it('fires events', async () => {
                 expectEvent(receipt1, 'Withdraw', {
-                    lpPool: pool, sender: account1, recipient: account1, amount: amounts[0]
+                    lpPool: pool,
+                    sender: account1,
+                    recipient: account1,
+                    amount: amounts[0]
                 })
                 expectEvent(receipt2, 'Withdraw', {
-                    lpPool: pool, sender: account2, recipient: account2, amount: amounts[2]
+                    lpPool: pool,
+                    sender: account2,
+                    recipient: account2,
+                    amount: amounts[2]
                 })
             })
 
@@ -514,9 +532,9 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             })
         })
         describe('withdraws for different acc', () => {
-            let balance1before 
+            let balance1before
             let balance2before
-            let stake1before 
+            let stake1before
             let stake2before
 
             let receipt
@@ -531,7 +549,10 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             })
             it('fires events', async () => {
                 expectEvent(receipt, 'Withdraw', {
-                    lpPool: pool, sender: account1, recipient: account2, amount: amounts[1]
+                    lpPool: pool,
+                    sender: account1,
+                    recipient: account2,
+                    amount: amounts[1]
                 })
             })
             it('correctly changes userStake for account1', async () => {
@@ -555,7 +576,7 @@ contract('UnoAssetRouterBalancer', (accounts) => {
         })
         describe('withdraws normal tokens', () => {
             const balancesBefore = []
-            let stakeLP2 
+            let stakeLP2
             let stakeLP1
 
             let receipt
@@ -570,7 +591,10 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             })
             it('fires events', async () => {
                 expectEvent(receipt, 'Withdraw', {
-                    lpPool: pool, sender: account1, recipient: account1, amount: stakeLP1
+                    lpPool: pool,
+                    sender: account1,
+                    recipient: account1,
+                    amount: stakeLP1
                 })
             })
             it('correctly updates account1 stake', async () => {
@@ -591,7 +615,7 @@ contract('UnoAssetRouterBalancer', (accounts) => {
         })
         describe('withdraws normal tokens for a different user', () => {
             const balancesBefore = []
-            let stakeLP1 
+            let stakeLP1
             let stakeLP2
 
             let receipt
@@ -606,7 +630,10 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             })
             it('fires events', async () => {
                 expectEvent(receipt, 'Withdraw', {
-                    lpPool: pool, sender: account2, recipient: account1, amount: stakeLP2
+                    lpPool: pool,
+                    sender: account2,
+                    recipient: account1,
+                    amount: stakeLP2
                 })
             })
             it('correctly updates account2 stake', async () => {
@@ -640,7 +667,7 @@ contract('UnoAssetRouterBalancer', (accounts) => {
         })
         describe('distributes', () => {
             let receipt
-            let balance1 
+            let balance1
             let balance2
             before(async () => {
                 balance1 = await stakingToken.balanceOf(account1)
@@ -799,13 +826,12 @@ contract('UnoAssetRouterBalancer', (accounts) => {
         const _amounts = []
         const amountETH = new BN(1000000000000)
 
-        let ethBalanceBefore 
+        let ethBalanceBefore
         let ETHSpentOnGas
         let stakesBefore
         let totalDepositsLPBefore
         let stakingRewardBalanceBefore
         before(async () => {
-            const _balancesBefore = []
             for (let i = 0; i < tokenContracts.length; i++) {
                 if (tokenContracts[i].address !== '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270') {
                     tokensWithoutWMATIC.push(tokenContracts[i])
@@ -883,7 +909,7 @@ contract('UnoAssetRouterBalancer', (accounts) => {
         const tokensWithoutWMATIC = []
         const _amounts = []
 
-        let ethBalanceBefore 
+        let ethBalanceBefore
         let ETHSpentOnGas
         let stakesBefore
         let totalDepositsLPBefore
