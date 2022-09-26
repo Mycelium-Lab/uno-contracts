@@ -1266,6 +1266,7 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
                     assetRouter.distribute(
                         pool,
                         [
+
                             {
                                 route: [
                                     rewardsTokenA.address, // dQuick
