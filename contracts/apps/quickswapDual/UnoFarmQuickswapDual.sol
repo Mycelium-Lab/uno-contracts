@@ -37,6 +37,24 @@ contract UnoFarmQuickswapDual is Initializable, ReentrancyGuardUpgradeable {
         uint32 lastDistribution;
         uint256 lastUpdate;
     }
+    /**
+     * @dev SwapInfo:
+     * {route} - Array of token addresses describing swap routes.
+     * {amountOutMin} - The minimum amount of output token that must be received for the transaction not to revert.
+     */
+    struct SwapInfo{
+        address[] route;
+        uint256 amountOutMin;
+    }
+    /**
+     * @dev FeeInfo:
+     * {feeCollector} - Contract to transfer fees to.
+     * {fee} - Fee percentage to collect (10^18 == 100%). 
+     */
+    struct FeeInfo {
+        address feeTo;
+        uint256 fee;
+    }
 
     /**
      * @dev Tokens Used:
@@ -179,41 +197,49 @@ contract UnoFarmQuickswapDual is Initializable, ReentrancyGuardUpgradeable {
      * 3. It deposits new LP tokens back to the {lpStakingPool}.
      */
     function distribute(
-        address[][4] calldata swapRoutes,
-        uint256[4] calldata amountsOutMin
+        SwapInfo[4] calldata swapInfos,
+        SwapInfo[2] calldata feeSwapInfos,
+        FeeInfo calldata feeInfo
     ) external onlyAssetRouter nonReentrant returns(uint256 reward){
         require(totalDeposits > 0, 'NO_LIQUIDITY');
         require(distributionInfo[distributionID - 1].block != block.number, 'CANT_CALL_ON_THE_SAME_BLOCK');
 
         lpStakingPool.getReward();
+
+        collectFees(feeSwapInfos[0], feeInfo, IERC20Upgradeable(rewardTokenA));
+        collectFees(feeSwapInfos[1], feeInfo, IERC20Upgradeable(rewardTokenB));
         { // scope to avoid stack too deep errors
         uint256 rewardTokenAHalf = IERC20(rewardTokenA).balanceOf(address(this)) / 2;
         uint256 rewardTokenBHalf = IERC20(rewardTokenB).balanceOf(address(this)) / 2;
         if (rewardTokenAHalf > 0) {
             if (tokenA != rewardTokenA) {
-                require(swapRoutes[0][0] == rewardTokenA && swapRoutes[0][swapRoutes[0].length - 1] == tokenA, 'BAD_REWARD_A_TOKEN_A_ROUTE');
-                quickswapRouter.swapExactTokensForTokens(rewardTokenAHalf, amountsOutMin[0], swapRoutes[0], address(this), block.timestamp);
+                address[] calldata route = swapInfos[0].route;
+                require(route[0] == rewardTokenA && route[route.length - 1] == tokenA, 'BAD_REWARD_A_TOKEN_A_ROUTE');
+                quickswapRouter.swapExactTokensForTokens(rewardTokenAHalf, swapInfos[0].amountOutMin, route, address(this), block.timestamp);
             }
 
             if (tokenB != rewardTokenA) {
-                require(swapRoutes[1][0] == rewardTokenA && swapRoutes[1][swapRoutes[1].length - 1] == tokenB, 'BAD_REWARD_A_TOKEN_B_ROUTE');
-                quickswapRouter.swapExactTokensForTokens(rewardTokenAHalf, amountsOutMin[1], swapRoutes[1], address(this), block.timestamp);
+                address[] calldata route = swapInfos[1].route;
+                require(route[0] == rewardTokenA && route[route.length - 1] == tokenB, 'BAD_REWARD_A_TOKEN_B_ROUTE');
+                quickswapRouter.swapExactTokensForTokens(rewardTokenAHalf, swapInfos[1].amountOutMin, route, address(this), block.timestamp);
             }
         }
         if (rewardTokenBHalf > 0) {
             if (tokenA != rewardTokenB) {
-                require(swapRoutes[2][0] == rewardTokenB && swapRoutes[2][swapRoutes[2].length - 1] == tokenA, 'BAD_REWARD_B_TOKEN_A_ROUTE');
-                quickswapRouter.swapExactTokensForTokens(rewardTokenBHalf, amountsOutMin[2], swapRoutes[2], address(this), block.timestamp);
+                address[] calldata route = swapInfos[2].route;
+                require(route[0] == rewardTokenB && route[route.length - 1] == tokenA, 'BAD_REWARD_B_TOKEN_A_ROUTE');
+                quickswapRouter.swapExactTokensForTokens(rewardTokenBHalf, swapInfos[2].amountOutMin, route, address(this), block.timestamp);
             }
     
             if (tokenB != rewardTokenB) {
-                require(swapRoutes[3][0] == rewardTokenB && swapRoutes[3][swapRoutes[3].length - 1] == tokenB, 'BAD_REWARD_B_TOKEN_B_ROUTE');
-                quickswapRouter.swapExactTokensForTokens(rewardTokenBHalf, amountsOutMin[3], swapRoutes[3], address(this), block.timestamp);
+                address[] calldata route = swapInfos[3].route;
+                require(route[0] == rewardTokenB && route[route.length - 1] == tokenB, 'BAD_REWARD_B_TOKEN_B_ROUTE');
+                quickswapRouter.swapExactTokensForTokens(rewardTokenBHalf, swapInfos[3].amountOutMin, route, address(this), block.timestamp);
             }
         }
         }
         
-        (,,reward) = quickswapRouter.addLiquidity(tokenA, tokenB, IERC20(tokenA).balanceOf(address(this)), IERC20(tokenB).balanceOf(address(this)), amountsOutMin[0] + amountsOutMin[2], amountsOutMin[1] + amountsOutMin[3], address(this), block.timestamp);
+        (,,reward) = quickswapRouter.addLiquidity(tokenA, tokenB, IERC20(tokenA).balanceOf(address(this)), IERC20(tokenB).balanceOf(address(this)), swapInfos[0].amountOutMin + swapInfos[2].amountOutMin, swapInfos[1].amountOutMin + swapInfos[3].amountOutMin, address(this), block.timestamp);
 
         uint256 rewardPerDepositAge = reward * fractionMultiplier / (totalDepositAge + totalDeposits * (block.number - totalDepositLastUpdate));
         uint256 cumulativeRewardAgePerDepositAge = distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge + rewardPerDepositAge * (block.number - distributionInfo[distributionID - 1].block);
@@ -229,6 +255,24 @@ contract UnoFarmQuickswapDual is Initializable, ReentrancyGuardUpgradeable {
         totalDepositAge = 0;
 
         lpStakingPool.stake(reward);
+    }
+
+    /**
+     * @dev Swaps and sends fees to feeTo.
+     */
+    function collectFees(SwapInfo calldata feeSwapInfo, FeeInfo calldata feeInfo, IERC20Upgradeable token) internal {
+        if(feeInfo.feeTo != address(0)){
+            uint256 feeAmount = token.balanceOf(address(this)) * feeInfo.fee / fractionMultiplier;
+            if(feeAmount > 0){
+                address[] calldata route = feeSwapInfo.route;
+                if(route.length > 0 && route[0] != route[route.length - 1]){
+                    require(route[0] == address(token), 'BAD_FEE_TOKEN_ROUTE');
+                    quickswapRouter.swapExactTokensForTokens(feeAmount, feeSwapInfo.amountOutMin, route, feeInfo.feeTo, block.timestamp);
+                    return;
+                }
+                token.safeTransfer(feeInfo.feeTo, feeAmount);
+            }
+        }
     }
 
     /**

@@ -7,6 +7,7 @@ import '../../interfaces/IUnoAccessManager.sol';
 import '../../interfaces/IUniswapV2Pair.sol';
 import '../../interfaces/IStakingRewards.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol';
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 import '@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol';
@@ -26,9 +27,13 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
     bytes32 private constant DISTRIBUTOR_ROLE = keccak256('DISTRIBUTOR_ROLE');
     bytes32 private constant PAUSER_ROLE = keccak256('PAUSER_ROLE');
 
+    uint256 public fee;
+
     event Deposit(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Withdraw(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Distribute(address indexed lpPool, uint256 reward);
+
+    event FeeChanged(uint256 previousFee, uint256 newFee);
 
     modifier onlyRole(bytes32 role){
         require(accessManager.hasRole(role, msg.sender), 'CALLER_NOT_AUTHORIZED');
@@ -108,20 +113,22 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
     /**
      * @dev Distributes tokens between users. Emits a {Distribute} event.
      * @param lpStakingPool - LP pool to distribute tokens in.
-     * @param swapRoutes - Arrays of token addresses describing swap routes. [rewardTokenToTokenARoute, rewardTokenToTokenBRoute].
-     * @param amountsOutMin The minimum amount of output tokens that must be received for the transaction not to revert.
+     * @param swapInfos - Arrays of structs with token arrays describing swap routes (rewardTokenToTokenA, rewardTokenToTokenB) and minimum amounts of output tokens that must be received for the transaction not to revert.
+     * @param feeSwapInfo - Struct with token array describing swap route (rewardTokenToFeeToken) and minimum amounts of output tokens that must be received for the transaction not to revert.
+     * @param feeTo - Address to collect fees to.
      *
      * Note: This function can only be called by the distributor.
      */ 
     function distribute(
         address lpStakingPool,
-        address[][2] calldata swapRoutes,
-        uint256[2] memory amountsOutMin
+        Farm.SwapInfo[2] calldata swapInfos,
+        Farm.SwapInfo calldata feeSwapInfo,
+        address feeTo
     ) external whenNotPaused onlyRole(DISTRIBUTOR_ROLE) {
         Farm farm = Farm(farmFactory.Farms(lpStakingPool));
         require(farm != Farm(address(0)), 'FARM_NOT_EXISTS');
 
-        uint256 reward = farm.distribute(swapRoutes, amountsOutMin);
+        uint256 reward = farm.distribute(swapInfos, feeSwapInfo, Farm.FeeInfo(feeTo, fee));
         emit Distribute(lpStakingPool, reward);
     }
 
@@ -164,13 +171,13 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
      * @dev Returns addresses of pair of tokens in {lpStakingPool}.
      * @param lpStakingPool - LP pool to check tokens in.
 
-     * @return tokenA - Token A address.
-     * @return tokenB - Token B address.
+     * @return tokens - Tokens addresses.
      */  
-    function getTokens(address lpStakingPool) external view returns(address tokenA, address tokenB){
+    function getTokens(address lpStakingPool) external view returns(IERC20[] memory tokens){
+        tokens = new IERC20[](2);
         IUniswapV2Pair stakingToken = IUniswapV2Pair(address(IStakingRewards(lpStakingPool).stakingToken()));
-        tokenA = stakingToken.token0();
-        tokenB = stakingToken.token1();
+        tokens[0] = IERC20(stakingToken.token0());
+        tokens[1] = IERC20(stakingToken.token1());
     }
 
     /**
@@ -185,6 +192,20 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
         uint256 totalSupply = IERC20Upgradeable(lpPair).totalSupply();
         amountA = amountLP * IERC20Upgradeable(IUniswapV2Pair(lpPair).token0()).balanceOf(lpPair) / totalSupply;
         amountB = amountLP * IERC20Upgradeable(IUniswapV2Pair(lpPair).token1()).balanceOf(lpPair) / totalSupply;
+    }
+
+    /**
+     * @dev Change fee amount.
+     * @param _fee -New fee to collect from farms. [10^18 == 100%]
+     *
+     * Note: This function can only be called by ADMIN_ROLE.
+     */ 
+    function setFee(uint256 _fee) external onlyRole(accessManager.ADMIN_ROLE()){
+        require (_fee <= 1 ether, "BAD_FEE");
+        if(fee != _fee){
+            emit FeeChanged(fee, _fee); 
+            fee = _fee;
+        }
     }
  
     function pause() external onlyRole(PAUSER_ROLE) {

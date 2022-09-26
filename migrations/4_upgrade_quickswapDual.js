@@ -1,3 +1,5 @@
+const { prepareUpgrade } = require('@openzeppelin/truffle-upgrades')
+
 const Farm = artifacts.require('UnoFarmQuickswapDual')
 const AssetRouter = artifacts.require('UnoAssetRouterQuickswapDual')
 

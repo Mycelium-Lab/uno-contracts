@@ -94,7 +94,12 @@ contract('UnoFarmQuickswapDual', (accounts) => {
                 'CALLER_NOT_ASSET_ROUTER'
             )
             await expectRevert(
-                implementation.distribute([[], [], [], []], [0, 0, 0, 0], { from: accounts[1] }),
+                implementation.distribute(
+                    [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
+                    [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
+                    { feeTo: accounts[1], fee: 0 },
+                    { from: accounts[1] }
+                ),
                 'CALLER_NOT_ASSET_ROUTER'
             )
         })
@@ -110,7 +115,12 @@ contract('UnoFarmQuickswapDual', (accounts) => {
                 'INSUFFICIENT_AMOUNT'
             )
             await expectRevert(
-                implementation.distribute([[], [], [], []], [0, 0, 0, 0], { from: assetRouter }),
+                implementation.distribute(
+                    [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
+                    [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
+                    { feeTo: accounts[1], fee: 0 },
+                    { from: assetRouter }
+                ),
                 'NO_LIQUIDITY'
             )
         })

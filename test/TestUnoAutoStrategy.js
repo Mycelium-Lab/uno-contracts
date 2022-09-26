@@ -1,5 +1,5 @@
 const {
-    expectRevert, expectEvent, BN, time
+    expectRevert, expectEvent, BN, constants, time
 } = require('@openzeppelin/test-helpers')
 const { deployProxy } = require('@openzeppelin/truffle-upgrades')
 
@@ -226,7 +226,9 @@ contract('UnoAutoStrategy', (accounts) => {
                 assert.ok(strategyTokenBalance.gt(strategyTokenBalanceBefore), 'tokens were not minted')
             })
             it('updates user stakes', async () => {
-                const { stakeA, stakeB } = await autoStrategy.userStake(account1)
+                const {
+                    stakeA, stakeB
+                } = await autoStrategy.userStake(account1)
 
                 const assetRouter = await UnoAssetRouterQuickswap.at((await autoStrategy.pools(id)).assetRouter)
                 const pool = (await autoStrategy.pools(id)).pool
@@ -848,18 +850,26 @@ contract('UnoAutoStrategy', (accounts) => {
                 await assetRouter.distribute(
                     data.pool,
                     [
-                        [
-                            '0xf28164A485B0B2C90639E47b0f377b4a438a16B1',
-                            '0x831753DD7087CaC61aB5644b308642cc1c33Dc13', // rewardsToken is dQUICK so we have to swap it to QUICK first and then to tokenA
-                            data.tokenA
-                        ],
-                        [
-                            '0xf28164A485B0B2C90639E47b0f377b4a438a16B1',
-                            '0x831753DD7087CaC61aB5644b308642cc1c33Dc13', // rewardsToken is dQUICK so we have to swap it to QUICK first and then to tokenB
-                            data.tokenB
-                        ]
+                        {
+                            route: [
+                                '0xf28164A485B0B2C90639E47b0f377b4a438a16B1',
+                                '0x831753DD7087CaC61aB5644b308642cc1c33Dc13', // rewardsToken is dQUICK so we have to swap it to QUICK first and then to tokenA
+                                data.tokenA
+                            ],
+                            amountOutMin: 1
+                        },
+
+                        {
+                            route: [
+                                '0xf28164A485B0B2C90639E47b0f377b4a438a16B1',
+                                '0x831753DD7087CaC61aB5644b308642cc1c33Dc13', // rewardsToken is dQUICK so we have to swap it to QUICK first and then to tokenB
+                                data.tokenB
+                            ],
+                            amountOutMin: 1
+                        }
                     ],
-                    [1, 1],
+                    { route: [], amountOutMin: 0 },
+                    constants.ZERO_ADDRESS,
                     { from: distributor }
                 )
             })

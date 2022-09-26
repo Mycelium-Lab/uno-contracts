@@ -86,7 +86,7 @@ contract('UnoFarmBalancer', (accounts) => {
                 'CALLER_NOT_ASSET_ROUTER'
             )
             await expectRevert(
-                implementation.distribute([], [], [], { from: accounts[1] }),
+                implementation.distribute([{ swaps: [], assets: [], limits: [] }], [{ swaps: [], assets: [], limits: [] }], { feeTo: accounts[1], fee: 0 }, { from: accounts[1] }),
                 'CALLER_NOT_ASSET_ROUTER'
             )
         })
@@ -102,7 +102,7 @@ contract('UnoFarmBalancer', (accounts) => {
                 'INSUFFICIENT_AMOUNT'
             )
             await expectRevert(
-                implementation.distribute([], [], [], { from: assetRouter }),
+                implementation.distribute([{ swaps: [], assets: [], limits: [] }], [{ swaps: [], assets: [], limits: [] }], { feeTo: accounts[1], fee: 0 }, { from: assetRouter }),
                 'NO_LIQUIDITY'
             )
         })

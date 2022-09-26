@@ -1,3 +1,5 @@
+const { prepareUpgrade } = require('@openzeppelin/truffle-upgrades')
+
 const Farm = artifacts.require('UnoFarmBalancer')
 const AssetRouter = artifacts.require('UnoAssetRouterBalancer')
 
