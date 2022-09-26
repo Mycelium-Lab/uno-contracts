@@ -38,6 +38,24 @@ contract UnoFarmTrisolarisStandard is Initializable, ReentrancyGuardUpgradeable 
         uint32 lastDistribution;
         uint256 lastUpdate;
     }
+    /**
+     * @dev SwapInfo:
+     * {route} - Array of token addresses describing swap routes.
+     * {amountOutMin} - The minimum amount of output token that must be received for the transaction not to revert.
+     */
+    struct SwapInfo{
+        address[] route;
+        uint256 amountOutMin;
+    }
+    /**
+     * @dev FeeInfo:
+     * {feeTo} - Address to transfer fees to.
+     * {fee} - Fee percentage to collect (10^18 == 100%). 
+     */
+    struct FeeInfo {
+        address feeTo;
+        uint256 fee;
+    }
 
     /**
      * @dev MASTERCHEF_TYPE:
@@ -239,8 +257,9 @@ contract UnoFarmTrisolarisStandard is Initializable, ReentrancyGuardUpgradeable 
      * 3. It deposits new LP tokens back to the {MasterChef}.
      */
     function distribute(
-        address[][4] calldata swapRoutes,
-        uint256[4] calldata amountsOutMin
+        SwapInfo[4] calldata swapInfos,
+        SwapInfo[2] calldata feeSwapInfos,
+        FeeInfo calldata feeInfo
     ) external onlyAssetRouter nonReentrant returns (uint256 reward) {
         require(totalDeposits > 0, "NO_LIQUIDITY");
         require(distributionInfo[distributionID - 1].block != block.number, "CANT_CALL_ON_THE_SAME_BLOCK");
@@ -251,6 +270,8 @@ contract UnoFarmTrisolarisStandard is Initializable, ReentrancyGuardUpgradeable 
             MasterChef.harvest(pid);
         }
 
+        collectFees(feeSwapInfos[0], feeInfo, IERC20Upgradeable(rewardToken));
+        collectFees(feeSwapInfos[1], feeInfo, IERC20Upgradeable(rewarderToken));
         {// scope to avoid stack too deep errors
         uint256 rewardTokenHalf = IERC20(rewardToken).balanceOf(address(this)) / 2;
         uint256 rewarderTokenHalf;
@@ -259,30 +280,34 @@ contract UnoFarmTrisolarisStandard is Initializable, ReentrancyGuardUpgradeable 
         }
         if (rewardTokenHalf > 0) {
             if (tokenA != rewardToken) {
-                require(swapRoutes[0][0] == rewardToken && swapRoutes[0][swapRoutes[0].length - 1] == tokenA, "BAD_REWARD_TOKEN_A_ROUTE");
-                trisolarisRouter.swapExactTokensForTokens(rewardTokenHalf, amountsOutMin[0], swapRoutes[0], address(this), block.timestamp);
+                address[] calldata route = swapInfos[0].route;
+                require(route[0] == rewardToken && route[route.length - 1] == tokenA, "BAD_REWARD_TOKEN_A_ROUTE");
+                trisolarisRouter.swapExactTokensForTokens(rewardTokenHalf, swapInfos[0].amountOutMin, route, address(this), block.timestamp);
             }
 
             if (tokenB != rewardToken) {
-                require(swapRoutes[1][0] == rewardToken && swapRoutes[1][swapRoutes[1].length - 1] == tokenB, "BAD_REWARD_TOKEN_B_ROUTE");
-                trisolarisRouter.swapExactTokensForTokens(rewardTokenHalf, amountsOutMin[1], swapRoutes[1], address(this), block.timestamp);
+                address[] calldata route = swapInfos[1].route;
+                require(route[0] == rewardToken && route[route.length - 1] == tokenB, "BAD_REWARD_TOKEN_B_ROUTE");
+                trisolarisRouter.swapExactTokensForTokens(rewardTokenHalf, swapInfos[1].amountOutMin, route, address(this), block.timestamp);
             }
         }
 
         if (rewarderTokenHalf > 0) {
             if (tokenA != rewarderToken) {
-                require(swapRoutes[2][0] == rewarderToken && swapRoutes[2][swapRoutes[2].length - 1] == tokenA, "BAD_REWARDER_TOKEN_A_ROUTE");
-                trisolarisRouter.swapExactTokensForTokens(rewarderTokenHalf, amountsOutMin[2], swapRoutes[2], address(this), block.timestamp);
+                address[] calldata route = swapInfos[2].route;
+                require(route[0] == rewarderToken && route[route.length - 1] == tokenA, "BAD_REWARDER_TOKEN_A_ROUTE");
+                trisolarisRouter.swapExactTokensForTokens(rewarderTokenHalf, swapInfos[2].amountOutMin, route, address(this), block.timestamp);
             }
 
             if (tokenB != rewarderToken) {
-                require(swapRoutes[3][0] == rewarderToken && swapRoutes[3][swapRoutes[3].length - 1] == tokenB, "BAD_REWARDER_TOKEN_B_ROUTE");
-                trisolarisRouter.swapExactTokensForTokens(rewarderTokenHalf, amountsOutMin[3], swapRoutes[3], address(this), block.timestamp);
+                address[] calldata route = swapInfos[3].route;
+                require(route[0] == rewarderToken && route[route.length - 1] == tokenB, "BAD_REWARDER_TOKEN_B_ROUTE");
+                trisolarisRouter.swapExactTokensForTokens(rewarderTokenHalf, swapInfos[3].amountOutMin, route, address(this), block.timestamp);
             }
         }
         }
 
-        (,,reward) = trisolarisRouter.addLiquidity(tokenA, tokenB, IERC20(tokenA).balanceOf(address(this)), IERC20(tokenB).balanceOf(address(this)), amountsOutMin[0] + amountsOutMin[2], amountsOutMin[1] + amountsOutMin[3], address(this), block.timestamp);
+        (,,reward) = trisolarisRouter.addLiquidity(tokenA, tokenB, IERC20(tokenA).balanceOf(address(this)), IERC20(tokenB).balanceOf(address(this)), swapInfos[0].amountOutMin + swapInfos[2].amountOutMin, swapInfos[1].amountOutMin + swapInfos[3].amountOutMin, address(this), block.timestamp);
 
         uint256 rewardPerDepositAge = reward * fractionMultiplier / (totalDepositAge + totalDeposits * (block.number - totalDepositLastUpdate));
         uint256 cumulativeRewardAgePerDepositAge = distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge + rewardPerDepositAge * (block.number - distributionInfo[distributionID - 1].block);
@@ -301,6 +326,24 @@ contract UnoFarmTrisolarisStandard is Initializable, ReentrancyGuardUpgradeable 
             MasterChef.deposit(pid, reward, address(this));
         } else {
             MasterChef.deposit(pid, reward);
+        }
+    }
+
+    /**
+     * @dev Swaps and sends fees to feeTo.
+     */
+    function collectFees(SwapInfo calldata feeSwapInfo, FeeInfo calldata feeInfo, IERC20Upgradeable token) internal {
+        if(address(token) != address(0) && feeInfo.feeTo != address(0)){
+            uint256 feeAmount = token.balanceOf(address(this)) * feeInfo.fee / fractionMultiplier;
+            if(feeAmount > 0){
+                address[] calldata route = feeSwapInfo.route;
+                if(route.length > 0 && route[0] != route[route.length - 1]){
+                    require(route[0] == address(token), 'BAD_FEE_TOKEN_ROUTE');
+                    trisolarisRouter.swapExactTokensForTokens(feeAmount, feeSwapInfo.amountOutMin, route, feeInfo.feeTo, block.timestamp);
+                    return;
+                }
+                token.safeTransfer(feeInfo.feeTo, feeAmount);
+            }
         }
     }
 

@@ -26,9 +26,13 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
     bytes32 private constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
     bytes32 private constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
+    uint256 public fee;
+
     event Deposit(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Withdraw(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Distribute(address indexed lpPool, uint256 reward);
+
+    event FeeChanged(uint256 previousFee, uint256 newFee);
 
     modifier onlyRole(bytes32 role){
         require(accessManager.hasRole(role, msg.sender), 'CALLER_NOT_AUTHORIZED');
@@ -116,25 +120,29 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
     /**
      * @dev Distributes tokens between users.
      * @param swap - Address of the Swap contract.
-     * @param rewardTokenRoutes - An array of swap routes describing the path from reward to tokens in {swap}.
-     * @param rewarderTokenRoutes - An array of swap routes describing the path from rewarder to tokens in {swap}.
-     * @param amountsOutMin - Arrays of minimum amounts of output tokens that must be received for the transaction not to revert. [rewardAmountsOutMin, rewarderAmountsOutMin]
+
+     * @param rewardSwapInfos - Arrays of structs with token arrays describing swap routes from reward to tokens in {swap} and minimum amounts of output tokens that must be received for the transaction not to revert.
+     * @param rewarderSwapInfos - Arrays of structs with token arrays describing swap routes from rewarder to tokens in {swap} and minimum amounts of output tokens that must be received for the transaction not to revert.
+     * @param feeSwapInfos - Arrays of structs with token arrays describing swap routes (rewardTokenToFeeToken, rewarderTokenToFeeToken) and minimum amounts of output tokens that must be received for the transaction not to revert.
+     * @param feeTo - Address to collect fees to.
      *
      * Note: This function can only be called by the distributor.
      */
     function distribute(
         address swap,
-        address[][] calldata rewardTokenRoutes,
-        address[][] calldata rewarderTokenRoutes,
-        uint256[][2] calldata amountsOutMin
+        Farm.SwapInfo[] calldata rewardSwapInfos,
+        Farm.SwapInfo[] calldata rewarderSwapInfos,
+        Farm.SwapInfo[2] calldata feeSwapInfos,
+        address feeTo
     ) external whenNotPaused onlyRole(DISTRIBUTOR_ROLE) {
         Farm farm = Farm(farmFactory.Farms(swap));
         require(farm != Farm(address(0)), "FARM_NOT_EXISTS");
 
         uint256 reward = farm.distribute(
-            rewardTokenRoutes,
-            rewarderTokenRoutes,
-            amountsOutMin
+            rewardSwapInfos,
+            rewarderSwapInfos,
+            feeSwapInfos,
+            Farm.FeeInfo(feeTo, fee)
         );
         emit Distribute(swap, reward);
     }
@@ -172,7 +180,7 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
 
      * @return tokens - Array of token addresses.
      */  
-    function getTokens(address swap) external view returns(address[] memory tokens){
+    function getTokens(address swap) external view returns(IERC20[] memory tokens){
         uint8 tokenCount;
         address[] memory _tokens = new address[](type(uint8).max);
         for (uint8 i = 0; i < type(uint8).max; i++) {
@@ -185,11 +193,25 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
         }
         require(tokenCount > 0, "NO_TOKENS_IN_SWAP");
 
-        tokens = new address[](tokenCount);
+        tokens = new IERC20[](tokenCount);
         for (uint8 i = 0; i < tokenCount; i++) {
-            tokens[i] = _tokens[i];
+            tokens[i] = IERC20(_tokens[i]);
         }
         return tokens;
+    }
+
+    /**
+     * @dev Change fee amount.
+     * @param _fee -New fee to collect from farms. [10^18 == 100%]
+     *
+     * Note: This function can only be called by ADMIN_ROLE.
+     */ 
+    function setFee(uint256 _fee) external onlyRole(ADMIN_ROLE){
+        require (_fee <= 1 ether, "BAD_FEE");
+        if(fee != _fee){
+            emit FeeChanged(fee, _fee); 
+            fee = _fee;
+        }
     }
 
     function pause() external onlyRole(PAUSER_ROLE) {
