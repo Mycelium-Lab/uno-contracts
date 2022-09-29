@@ -15,7 +15,6 @@
 pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./IAsset.sol";
 
 pragma solidity 0.8.10;
 
@@ -69,7 +68,7 @@ interface IVault{
     ) external payable;
 
     struct JoinPoolRequest {
-        IAsset[] assets;
+        IERC20[] assets;
         uint256[] maxAmountsIn;
         bytes userData;
         bool fromInternalBalance;
@@ -118,7 +117,7 @@ interface IVault{
     ) external;
 
     struct ExitPoolRequest {
-        IAsset[] assets;
+        IERC20[] assets;
         uint256[] minAmountsOut;
         bytes userData;
         bool toInternalBalance;
@@ -206,7 +205,7 @@ interface IVault{
     function batchSwap(
         SwapKind kind,
         BatchSwapStep[] memory swaps,
-        IAsset[] memory assets,
+        IERC20[] memory assets,
         FundManagement memory funds,
         int256[] memory limits,
         uint256 deadline

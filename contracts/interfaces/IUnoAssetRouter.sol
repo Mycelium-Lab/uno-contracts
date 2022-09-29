@@ -4,6 +4,7 @@ pragma experimental ABIEncoderV2;
 
 import './IUnoFarmFactory.sol';
 import './IUnoAccessManager.sol'; 
+import '@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol';
 
 interface IUnoAssetRouter {
     event Deposit(address indexed lpPool, address indexed from, address indexed recipient, uint256 amount);
@@ -20,7 +21,7 @@ interface IUnoAssetRouter {
 
     function userStake(address _address, address lpPool) external view returns (uint256 stakeLP, uint256 stakeA, uint256 stakeB);
     function totalDeposits(address lpPool) external view returns (uint256 totalDepositsLP, uint256 totalDepositsA, uint256 totalDepositsB);
-    function getTokens(address lpPool) external view returns(address tokenA, address tokenB);
+    function getTokens(address lpPool) external view returns(address[] memory tokens);
 
     function paused() external view returns(bool);
     function pause() external;

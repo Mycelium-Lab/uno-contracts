@@ -94,12 +94,12 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         __ReentrancyGuard_init();
         
         for (uint256 i = 0; i < poolInfos.length; i++) {
-            (address _tokenA, address _tokenB) = poolInfos[i].assetRouter.getTokens(poolInfos[i].pool);
+            address[] memory _tokens = IUnoAssetRouter(poolInfos[i].assetRouter).getTokens(poolInfos[i].pool);
             PoolInfo memory pool = PoolInfo({
                 pool: poolInfos[i].pool,
                 assetRouter: poolInfos[i].assetRouter,
-                tokenA: IERC20Upgradeable(_tokenA),
-                tokenB: IERC20Upgradeable(_tokenB)
+                tokenA: IERC20Upgradeable(_tokens[0]),
+                tokenB: IERC20Upgradeable(_tokens[1])
             });
             pools.push(pool);
 

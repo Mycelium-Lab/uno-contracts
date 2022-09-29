@@ -50,7 +50,7 @@
         {
           "components": [
             {
-              "internalType": "contract IAsset[]",
+              "internalType": "contract IERC20[]",
               "name": "assets",
               "type": "address[]"
             },
@@ -100,7 +100,7 @@
         {
           "components": [
             {
-              "internalType": "contract IAsset[]",
+              "internalType": "contract IERC20[]",
               "name": "assets",
               "type": "address[]"
             },
@@ -170,7 +170,7 @@
           "type": "tuple[]"
         },
         {
-          "internalType": "contract IAsset[]",
+          "internalType": "contract IERC20[]",
           "name": "assets",
           "type": "address[]"
         },
@@ -224,7 +224,7 @@
       "type": "function"
     }
   ],
-  "metadata": "{\"compiler\":{\"version\":\"0.8.10+commit.fc410830\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"enum IVault.SwapKind\",\"name\":\"kind\",\"type\":\"uint8\"},{\"components\":[{\"internalType\":\"bytes32\",\"name\":\"poolId\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"assetInIndex\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"assetOutIndex\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"userData\",\"type\":\"bytes\"}],\"internalType\":\"struct IVault.BatchSwapStep[]\",\"name\":\"swaps\",\"type\":\"tuple[]\"},{\"internalType\":\"contract IAsset[]\",\"name\":\"assets\",\"type\":\"address[]\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"fromInternalBalance\",\"type\":\"bool\"},{\"internalType\":\"address payable\",\"name\":\"recipient\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"toInternalBalance\",\"type\":\"bool\"}],\"internalType\":\"struct IVault.FundManagement\",\"name\":\"funds\",\"type\":\"tuple\"},{\"internalType\":\"int256[]\",\"name\":\"limits\",\"type\":\"int256[]\"},{\"internalType\":\"uint256\",\"name\":\"deadline\",\"type\":\"uint256\"}],\"name\":\"batchSwap\",\"outputs\":[{\"internalType\":\"int256[]\",\"name\":\"\",\"type\":\"int256[]\"}],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"poolId\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"internalType\":\"address payable\",\"name\":\"recipient\",\"type\":\"address\"},{\"components\":[{\"internalType\":\"contract IAsset[]\",\"name\":\"assets\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"minAmountsOut\",\"type\":\"uint256[]\"},{\"internalType\":\"bytes\",\"name\":\"userData\",\"type\":\"bytes\"},{\"internalType\":\"bool\",\"name\":\"toInternalBalance\",\"type\":\"bool\"}],\"internalType\":\"struct IVault.ExitPoolRequest\",\"name\":\"request\",\"type\":\"tuple\"}],\"name\":\"exitPool\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"poolId\",\"type\":\"bytes32\"}],\"name\":\"getPoolTokens\",\"outputs\":[{\"internalType\":\"contract IERC20[]\",\"name\":\"tokens\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"balances\",\"type\":\"uint256[]\"},{\"internalType\":\"uint256\",\"name\":\"lastChangeBlock\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"poolId\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"recipient\",\"type\":\"address\"},{\"components\":[{\"internalType\":\"contract IAsset[]\",\"name\":\"assets\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"maxAmountsIn\",\"type\":\"uint256[]\"},{\"internalType\":\"bytes\",\"name\":\"userData\",\"type\":\"bytes\"},{\"internalType\":\"bool\",\"name\":\"fromInternalBalance\",\"type\":\"bool\"}],\"internalType\":\"struct IVault.JoinPoolRequest\",\"name\":\"request\",\"type\":\"tuple\"}],\"name\":\"joinPool\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{\"batchSwap(uint8,(bytes32,uint256,uint256,uint256,bytes)[],address[],(address,bool,address,bool),int256[],uint256)\":{\"details\":\"Performs a series of swaps with one or multiple Pools. In each individual swap, the caller determines either the amount of tokens sent to or received from the Pool, depending on the `kind` value. Returns an array with the net Vault asset balance deltas. Positive amounts represent tokens (or ETH) sent to the Vault, and negative amounts represent tokens (or ETH) sent by the Vault. Each delta corresponds to the asset at the same index in the `assets` array. Swaps are executed sequentially, in the order specified by the `swaps` array. Each array element describes a Pool, the token to be sent to this Pool, the token to receive from it, and an amount that is either `amountIn` or `amountOut` depending on the swap kind. Multihop swaps can be executed by passing an `amount` value of zero for a swap. This will cause the amount in/out of the previous swap to be used as the amount in for the current one. In a 'given in' swap, 'tokenIn' must equal the previous swap's `tokenOut`. For a 'given out' swap, `tokenOut` must equal the previous swap's `tokenIn`. The `assets` array contains the addresses of all assets involved in the swaps. These are either token addresses, or the IAsset sentinel value for ETH (the zero address). Each entry in the `swaps` array specifies tokens in and out by referencing an index in `assets`. Note that Pools never interact with ETH directly: it will be wrapped to or unwrapped from WETH by the Vault. Internal Balance usage, sender, and recipient are determined by the `funds` struct. The `limits` array specifies the minimum or maximum amount of each token the vault is allowed to transfer. `batchSwap` can be used to make a single swap, like `swap` does, but doing so requires more gas than the equivalent `swap` call. Emits `Swap` events.\"},\"exitPool(bytes32,address,address,(address[],uint256[],bytes,bool))\":{\"details\":\"Called by users to exit a Pool, which transfers tokens from the Pool's balance to `recipient`. This will trigger custom Pool behavior, which will typically ask for something in return from `sender` - often tokenized Pool shares. The amount of tokens that can be withdrawn is limited by the Pool's `cash` balance (see `getPoolTokenInfo`). If the caller is not `sender`, it must be an authorized relayer for them. The `tokens` and `minAmountsOut` arrays must have the same length, and each entry in these indicates the minimum token amount to receive for each token contract. The amounts to send are decided by the Pool and not the Vault: it just enforces these minimums. If exiting a Pool that holds WETH, it is possible to receive ETH directly: the Vault will do the unwrapping. To enable this mechanism, the IAsset sentinel value (the zero address) must be passed in the `assets` array instead of the WETH address. Note that it is not possible to combine ETH and WETH in the same exit. `assets` must have the same length and order as the array returned by `getPoolTokens`. This prevents issues when interacting with Pools that register and deregister tokens frequently. If receiving ETH however, the array must be sorted *before* replacing the WETH address with the ETH sentinel value (the zero address), which means the final `assets` array might not be sorted. Pools with no registered tokens cannot be exited. If `toInternalBalance` is true, the tokens will be deposited to `recipient`'s Internal Balance. Otherwise, an ERC20 transfer will be performed. Note that ETH cannot be deposited to Internal Balance: attempting to do so will trigger a revert. `minAmountsOut` is the minimum amount of tokens the user expects to get out of the Pool, for each token in the `tokens` array. This array must match the Pool's registered tokens. This causes the Vault to call the `IBasePool.onExitPool` hook on the Pool's contract, where Pools implement their own custom logic. This typically requires additional information from the user (such as the expected number of Pool shares to return). This can be encoded in the `userData` argument, which is ignored by the Vault and passed directly to the Pool's contract. Emits a `PoolBalanceChanged` event.\"},\"joinPool(bytes32,address,address,(address[],uint256[],bytes,bool))\":{\"details\":\"Called by users to join a Pool, which transfers tokens from `sender` into the Pool's balance. This will trigger custom Pool behavior, which will typically grant something in return to `recipient` - often tokenized Pool shares. If the caller is not `sender`, it must be an authorized relayer for them. The `assets` and `maxAmountsIn` arrays must have the same length, and each entry indicates the maximum amount to send for each asset. The amounts to send are decided by the Pool and not the Vault: it just enforces these maximums. If joining a Pool that holds WETH, it is possible to send ETH directly: the Vault will do the wrapping. To enable this mechanism, the IAsset sentinel value (the zero address) must be passed in the `assets` array instead of the WETH address. Note that it is not possible to combine ETH and WETH in the same join. Any excess ETH will be sent back to the caller (not the sender, which is important for relayers). `assets` must have the same length and order as the array returned by `getPoolTokens`. This prevents issues when interacting with Pools that register and deregister tokens frequently. If sending ETH however, the array must be sorted *before* replacing the WETH address with the ETH sentinel value (the zero address), which means the final `assets` array might not be sorted. Pools with no registered tokens cannot be joined. If `fromInternalBalance` is true, the caller's Internal Balance will be preferred: ERC20 transfers will only be made for the difference between the requested amount and Internal Balance (if any). Note that ETH cannot be withdrawn from Internal Balance: attempting to do so will trigger a revert. This causes the Vault to call the `IBasePool.onJoinPool` hook on the Pool's contract, where Pools implement their own custom logic. This typically requires additional information from the user (such as the expected number of Pool shares). This can be encoded in the `userData` argument, which is ignored by the Vault and passed directly to the Pool's contract, as is `recipient`. Emits a `PoolBalanceChanged` event.\"}},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"project:/contracts/interfaces/IVault.sol\":\"IVault\"},\"evmVersion\":\"london\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[]},\"sources\":{\"@openzeppelin/contracts/token/ERC20/IERC20.sol\":{\"keccak256\":\"0x9750c6b834f7b43000631af5cc30001c5f547b3ceb3635488f140f60e897ea6b\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://5a7d5b1ef5d8d5889ad2ed89d8619c09383b80b72ab226e0fe7bde1636481e34\",\"dweb:/ipfs/QmebXWgtEfumQGBdVeM6c71McLixYXQP5Bk6kKXuoY4Bmr\"]},\"project:/contracts/interfaces/IAsset.sol\":{\"keccak256\":\"0xd0af11a4031b09c503f43facb5843e6dc09b94247f416153cb116546bb439389\",\"license\":\"GPL-3.0-or-later\",\"urls\":[\"bzz-raw://ded2df074ca1097b86a7acd7ef97ce10ef7f9cdc44e4c5629bde5c4e69116f76\",\"dweb:/ipfs/QmZ5TQkm2UzyqZEMSdCaxd7Lm12KUxzX6hmAcridrcWuCa\"]},\"project:/contracts/interfaces/IVault.sol\":{\"keccak256\":\"0xecc5f517e934fe9d3128d790ade9f2e662ac334e3c3d3408a295788185d359fa\",\"license\":\"GPL-3.0-or-later\",\"urls\":[\"bzz-raw://478af291da63f84543930ed2eff08ff34148501e58c60c2d60f4a7d6167340a4\",\"dweb:/ipfs/QmY4eqDPHYdYfkRc7xNpYqeYjktS7SWf7xVHRbSbiG7jsV\"]}},\"version\":1}",
+  "metadata": "{\"compiler\":{\"version\":\"0.8.10+commit.fc410830\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"enum IVault.SwapKind\",\"name\":\"kind\",\"type\":\"uint8\"},{\"components\":[{\"internalType\":\"bytes32\",\"name\":\"poolId\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"assetInIndex\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"assetOutIndex\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"userData\",\"type\":\"bytes\"}],\"internalType\":\"struct IVault.BatchSwapStep[]\",\"name\":\"swaps\",\"type\":\"tuple[]\"},{\"internalType\":\"contract IERC20[]\",\"name\":\"assets\",\"type\":\"address[]\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"fromInternalBalance\",\"type\":\"bool\"},{\"internalType\":\"address payable\",\"name\":\"recipient\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"toInternalBalance\",\"type\":\"bool\"}],\"internalType\":\"struct IVault.FundManagement\",\"name\":\"funds\",\"type\":\"tuple\"},{\"internalType\":\"int256[]\",\"name\":\"limits\",\"type\":\"int256[]\"},{\"internalType\":\"uint256\",\"name\":\"deadline\",\"type\":\"uint256\"}],\"name\":\"batchSwap\",\"outputs\":[{\"internalType\":\"int256[]\",\"name\":\"\",\"type\":\"int256[]\"}],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"poolId\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"internalType\":\"address payable\",\"name\":\"recipient\",\"type\":\"address\"},{\"components\":[{\"internalType\":\"contract IERC20[]\",\"name\":\"assets\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"minAmountsOut\",\"type\":\"uint256[]\"},{\"internalType\":\"bytes\",\"name\":\"userData\",\"type\":\"bytes\"},{\"internalType\":\"bool\",\"name\":\"toInternalBalance\",\"type\":\"bool\"}],\"internalType\":\"struct IVault.ExitPoolRequest\",\"name\":\"request\",\"type\":\"tuple\"}],\"name\":\"exitPool\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"poolId\",\"type\":\"bytes32\"}],\"name\":\"getPoolTokens\",\"outputs\":[{\"internalType\":\"contract IERC20[]\",\"name\":\"tokens\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"balances\",\"type\":\"uint256[]\"},{\"internalType\":\"uint256\",\"name\":\"lastChangeBlock\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"poolId\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"recipient\",\"type\":\"address\"},{\"components\":[{\"internalType\":\"contract IERC20[]\",\"name\":\"assets\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"maxAmountsIn\",\"type\":\"uint256[]\"},{\"internalType\":\"bytes\",\"name\":\"userData\",\"type\":\"bytes\"},{\"internalType\":\"bool\",\"name\":\"fromInternalBalance\",\"type\":\"bool\"}],\"internalType\":\"struct IVault.JoinPoolRequest\",\"name\":\"request\",\"type\":\"tuple\"}],\"name\":\"joinPool\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{\"batchSwap(uint8,(bytes32,uint256,uint256,uint256,bytes)[],address[],(address,bool,address,bool),int256[],uint256)\":{\"details\":\"Performs a series of swaps with one or multiple Pools. In each individual swap, the caller determines either the amount of tokens sent to or received from the Pool, depending on the `kind` value. Returns an array with the net Vault asset balance deltas. Positive amounts represent tokens (or ETH) sent to the Vault, and negative amounts represent tokens (or ETH) sent by the Vault. Each delta corresponds to the asset at the same index in the `assets` array. Swaps are executed sequentially, in the order specified by the `swaps` array. Each array element describes a Pool, the token to be sent to this Pool, the token to receive from it, and an amount that is either `amountIn` or `amountOut` depending on the swap kind. Multihop swaps can be executed by passing an `amount` value of zero for a swap. This will cause the amount in/out of the previous swap to be used as the amount in for the current one. In a 'given in' swap, 'tokenIn' must equal the previous swap's `tokenOut`. For a 'given out' swap, `tokenOut` must equal the previous swap's `tokenIn`. The `assets` array contains the addresses of all assets involved in the swaps. These are either token addresses, or the IAsset sentinel value for ETH (the zero address). Each entry in the `swaps` array specifies tokens in and out by referencing an index in `assets`. Note that Pools never interact with ETH directly: it will be wrapped to or unwrapped from WETH by the Vault. Internal Balance usage, sender, and recipient are determined by the `funds` struct. The `limits` array specifies the minimum or maximum amount of each token the vault is allowed to transfer. `batchSwap` can be used to make a single swap, like `swap` does, but doing so requires more gas than the equivalent `swap` call. Emits `Swap` events.\"},\"exitPool(bytes32,address,address,(address[],uint256[],bytes,bool))\":{\"details\":\"Called by users to exit a Pool, which transfers tokens from the Pool's balance to `recipient`. This will trigger custom Pool behavior, which will typically ask for something in return from `sender` - often tokenized Pool shares. The amount of tokens that can be withdrawn is limited by the Pool's `cash` balance (see `getPoolTokenInfo`). If the caller is not `sender`, it must be an authorized relayer for them. The `tokens` and `minAmountsOut` arrays must have the same length, and each entry in these indicates the minimum token amount to receive for each token contract. The amounts to send are decided by the Pool and not the Vault: it just enforces these minimums. If exiting a Pool that holds WETH, it is possible to receive ETH directly: the Vault will do the unwrapping. To enable this mechanism, the IAsset sentinel value (the zero address) must be passed in the `assets` array instead of the WETH address. Note that it is not possible to combine ETH and WETH in the same exit. `assets` must have the same length and order as the array returned by `getPoolTokens`. This prevents issues when interacting with Pools that register and deregister tokens frequently. If receiving ETH however, the array must be sorted *before* replacing the WETH address with the ETH sentinel value (the zero address), which means the final `assets` array might not be sorted. Pools with no registered tokens cannot be exited. If `toInternalBalance` is true, the tokens will be deposited to `recipient`'s Internal Balance. Otherwise, an ERC20 transfer will be performed. Note that ETH cannot be deposited to Internal Balance: attempting to do so will trigger a revert. `minAmountsOut` is the minimum amount of tokens the user expects to get out of the Pool, for each token in the `tokens` array. This array must match the Pool's registered tokens. This causes the Vault to call the `IBasePool.onExitPool` hook on the Pool's contract, where Pools implement their own custom logic. This typically requires additional information from the user (such as the expected number of Pool shares to return). This can be encoded in the `userData` argument, which is ignored by the Vault and passed directly to the Pool's contract. Emits a `PoolBalanceChanged` event.\"},\"joinPool(bytes32,address,address,(address[],uint256[],bytes,bool))\":{\"details\":\"Called by users to join a Pool, which transfers tokens from `sender` into the Pool's balance. This will trigger custom Pool behavior, which will typically grant something in return to `recipient` - often tokenized Pool shares. If the caller is not `sender`, it must be an authorized relayer for them. The `assets` and `maxAmountsIn` arrays must have the same length, and each entry indicates the maximum amount to send for each asset. The amounts to send are decided by the Pool and not the Vault: it just enforces these maximums. If joining a Pool that holds WETH, it is possible to send ETH directly: the Vault will do the wrapping. To enable this mechanism, the IAsset sentinel value (the zero address) must be passed in the `assets` array instead of the WETH address. Note that it is not possible to combine ETH and WETH in the same join. Any excess ETH will be sent back to the caller (not the sender, which is important for relayers). `assets` must have the same length and order as the array returned by `getPoolTokens`. This prevents issues when interacting with Pools that register and deregister tokens frequently. If sending ETH however, the array must be sorted *before* replacing the WETH address with the ETH sentinel value (the zero address), which means the final `assets` array might not be sorted. Pools with no registered tokens cannot be joined. If `fromInternalBalance` is true, the caller's Internal Balance will be preferred: ERC20 transfers will only be made for the difference between the requested amount and Internal Balance (if any). Note that ETH cannot be withdrawn from Internal Balance: attempting to do so will trigger a revert. This causes the Vault to call the `IBasePool.onJoinPool` hook on the Pool's contract, where Pools implement their own custom logic. This typically requires additional information from the user (such as the expected number of Pool shares). This can be encoded in the `userData` argument, which is ignored by the Vault and passed directly to the Pool's contract, as is `recipient`. Emits a `PoolBalanceChanged` event.\"}},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"project:/contracts/interfaces/IVault.sol\":\"IVault\"},\"evmVersion\":\"london\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[]},\"sources\":{\"@openzeppelin/contracts/token/ERC20/IERC20.sol\":{\"keccak256\":\"0x9750c6b834f7b43000631af5cc30001c5f547b3ceb3635488f140f60e897ea6b\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://5a7d5b1ef5d8d5889ad2ed89d8619c09383b80b72ab226e0fe7bde1636481e34\",\"dweb:/ipfs/QmebXWgtEfumQGBdVeM6c71McLixYXQP5Bk6kKXuoY4Bmr\"]},\"project:/contracts/interfaces/IVault.sol\":{\"keccak256\":\"0x4c52cfa8f8fae1b7f3d94e0c3d546d1bcd5fcf6304b9e40a8d7b58d1590ba20a\",\"license\":\"GPL-3.0-or-later\",\"urls\":[\"bzz-raw://f66c26a8ca818017c7f9f2ffe9d517d5fa59e0b0ba513ebdd1358413e11221b9\",\"dweb:/ipfs/QmNRgDDtkse8icQKjXeuCTfTYwkA3qmZALFoxHVFx2jCxK\"]}},\"version\":1}",
   "bytecode": "0x",
   "deployedBytecode": "0x",
   "immutableReferences": {},
@@ -232,67 +232,52 @@
   "deployedGeneratedSources": [],
   "sourceMap": "",
   "deployedSourceMap": "",
-  "source": "// SPDX-License-Identifier: GPL-3.0-or-later\r\n// This program is free software: you can redistribute it and/or modify\r\n// it under the terms of the GNU General Public License as published by\r\n// the Free Software Foundation, either version 3 of the License, or\r\n// (at your option) any later version.\r\n\r\n// This program is distributed in the hope that it will be useful,\r\n// but WITHOUT ANY WARRANTY; without even the implied warranty of\r\n// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\r\n// GNU General Public License for more details.\r\n\r\n// You should have received a copy of the GNU General Public License\r\n// along with this program.  If not, see <http://www.gnu.org/licenses/>.\r\n\r\npragma experimental ABIEncoderV2;\r\n\r\nimport \"@openzeppelin/contracts/token/ERC20/IERC20.sol\";\r\nimport \"./IAsset.sol\";\r\n\r\npragma solidity 0.8.10;\r\n\r\ninterface IVault{\r\n    function getPoolTokens(bytes32 poolId)\r\n        external\r\n        view\r\n        returns (\r\n            IERC20[] memory tokens,\r\n            uint256[] memory balances,\r\n            uint256 lastChangeBlock\r\n        );\r\n\r\n    /**\r\n     * @dev Called by users to join a Pool, which transfers tokens from `sender` into the Pool's balance. This will\r\n     * trigger custom Pool behavior, which will typically grant something in return to `recipient` - often tokenized\r\n     * Pool shares.\r\n     *\r\n     * If the caller is not `sender`, it must be an authorized relayer for them.\r\n     *\r\n     * The `assets` and `maxAmountsIn` arrays must have the same length, and each entry indicates the maximum amount\r\n     * to send for each asset. The amounts to send are decided by the Pool and not the Vault: it just enforces\r\n     * these maximums.\r\n     *\r\n     * If joining a Pool that holds WETH, it is possible to send ETH directly: the Vault will do the wrapping. To enable\r\n     * this mechanism, the IAsset sentinel value (the zero address) must be passed in the `assets` array instead of the\r\n     * WETH address. Note that it is not possible to combine ETH and WETH in the same join. Any excess ETH will be sent\r\n     * back to the caller (not the sender, which is important for relayers).\r\n     *\r\n     * `assets` must have the same length and order as the array returned by `getPoolTokens`. This prevents issues when\r\n     * interacting with Pools that register and deregister tokens frequently. If sending ETH however, the array must be\r\n     * sorted *before* replacing the WETH address with the ETH sentinel value (the zero address), which means the final\r\n     * `assets` array might not be sorted. Pools with no registered tokens cannot be joined.\r\n     *\r\n     * If `fromInternalBalance` is true, the caller's Internal Balance will be preferred: ERC20 transfers will only\r\n     * be made for the difference between the requested amount and Internal Balance (if any). Note that ETH cannot be\r\n     * withdrawn from Internal Balance: attempting to do so will trigger a revert.\r\n     *\r\n     * This causes the Vault to call the `IBasePool.onJoinPool` hook on the Pool's contract, where Pools implement\r\n     * their own custom logic. This typically requires additional information from the user (such as the expected number\r\n     * of Pool shares). This can be encoded in the `userData` argument, which is ignored by the Vault and passed\r\n     * directly to the Pool's contract, as is `recipient`.\r\n     *\r\n     * Emits a `PoolBalanceChanged` event.\r\n     */\r\n    function joinPool(\r\n        bytes32 poolId,\r\n        address sender,\r\n        address recipient,\r\n        JoinPoolRequest memory request\r\n    ) external payable;\r\n\r\n    struct JoinPoolRequest {\r\n        IAsset[] assets;\r\n        uint256[] maxAmountsIn;\r\n        bytes userData;\r\n        bool fromInternalBalance;\r\n    }\r\n\r\n    /**\r\n     * @dev Called by users to exit a Pool, which transfers tokens from the Pool's balance to `recipient`. This will\r\n     * trigger custom Pool behavior, which will typically ask for something in return from `sender` - often tokenized\r\n     * Pool shares. The amount of tokens that can be withdrawn is limited by the Pool's `cash` balance (see\r\n     * `getPoolTokenInfo`).\r\n     *\r\n     * If the caller is not `sender`, it must be an authorized relayer for them.\r\n     *\r\n     * The `tokens` and `minAmountsOut` arrays must have the same length, and each entry in these indicates the minimum\r\n     * token amount to receive for each token contract. The amounts to send are decided by the Pool and not the Vault:\r\n     * it just enforces these minimums.\r\n     *\r\n     * If exiting a Pool that holds WETH, it is possible to receive ETH directly: the Vault will do the unwrapping. To\r\n     * enable this mechanism, the IAsset sentinel value (the zero address) must be passed in the `assets` array instead\r\n     * of the WETH address. Note that it is not possible to combine ETH and WETH in the same exit.\r\n     *\r\n     * `assets` must have the same length and order as the array returned by `getPoolTokens`. This prevents issues when\r\n     * interacting with Pools that register and deregister tokens frequently. If receiving ETH however, the array must\r\n     * be sorted *before* replacing the WETH address with the ETH sentinel value (the zero address), which means the\r\n     * final `assets` array might not be sorted. Pools with no registered tokens cannot be exited.\r\n     *\r\n     * If `toInternalBalance` is true, the tokens will be deposited to `recipient`'s Internal Balance. Otherwise,\r\n     * an ERC20 transfer will be performed. Note that ETH cannot be deposited to Internal Balance: attempting to\r\n     * do so will trigger a revert.\r\n     *\r\n     * `minAmountsOut` is the minimum amount of tokens the user expects to get out of the Pool, for each token in the\r\n     * `tokens` array. This array must match the Pool's registered tokens.\r\n     *\r\n     * This causes the Vault to call the `IBasePool.onExitPool` hook on the Pool's contract, where Pools implement\r\n     * their own custom logic. This typically requires additional information from the user (such as the expected number\r\n     * of Pool shares to return). This can be encoded in the `userData` argument, which is ignored by the Vault and\r\n     * passed directly to the Pool's contract.\r\n     *\r\n     * Emits a `PoolBalanceChanged` event.\r\n     */\r\n    function exitPool(\r\n        bytes32 poolId,\r\n        address sender,\r\n        address payable recipient,\r\n        ExitPoolRequest memory request\r\n    ) external;\r\n\r\n    struct ExitPoolRequest {\r\n        IAsset[] assets;\r\n        uint256[] minAmountsOut;\r\n        bytes userData;\r\n        bool toInternalBalance;\r\n    }\r\n\r\n\r\n    // Swaps\r\n    //\r\n    // Users can swap tokens with Pools by calling the `swap` and `batchSwap` functions. To do this,\r\n    // they need not trust Pool contracts in any way: all security checks are made by the Vault. They must however be\r\n    // aware of the Pools' pricing algorithms in order to estimate the prices Pools will quote.\r\n    //\r\n    // The `swap` function executes a single swap, while `batchSwap` can perform multiple swaps in sequence.\r\n    // In each individual swap, tokens of one kind are sent from the sender to the Pool (this is the 'token in'),\r\n    // and tokens of another kind are sent from the Pool to the recipient in exchange (this is the 'token out').\r\n    // More complex swaps, such as one token in to multiple tokens out can be achieved by batching together\r\n    // individual swaps.\r\n    //\r\n    // There are two swap kinds:\r\n    //  - 'given in' swaps, where the amount of tokens in (sent to the Pool) is known, and the Pool determines (via the\r\n    // `onSwap` hook) the amount of tokens out (to send to the recipient).\r\n    //  - 'given out' swaps, where the amount of tokens out (received from the Pool) is known, and the Pool determines\r\n    // (via the `onSwap` hook) the amount of tokens in (to receive from the sender).\r\n    //\r\n    // Additionally, it is possible to chain swaps using a placeholder input amount, which the Vault replaces with\r\n    // the calculated output of the previous swap. If the previous swap was 'given in', this will be the calculated\r\n    // tokenOut amount. If the previous swap was 'given out', it will use the calculated tokenIn amount. These extended\r\n    // swaps are known as 'multihop' swaps, since they 'hop' through a number of intermediate tokens before arriving at\r\n    // the final intended token.\r\n    //\r\n    // In all cases, tokens are only transferred in and out of the Vault (or withdrawn from and deposited into Internal\r\n    // Balance) after all individual swaps have been completed, and the net token balance change computed. This makes\r\n    // certain swap patterns, such as multihops, or swaps that interact with the same token pair in multiple Pools, cost\r\n    // much less gas than they would otherwise.\r\n    //\r\n    // It also means that under certain conditions it is possible to perform arbitrage by swapping with multiple\r\n    // Pools in a way that results in net token movement out of the Vault (profit), with no tokens being sent in (only\r\n    // updating the Pool's internal accounting).\r\n    //\r\n    // To protect users from front-running or the market changing rapidly, they supply a list of 'limits' for each token\r\n    // involved in the swap, where either the maximum number of tokens to send (by passing a positive value) or the\r\n    // minimum amount of tokens to receive (by passing a negative value) is specified.\r\n    //\r\n    // Additionally, a 'deadline' timestamp can also be provided, forcing the swap to fail if it occurs after\r\n    // this point in time (e.g. if the transaction failed to be included in a block promptly).\r\n    //\r\n    // If interacting with Pools that hold WETH, it is possible to both send and receive ETH directly: the Vault will do\r\n    // the wrapping and unwrapping. To enable this mechanism, the IAsset sentinel value (the zero address) must be\r\n    // passed in the `assets` array instead of the WETH address. Note that it is possible to combine ETH and WETH in the\r\n    // same swap. Any excess ETH will be sent back to the caller (not the sender, which is relevant for relayers).\r\n    //\r\n    // Finally, Internal Balance can be used when either sending or receiving tokens.\r\n\r\n    enum SwapKind { GIVEN_IN, GIVEN_OUT }\r\n\r\n    /**\r\n     * @dev Performs a series of swaps with one or multiple Pools. In each individual swap, the caller determines either\r\n     * the amount of tokens sent to or received from the Pool, depending on the `kind` value.\r\n     *\r\n     * Returns an array with the net Vault asset balance deltas. Positive amounts represent tokens (or ETH) sent to the\r\n     * Vault, and negative amounts represent tokens (or ETH) sent by the Vault. Each delta corresponds to the asset at\r\n     * the same index in the `assets` array.\r\n     *\r\n     * Swaps are executed sequentially, in the order specified by the `swaps` array. Each array element describes a\r\n     * Pool, the token to be sent to this Pool, the token to receive from it, and an amount that is either `amountIn` or\r\n     * `amountOut` depending on the swap kind.\r\n     *\r\n     * Multihop swaps can be executed by passing an `amount` value of zero for a swap. This will cause the amount in/out\r\n     * of the previous swap to be used as the amount in for the current one. In a 'given in' swap, 'tokenIn' must equal\r\n     * the previous swap's `tokenOut`. For a 'given out' swap, `tokenOut` must equal the previous swap's `tokenIn`.\r\n     *\r\n     * The `assets` array contains the addresses of all assets involved in the swaps. These are either token addresses,\r\n     * or the IAsset sentinel value for ETH (the zero address). Each entry in the `swaps` array specifies tokens in and\r\n     * out by referencing an index in `assets`. Note that Pools never interact with ETH directly: it will be wrapped to\r\n     * or unwrapped from WETH by the Vault.\r\n     *\r\n     * Internal Balance usage, sender, and recipient are determined by the `funds` struct. The `limits` array specifies\r\n     * the minimum or maximum amount of each token the vault is allowed to transfer.\r\n     *\r\n     * `batchSwap` can be used to make a single swap, like `swap` does, but doing so requires more gas than the\r\n     * equivalent `swap` call.\r\n     *\r\n     * Emits `Swap` events.\r\n     */\r\n    function batchSwap(\r\n        SwapKind kind,\r\n        BatchSwapStep[] memory swaps,\r\n        IAsset[] memory assets,\r\n        FundManagement memory funds,\r\n        int256[] memory limits,\r\n        uint256 deadline\r\n    ) external payable returns (int256[] memory);\r\n\r\n    /**\r\n     * @dev Data for each individual swap executed by `batchSwap`. The asset in and out fields are indexes into the\r\n     * `assets` array passed to that function, and ETH assets are converted to WETH.\r\n     *\r\n     * If `amount` is zero, the multihop mechanism is used to determine the actual amount based on the amount in/out\r\n     * from the previous swap, depending on the swap kind.\r\n     *\r\n     * The `userData` field is ignored by the Vault, but forwarded to the Pool in the `onSwap` hook, and may be\r\n     * used to extend swap behavior.\r\n     */\r\n    struct BatchSwapStep {\r\n        bytes32 poolId;\r\n        uint256 assetInIndex;\r\n        uint256 assetOutIndex;\r\n        uint256 amount;\r\n        bytes userData;\r\n    }\r\n\r\n\r\n    /**\r\n     * @dev All tokens in a swap are either sent from the `sender` account to the Vault, or from the Vault to the\r\n     * `recipient` account.\r\n     *\r\n     * If the caller is not `sender`, it must be an authorized relayer for them.\r\n     *\r\n     * If `fromInternalBalance` is true, the `sender`'s Internal Balance will be preferred, performing an ERC20\r\n     * transfer for the difference between the requested amount and the User's Internal Balance (if any). The `sender`\r\n     * must have allowed the Vault to use their tokens via `IERC20.approve()`. This matches the behavior of\r\n     * `joinPool`.\r\n     *\r\n     * If `toInternalBalance` is true, tokens will be deposited to `recipient`'s internal balance instead of\r\n     * transferred. This matches the behavior of `exitPool`.\r\n     *\r\n     * Note that ETH cannot be deposited to or withdrawn from Internal Balance: attempting to do so will trigger a\r\n     * revert.\r\n     */\r\n    struct FundManagement {\r\n        address sender;\r\n        bool fromInternalBalance;\r\n        address payable recipient;\r\n        bool toInternalBalance;\r\n    }\r\n}",
-  "sourcePath": "C:\\Users\\nick_\\OneDrive\\Документы\\UNO\\Solidity\\autostrats_balancer\\uno-contracts\\contracts\\interfaces\\IVault.sol",
+  "source": "// SPDX-License-Identifier: GPL-3.0-or-later\r\n// This program is free software: you can redistribute it and/or modify\r\n// it under the terms of the GNU General Public License as published by\r\n// the Free Software Foundation, either version 3 of the License, or\r\n// (at your option) any later version.\r\n\r\n// This program is distributed in the hope that it will be useful,\r\n// but WITHOUT ANY WARRANTY; without even the implied warranty of\r\n// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\r\n// GNU General Public License for more details.\r\n\r\n// You should have received a copy of the GNU General Public License\r\n// along with this program.  If not, see <http://www.gnu.org/licenses/>.\r\n\r\npragma experimental ABIEncoderV2;\r\n\r\nimport \"@openzeppelin/contracts/token/ERC20/IERC20.sol\";\r\n\r\npragma solidity 0.8.10;\r\n\r\ninterface IVault{\r\n    function getPoolTokens(bytes32 poolId)\r\n        external\r\n        view\r\n        returns (\r\n            IERC20[] memory tokens,\r\n            uint256[] memory balances,\r\n            uint256 lastChangeBlock\r\n        );\r\n\r\n    /**\r\n     * @dev Called by users to join a Pool, which transfers tokens from `sender` into the Pool's balance. This will\r\n     * trigger custom Pool behavior, which will typically grant something in return to `recipient` - often tokenized\r\n     * Pool shares.\r\n     *\r\n     * If the caller is not `sender`, it must be an authorized relayer for them.\r\n     *\r\n     * The `assets` and `maxAmountsIn` arrays must have the same length, and each entry indicates the maximum amount\r\n     * to send for each asset. The amounts to send are decided by the Pool and not the Vault: it just enforces\r\n     * these maximums.\r\n     *\r\n     * If joining a Pool that holds WETH, it is possible to send ETH directly: the Vault will do the wrapping. To enable\r\n     * this mechanism, the IAsset sentinel value (the zero address) must be passed in the `assets` array instead of the\r\n     * WETH address. Note that it is not possible to combine ETH and WETH in the same join. Any excess ETH will be sent\r\n     * back to the caller (not the sender, which is important for relayers).\r\n     *\r\n     * `assets` must have the same length and order as the array returned by `getPoolTokens`. This prevents issues when\r\n     * interacting with Pools that register and deregister tokens frequently. If sending ETH however, the array must be\r\n     * sorted *before* replacing the WETH address with the ETH sentinel value (the zero address), which means the final\r\n     * `assets` array might not be sorted. Pools with no registered tokens cannot be joined.\r\n     *\r\n     * If `fromInternalBalance` is true, the caller's Internal Balance will be preferred: ERC20 transfers will only\r\n     * be made for the difference between the requested amount and Internal Balance (if any). Note that ETH cannot be\r\n     * withdrawn from Internal Balance: attempting to do so will trigger a revert.\r\n     *\r\n     * This causes the Vault to call the `IBasePool.onJoinPool` hook on the Pool's contract, where Pools implement\r\n     * their own custom logic. This typically requires additional information from the user (such as the expected number\r\n     * of Pool shares). This can be encoded in the `userData` argument, which is ignored by the Vault and passed\r\n     * directly to the Pool's contract, as is `recipient`.\r\n     *\r\n     * Emits a `PoolBalanceChanged` event.\r\n     */\r\n    function joinPool(\r\n        bytes32 poolId,\r\n        address sender,\r\n        address recipient,\r\n        JoinPoolRequest memory request\r\n    ) external payable;\r\n\r\n    struct JoinPoolRequest {\r\n        IERC20[] assets;\r\n        uint256[] maxAmountsIn;\r\n        bytes userData;\r\n        bool fromInternalBalance;\r\n    }\r\n\r\n    /**\r\n     * @dev Called by users to exit a Pool, which transfers tokens from the Pool's balance to `recipient`. This will\r\n     * trigger custom Pool behavior, which will typically ask for something in return from `sender` - often tokenized\r\n     * Pool shares. The amount of tokens that can be withdrawn is limited by the Pool's `cash` balance (see\r\n     * `getPoolTokenInfo`).\r\n     *\r\n     * If the caller is not `sender`, it must be an authorized relayer for them.\r\n     *\r\n     * The `tokens` and `minAmountsOut` arrays must have the same length, and each entry in these indicates the minimum\r\n     * token amount to receive for each token contract. The amounts to send are decided by the Pool and not the Vault:\r\n     * it just enforces these minimums.\r\n     *\r\n     * If exiting a Pool that holds WETH, it is possible to receive ETH directly: the Vault will do the unwrapping. To\r\n     * enable this mechanism, the IAsset sentinel value (the zero address) must be passed in the `assets` array instead\r\n     * of the WETH address. Note that it is not possible to combine ETH and WETH in the same exit.\r\n     *\r\n     * `assets` must have the same length and order as the array returned by `getPoolTokens`. This prevents issues when\r\n     * interacting with Pools that register and deregister tokens frequently. If receiving ETH however, the array must\r\n     * be sorted *before* replacing the WETH address with the ETH sentinel value (the zero address), which means the\r\n     * final `assets` array might not be sorted. Pools with no registered tokens cannot be exited.\r\n     *\r\n     * If `toInternalBalance` is true, the tokens will be deposited to `recipient`'s Internal Balance. Otherwise,\r\n     * an ERC20 transfer will be performed. Note that ETH cannot be deposited to Internal Balance: attempting to\r\n     * do so will trigger a revert.\r\n     *\r\n     * `minAmountsOut` is the minimum amount of tokens the user expects to get out of the Pool, for each token in the\r\n     * `tokens` array. This array must match the Pool's registered tokens.\r\n     *\r\n     * This causes the Vault to call the `IBasePool.onExitPool` hook on the Pool's contract, where Pools implement\r\n     * their own custom logic. This typically requires additional information from the user (such as the expected number\r\n     * of Pool shares to return). This can be encoded in the `userData` argument, which is ignored by the Vault and\r\n     * passed directly to the Pool's contract.\r\n     *\r\n     * Emits a `PoolBalanceChanged` event.\r\n     */\r\n    function exitPool(\r\n        bytes32 poolId,\r\n        address sender,\r\n        address payable recipient,\r\n        ExitPoolRequest memory request\r\n    ) external;\r\n\r\n    struct ExitPoolRequest {\r\n        IERC20[] assets;\r\n        uint256[] minAmountsOut;\r\n        bytes userData;\r\n        bool toInternalBalance;\r\n    }\r\n\r\n\r\n    // Swaps\r\n    //\r\n    // Users can swap tokens with Pools by calling the `swap` and `batchSwap` functions. To do this,\r\n    // they need not trust Pool contracts in any way: all security checks are made by the Vault. They must however be\r\n    // aware of the Pools' pricing algorithms in order to estimate the prices Pools will quote.\r\n    //\r\n    // The `swap` function executes a single swap, while `batchSwap` can perform multiple swaps in sequence.\r\n    // In each individual swap, tokens of one kind are sent from the sender to the Pool (this is the 'token in'),\r\n    // and tokens of another kind are sent from the Pool to the recipient in exchange (this is the 'token out').\r\n    // More complex swaps, such as one token in to multiple tokens out can be achieved by batching together\r\n    // individual swaps.\r\n    //\r\n    // There are two swap kinds:\r\n    //  - 'given in' swaps, where the amount of tokens in (sent to the Pool) is known, and the Pool determines (via the\r\n    // `onSwap` hook) the amount of tokens out (to send to the recipient).\r\n    //  - 'given out' swaps, where the amount of tokens out (received from the Pool) is known, and the Pool determines\r\n    // (via the `onSwap` hook) the amount of tokens in (to receive from the sender).\r\n    //\r\n    // Additionally, it is possible to chain swaps using a placeholder input amount, which the Vault replaces with\r\n    // the calculated output of the previous swap. If the previous swap was 'given in', this will be the calculated\r\n    // tokenOut amount. If the previous swap was 'given out', it will use the calculated tokenIn amount. These extended\r\n    // swaps are known as 'multihop' swaps, since they 'hop' through a number of intermediate tokens before arriving at\r\n    // the final intended token.\r\n    //\r\n    // In all cases, tokens are only transferred in and out of the Vault (or withdrawn from and deposited into Internal\r\n    // Balance) after all individual swaps have been completed, and the net token balance change computed. This makes\r\n    // certain swap patterns, such as multihops, or swaps that interact with the same token pair in multiple Pools, cost\r\n    // much less gas than they would otherwise.\r\n    //\r\n    // It also means that under certain conditions it is possible to perform arbitrage by swapping with multiple\r\n    // Pools in a way that results in net token movement out of the Vault (profit), with no tokens being sent in (only\r\n    // updating the Pool's internal accounting).\r\n    //\r\n    // To protect users from front-running or the market changing rapidly, they supply a list of 'limits' for each token\r\n    // involved in the swap, where either the maximum number of tokens to send (by passing a positive value) or the\r\n    // minimum amount of tokens to receive (by passing a negative value) is specified.\r\n    //\r\n    // Additionally, a 'deadline' timestamp can also be provided, forcing the swap to fail if it occurs after\r\n    // this point in time (e.g. if the transaction failed to be included in a block promptly).\r\n    //\r\n    // If interacting with Pools that hold WETH, it is possible to both send and receive ETH directly: the Vault will do\r\n    // the wrapping and unwrapping. To enable this mechanism, the IAsset sentinel value (the zero address) must be\r\n    // passed in the `assets` array instead of the WETH address. Note that it is possible to combine ETH and WETH in the\r\n    // same swap. Any excess ETH will be sent back to the caller (not the sender, which is relevant for relayers).\r\n    //\r\n    // Finally, Internal Balance can be used when either sending or receiving tokens.\r\n\r\n    enum SwapKind { GIVEN_IN, GIVEN_OUT }\r\n\r\n    /**\r\n     * @dev Performs a series of swaps with one or multiple Pools. In each individual swap, the caller determines either\r\n     * the amount of tokens sent to or received from the Pool, depending on the `kind` value.\r\n     *\r\n     * Returns an array with the net Vault asset balance deltas. Positive amounts represent tokens (or ETH) sent to the\r\n     * Vault, and negative amounts represent tokens (or ETH) sent by the Vault. Each delta corresponds to the asset at\r\n     * the same index in the `assets` array.\r\n     *\r\n     * Swaps are executed sequentially, in the order specified by the `swaps` array. Each array element describes a\r\n     * Pool, the token to be sent to this Pool, the token to receive from it, and an amount that is either `amountIn` or\r\n     * `amountOut` depending on the swap kind.\r\n     *\r\n     * Multihop swaps can be executed by passing an `amount` value of zero for a swap. This will cause the amount in/out\r\n     * of the previous swap to be used as the amount in for the current one. In a 'given in' swap, 'tokenIn' must equal\r\n     * the previous swap's `tokenOut`. For a 'given out' swap, `tokenOut` must equal the previous swap's `tokenIn`.\r\n     *\r\n     * The `assets` array contains the addresses of all assets involved in the swaps. These are either token addresses,\r\n     * or the IAsset sentinel value for ETH (the zero address). Each entry in the `swaps` array specifies tokens in and\r\n     * out by referencing an index in `assets`. Note that Pools never interact with ETH directly: it will be wrapped to\r\n     * or unwrapped from WETH by the Vault.\r\n     *\r\n     * Internal Balance usage, sender, and recipient are determined by the `funds` struct. The `limits` array specifies\r\n     * the minimum or maximum amount of each token the vault is allowed to transfer.\r\n     *\r\n     * `batchSwap` can be used to make a single swap, like `swap` does, but doing so requires more gas than the\r\n     * equivalent `swap` call.\r\n     *\r\n     * Emits `Swap` events.\r\n     */\r\n    function batchSwap(\r\n        SwapKind kind,\r\n        BatchSwapStep[] memory swaps,\r\n        IERC20[] memory assets,\r\n        FundManagement memory funds,\r\n        int256[] memory limits,\r\n        uint256 deadline\r\n    ) external payable returns (int256[] memory);\r\n\r\n    /**\r\n     * @dev Data for each individual swap executed by `batchSwap`. The asset in and out fields are indexes into the\r\n     * `assets` array passed to that function, and ETH assets are converted to WETH.\r\n     *\r\n     * If `amount` is zero, the multihop mechanism is used to determine the actual amount based on the amount in/out\r\n     * from the previous swap, depending on the swap kind.\r\n     *\r\n     * The `userData` field is ignored by the Vault, but forwarded to the Pool in the `onSwap` hook, and may be\r\n     * used to extend swap behavior.\r\n     */\r\n    struct BatchSwapStep {\r\n        bytes32 poolId;\r\n        uint256 assetInIndex;\r\n        uint256 assetOutIndex;\r\n        uint256 amount;\r\n        bytes userData;\r\n    }\r\n\r\n\r\n    /**\r\n     * @dev All tokens in a swap are either sent from the `sender` account to the Vault, or from the Vault to the\r\n     * `recipient` account.\r\n     *\r\n     * If the caller is not `sender`, it must be an authorized relayer for them.\r\n     *\r\n     * If `fromInternalBalance` is true, the `sender`'s Internal Balance will be preferred, performing an ERC20\r\n     * transfer for the difference between the requested amount and the User's Internal Balance (if any). The `sender`\r\n     * must have allowed the Vault to use their tokens via `IERC20.approve()`. This matches the behavior of\r\n     * `joinPool`.\r\n     *\r\n     * If `toInternalBalance` is true, tokens will be deposited to `recipient`'s internal balance instead of\r\n     * transferred. This matches the behavior of `exitPool`.\r\n     *\r\n     * Note that ETH cannot be deposited to or withdrawn from Internal Balance: attempting to do so will trigger a\r\n     * revert.\r\n     */\r\n    struct FundManagement {\r\n        address sender;\r\n        bool fromInternalBalance;\r\n        address payable recipient;\r\n        bool toInternalBalance;\r\n    }\r\n}",
+  "sourcePath": "C:\\Users\\jugli\\Desktop\\uno\\uno-contracts\\contracts\\interfaces\\IVault.sol",
   "ast": {
     "absolutePath": "project:/contracts/interfaces/IVault.sol",
     "exportedSymbols": {
-      "IAsset": [
-        15577
-      ],
       "IERC20": [
         2941
       ],
       "IVault": [
-        17116
+        17750
       ]
     },
-    "id": 17117,
+    "id": 17751,
     "license": "GPL-3.0-or-later",
     "nodeType": "SourceUnit",
     "nodes": [
       {
-        "id": 16999,
+        "id": 17634,
         "literals": [
           "experimental",
           "ABIEncoderV2"
         ],
         "nodeType": "PragmaDirective",
-        "src": "702:33:63"
+        "src": "702:33:62"
       },
       {
         "absolutePath": "@openzeppelin/contracts/token/ERC20/IERC20.sol",
         "file": "@openzeppelin/contracts/token/ERC20/IERC20.sol",
-        "id": 17000,
+        "id": 17635,
         "nameLocation": "-1:-1:-1",
         "nodeType": "ImportDirective",
-        "scope": 17117,
+        "scope": 17751,
         "sourceUnit": 2942,
-        "src": "739:56:63",
+        "src": "739:56:62",
         "symbolAliases": [],
         "unitAlias": ""
       },
       {
-        "absolutePath": "project:/contracts/interfaces/IAsset.sol",
-        "file": "./IAsset.sol",
-        "id": 17001,
-        "nameLocation": "-1:-1:-1",
-        "nodeType": "ImportDirective",
-        "scope": 17117,
-        "sourceUnit": 15578,
-        "src": "797:22:63",
-        "symbolAliases": [],
-        "unitAlias": ""
-      },
-      {
-        "id": 17002,
+        "id": 17636,
         "literals": [
           "solidity",
           "0.8",
           ".10"
         ],
         "nodeType": "PragmaDirective",
-        "src": "823:23:63"
+        "src": "799:23:62"
       },
       {
         "abstract": false,
@@ -301,36 +286,36 @@
         "contractDependencies": [],
         "contractKind": "interface",
         "fullyImplemented": false,
-        "id": 17116,
+        "id": 17750,
         "linearizedBaseContracts": [
-          17116
+          17750
         ],
         "name": "IVault",
-        "nameLocation": "860:6:63",
+        "nameLocation": "836:6:62",
         "nodeType": "ContractDefinition",
         "nodes": [
           {
             "functionSelector": "f94d4668",
-            "id": 17016,
+            "id": 17650,
             "implemented": false,
             "kind": "function",
             "modifiers": [],
             "name": "getPoolTokens",
-            "nameLocation": "882:13:63",
+            "nameLocation": "858:13:62",
             "nodeType": "FunctionDefinition",
             "parameters": {
-              "id": 17005,
+              "id": 17639,
               "nodeType": "ParameterList",
               "parameters": [
                 {
                   "constant": false,
-                  "id": 17004,
+                  "id": 17638,
                   "mutability": "mutable",
                   "name": "poolId",
-                  "nameLocation": "904:6:63",
+                  "nameLocation": "880:6:62",
                   "nodeType": "VariableDeclaration",
-                  "scope": 17016,
-                  "src": "896:14:63",
+                  "scope": 17650,
+                  "src": "872:14:62",
                   "stateVariable": false,
                   "storageLocation": "default",
                   "typeDescriptions": {
@@ -338,10 +323,10 @@
                     "typeString": "bytes32"
                   },
                   "typeName": {
-                    "id": 17003,
+                    "id": 17637,
                     "name": "bytes32",
                     "nodeType": "ElementaryTypeName",
-                    "src": "896:7:63",
+                    "src": "872:7:62",
                     "typeDescriptions": {
                       "typeIdentifier": "t_bytes32",
                       "typeString": "bytes32"
@@ -350,21 +335,21 @@
                   "visibility": "internal"
                 }
               ],
-              "src": "895:16:63"
+              "src": "871:16:62"
             },
             "returnParameters": {
-              "id": 17015,
+              "id": 17649,
               "nodeType": "ParameterList",
               "parameters": [
                 {
                   "constant": false,
-                  "id": 17009,
+                  "id": 17643,
                   "mutability": "mutable",
                   "name": "tokens",
-                  "nameLocation": "992:6:63",
+                  "nameLocation": "968:6:62",
                   "nodeType": "VariableDeclaration",
-                  "scope": 17016,
-                  "src": "976:22:63",
+                  "scope": 17650,
+                  "src": "952:22:62",
                   "stateVariable": false,
                   "storageLocation": "memory",
                   "typeDescriptions": {
@@ -373,25 +358,25 @@
                   },
                   "typeName": {
                     "baseType": {
-                      "id": 17007,
+                      "id": 17641,
                       "nodeType": "UserDefinedTypeName",
                       "pathNode": {
-                        "id": 17006,
+                        "id": 17640,
                         "name": "IERC20",
                         "nodeType": "IdentifierPath",
                         "referencedDeclaration": 2941,
-                        "src": "976:6:63"
+                        "src": "952:6:62"
                       },
                       "referencedDeclaration": 2941,
-                      "src": "976:6:63",
+                      "src": "952:6:62",
                       "typeDescriptions": {
                         "typeIdentifier": "t_contract$_IERC20_$2941",
                         "typeString": "contract IERC20"
                       }
                     },
-                    "id": 17008,
+                    "id": 17642,
                     "nodeType": "ArrayTypeName",
-                    "src": "976:8:63",
+                    "src": "952:8:62",
                     "typeDescriptions": {
                       "typeIdentifier": "t_array$_t_contract$_IERC20_$2941_$dyn_storage_ptr",
                       "typeString": "contract IERC20[]"
@@ -401,13 +386,13 @@
                 },
                 {
                   "constant": false,
-                  "id": 17012,
+                  "id": 17646,
                   "mutability": "mutable",
                   "name": "balances",
-                  "nameLocation": "1030:8:63",
+                  "nameLocation": "1006:8:62",
                   "nodeType": "VariableDeclaration",
-                  "scope": 17016,
-                  "src": "1013:25:63",
+                  "scope": 17650,
+                  "src": "989:25:62",
                   "stateVariable": false,
                   "storageLocation": "memory",
                   "typeDescriptions": {
@@ -416,18 +401,18 @@
                   },
                   "typeName": {
                     "baseType": {
-                      "id": 17010,
+                      "id": 17644,
                       "name": "uint256",
                       "nodeType": "ElementaryTypeName",
-                      "src": "1013:7:63",
+                      "src": "989:7:62",
                       "typeDescriptions": {
                         "typeIdentifier": "t_uint256",
                         "typeString": "uint256"
                       }
                     },
-                    "id": 17011,
+                    "id": 17645,
                     "nodeType": "ArrayTypeName",
-                    "src": "1013:9:63",
+                    "src": "989:9:62",
                     "typeDescriptions": {
                       "typeIdentifier": "t_array$_t_uint256_$dyn_storage_ptr",
                       "typeString": "uint256[]"
@@ -437,13 +422,13 @@
                 },
                 {
                   "constant": false,
-                  "id": 17014,
+                  "id": 17648,
                   "mutability": "mutable",
                   "name": "lastChangeBlock",
-                  "nameLocation": "1061:15:63",
+                  "nameLocation": "1037:15:62",
                   "nodeType": "VariableDeclaration",
-                  "scope": 17016,
-                  "src": "1053:23:63",
+                  "scope": 17650,
+                  "src": "1029:23:62",
                   "stateVariable": false,
                   "storageLocation": "default",
                   "typeDescriptions": {
@@ -451,10 +436,10 @@
                     "typeString": "uint256"
                   },
                   "typeName": {
-                    "id": 17013,
+                    "id": 17647,
                     "name": "uint256",
                     "nodeType": "ElementaryTypeName",
-                    "src": "1053:7:63",
+                    "src": "1029:7:62",
                     "typeDescriptions": {
                       "typeIdentifier": "t_uint256",
                       "typeString": "uint256"
@@ -463,42 +448,42 @@
                   "visibility": "internal"
                 }
               ],
-              "src": "961:126:63"
+              "src": "937:126:62"
             },
-            "scope": 17116,
-            "src": "873:215:63",
+            "scope": 17750,
+            "src": "849:215:62",
             "stateMutability": "view",
             "virtual": false,
             "visibility": "external"
           },
           {
             "documentation": {
-              "id": 17017,
+              "id": 17651,
               "nodeType": "StructuredDocumentation",
-              "src": "1096:2335:63",
+              "src": "1072:2335:62",
               "text": " @dev Called by users to join a Pool, which transfers tokens from `sender` into the Pool's balance. This will\n trigger custom Pool behavior, which will typically grant something in return to `recipient` - often tokenized\n Pool shares.\n If the caller is not `sender`, it must be an authorized relayer for them.\n The `assets` and `maxAmountsIn` arrays must have the same length, and each entry indicates the maximum amount\n to send for each asset. The amounts to send are decided by the Pool and not the Vault: it just enforces\n these maximums.\n If joining a Pool that holds WETH, it is possible to send ETH directly: the Vault will do the wrapping. To enable\n this mechanism, the IAsset sentinel value (the zero address) must be passed in the `assets` array instead of the\n WETH address. Note that it is not possible to combine ETH and WETH in the same join. Any excess ETH will be sent\n back to the caller (not the sender, which is important for relayers).\n `assets` must have the same length and order as the array returned by `getPoolTokens`. This prevents issues when\n interacting with Pools that register and deregister tokens frequently. If sending ETH however, the array must be\n sorted *before* replacing the WETH address with the ETH sentinel value (the zero address), which means the final\n `assets` array might not be sorted. Pools with no registered tokens cannot be joined.\n If `fromInternalBalance` is true, the caller's Internal Balance will be preferred: ERC20 transfers will only\n be made for the difference between the requested amount and Internal Balance (if any). Note that ETH cannot be\n withdrawn from Internal Balance: attempting to do so will trigger a revert.\n This causes the Vault to call the `IBasePool.onJoinPool` hook on the Pool's contract, where Pools implement\n their own custom logic. This typically requires additional information from the user (such as the expected number\n of Pool shares). This can be encoded in the `userData` argument, which is ignored by the Vault and passed\n directly to the Pool's contract, as is `recipient`.\n Emits a `PoolBalanceChanged` event."
             },
             "functionSelector": "b95cac28",
-            "id": 17029,
+            "id": 17663,
             "implemented": false,
             "kind": "function",
             "modifiers": [],
             "name": "joinPool",
-            "nameLocation": "3446:8:63",
+            "nameLocation": "3422:8:62",
             "nodeType": "FunctionDefinition",
             "parameters": {
-              "id": 17027,
+              "id": 17661,
               "nodeType": "ParameterList",
               "parameters": [
                 {
                   "constant": false,
-                  "id": 17019,
+                  "id": 17653,
                   "mutability": "mutable",
                   "name": "poolId",
-                  "nameLocation": "3473:6:63",
+                  "nameLocation": "3449:6:62",
                   "nodeType": "VariableDeclaration",
-                  "scope": 17029,
-                  "src": "3465:14:63",
+                  "scope": 17663,
+                  "src": "3441:14:62",
                   "stateVariable": false,
                   "storageLocation": "default",
                   "typeDescriptions": {
@@ -506,10 +491,10 @@
                     "typeString": "bytes32"
                   },
                   "typeName": {
-                    "id": 17018,
+                    "id": 17652,
                     "name": "bytes32",
                     "nodeType": "ElementaryTypeName",
-                    "src": "3465:7:63",
+                    "src": "3441:7:62",
                     "typeDescriptions": {
                       "typeIdentifier": "t_bytes32",
                       "typeString": "bytes32"
@@ -519,13 +504,13 @@
                 },
                 {
                   "constant": false,
-                  "id": 17021,
+                  "id": 17655,
                   "mutability": "mutable",
                   "name": "sender",
-                  "nameLocation": "3498:6:63",
+                  "nameLocation": "3474:6:62",
                   "nodeType": "VariableDeclaration",
-                  "scope": 17029,
-                  "src": "3490:14:63",
+                  "scope": 17663,
+                  "src": "3466:14:62",
                   "stateVariable": false,
                   "storageLocation": "default",
                   "typeDescriptions": {
@@ -533,10 +518,10 @@
                     "typeString": "address"
                   },
                   "typeName": {
-                    "id": 17020,
+                    "id": 17654,
                     "name": "address",
                     "nodeType": "ElementaryTypeName",
-                    "src": "3490:7:63",
+                    "src": "3466:7:62",
                     "stateMutability": "nonpayable",
                     "typeDescriptions": {
                       "typeIdentifier": "t_address",
@@ -547,13 +532,13 @@
                 },
                 {
                   "constant": false,
-                  "id": 17023,
+                  "id": 17657,
                   "mutability": "mutable",
                   "name": "recipient",
-                  "nameLocation": "3523:9:63",
+                  "nameLocation": "3499:9:62",
                   "nodeType": "VariableDeclaration",
-                  "scope": 17029,
-                  "src": "3515:17:63",
+                  "scope": 17663,
+                  "src": "3491:17:62",
                   "stateVariable": false,
                   "storageLocation": "default",
                   "typeDescriptions": {
@@ -561,10 +546,10 @@
                     "typeString": "address"
                   },
                   "typeName": {
-                    "id": 17022,
+                    "id": 17656,
                     "name": "address",
                     "nodeType": "ElementaryTypeName",
-                    "src": "3515:7:63",
+                    "src": "3491:7:62",
                     "stateMutability": "nonpayable",
                     "typeDescriptions": {
                       "typeIdentifier": "t_address",
@@ -575,109 +560,109 @@
                 },
                 {
                   "constant": false,
-                  "id": 17026,
+                  "id": 17660,
                   "mutability": "mutable",
                   "name": "request",
-                  "nameLocation": "3566:7:63",
+                  "nameLocation": "3542:7:62",
                   "nodeType": "VariableDeclaration",
-                  "scope": 17029,
-                  "src": "3543:30:63",
+                  "scope": 17663,
+                  "src": "3519:30:62",
                   "stateVariable": false,
                   "storageLocation": "memory",
                   "typeDescriptions": {
-                    "typeIdentifier": "t_struct$_JoinPoolRequest_$17041_memory_ptr",
+                    "typeIdentifier": "t_struct$_JoinPoolRequest_$17675_memory_ptr",
                     "typeString": "struct IVault.JoinPoolRequest"
                   },
                   "typeName": {
-                    "id": 17025,
+                    "id": 17659,
                     "nodeType": "UserDefinedTypeName",
                     "pathNode": {
-                      "id": 17024,
+                      "id": 17658,
                       "name": "JoinPoolRequest",
                       "nodeType": "IdentifierPath",
-                      "referencedDeclaration": 17041,
-                      "src": "3543:15:63"
+                      "referencedDeclaration": 17675,
+                      "src": "3519:15:62"
                     },
-                    "referencedDeclaration": 17041,
-                    "src": "3543:15:63",
+                    "referencedDeclaration": 17675,
+                    "src": "3519:15:62",
                     "typeDescriptions": {
-                      "typeIdentifier": "t_struct$_JoinPoolRequest_$17041_storage_ptr",
+                      "typeIdentifier": "t_struct$_JoinPoolRequest_$17675_storage_ptr",
                       "typeString": "struct IVault.JoinPoolRequest"
                     }
                   },
                   "visibility": "internal"
                 }
               ],
-              "src": "3454:126:63"
+              "src": "3430:126:62"
             },
             "returnParameters": {
-              "id": 17028,
+              "id": 17662,
               "nodeType": "ParameterList",
               "parameters": [],
-              "src": "3597:0:63"
+              "src": "3573:0:62"
             },
-            "scope": 17116,
-            "src": "3437:161:63",
+            "scope": 17750,
+            "src": "3413:161:62",
             "stateMutability": "payable",
             "virtual": false,
             "visibility": "external"
           },
           {
             "canonicalName": "IVault.JoinPoolRequest",
-            "id": 17041,
+            "id": 17675,
             "members": [
               {
                 "constant": false,
-                "id": 17033,
+                "id": 17667,
                 "mutability": "mutable",
                 "name": "assets",
-                "nameLocation": "3649:6:63",
+                "nameLocation": "3625:6:62",
                 "nodeType": "VariableDeclaration",
-                "scope": 17041,
-                "src": "3640:15:63",
+                "scope": 17675,
+                "src": "3616:15:62",
                 "stateVariable": false,
                 "storageLocation": "default",
                 "typeDescriptions": {
-                  "typeIdentifier": "t_array$_t_contract$_IAsset_$15577_$dyn_storage_ptr",
-                  "typeString": "contract IAsset[]"
+                  "typeIdentifier": "t_array$_t_contract$_IERC20_$2941_$dyn_storage_ptr",
+                  "typeString": "contract IERC20[]"
                 },
                 "typeName": {
                   "baseType": {
-                    "id": 17031,
+                    "id": 17665,
                     "nodeType": "UserDefinedTypeName",
                     "pathNode": {
-                      "id": 17030,
-                      "name": "IAsset",
+                      "id": 17664,
+                      "name": "IERC20",
                       "nodeType": "IdentifierPath",
-                      "referencedDeclaration": 15577,
-                      "src": "3640:6:63"
+                      "referencedDeclaration": 2941,
+                      "src": "3616:6:62"
                     },
-                    "referencedDeclaration": 15577,
-                    "src": "3640:6:63",
+                    "referencedDeclaration": 2941,
+                    "src": "3616:6:62",
                     "typeDescriptions": {
-                      "typeIdentifier": "t_contract$_IAsset_$15577",
-                      "typeString": "contract IAsset"
+                      "typeIdentifier": "t_contract$_IERC20_$2941",
+                      "typeString": "contract IERC20"
                     }
                   },
-                  "id": 17032,
+                  "id": 17666,
                   "nodeType": "ArrayTypeName",
-                  "src": "3640:8:63",
+                  "src": "3616:8:62",
                   "typeDescriptions": {
-                    "typeIdentifier": "t_array$_t_contract$_IAsset_$15577_$dyn_storage_ptr",
-                    "typeString": "contract IAsset[]"
+                    "typeIdentifier": "t_array$_t_contract$_IERC20_$2941_$dyn_storage_ptr",
+                    "typeString": "contract IERC20[]"
                   }
                 },
                 "visibility": "internal"
               },
               {
                 "constant": false,
-                "id": 17036,
+                "id": 17670,
                 "mutability": "mutable",
                 "name": "maxAmountsIn",
-                "nameLocation": "3676:12:63",
+                "nameLocation": "3652:12:62",
                 "nodeType": "VariableDeclaration",
-                "scope": 17041,
-                "src": "3666:22:63",
+                "scope": 17675,
+                "src": "3642:22:62",
                 "stateVariable": false,
                 "storageLocation": "default",
                 "typeDescriptions": {
@@ -686,18 +671,18 @@
                 },
                 "typeName": {
                   "baseType": {
-                    "id": 17034,
+                    "id": 17668,
                     "name": "uint256",
                     "nodeType": "ElementaryTypeName",
-                    "src": "3666:7:63",
+                    "src": "3642:7:62",
                     "typeDescriptions": {
                       "typeIdentifier": "t_uint256",
                       "typeString": "uint256"
                     }
                   },
-                  "id": 17035,
+                  "id": 17669,
                   "nodeType": "ArrayTypeName",
-                  "src": "3666:9:63",
+                  "src": "3642:9:62",
                   "typeDescriptions": {
                     "typeIdentifier": "t_array$_t_uint256_$dyn_storage_ptr",
                     "typeString": "uint256[]"
@@ -707,13 +692,13 @@
               },
               {
                 "constant": false,
-                "id": 17038,
+                "id": 17672,
                 "mutability": "mutable",
                 "name": "userData",
-                "nameLocation": "3705:8:63",
+                "nameLocation": "3681:8:62",
                 "nodeType": "VariableDeclaration",
-                "scope": 17041,
-                "src": "3699:14:63",
+                "scope": 17675,
+                "src": "3675:14:62",
                 "stateVariable": false,
                 "storageLocation": "default",
                 "typeDescriptions": {
@@ -721,10 +706,10 @@
                   "typeString": "bytes"
                 },
                 "typeName": {
-                  "id": 17037,
+                  "id": 17671,
                   "name": "bytes",
                   "nodeType": "ElementaryTypeName",
-                  "src": "3699:5:63",
+                  "src": "3675:5:62",
                   "typeDescriptions": {
                     "typeIdentifier": "t_bytes_storage_ptr",
                     "typeString": "bytes"
@@ -734,13 +719,13 @@
               },
               {
                 "constant": false,
-                "id": 17040,
+                "id": 17674,
                 "mutability": "mutable",
                 "name": "fromInternalBalance",
-                "nameLocation": "3729:19:63",
+                "nameLocation": "3705:19:62",
                 "nodeType": "VariableDeclaration",
-                "scope": 17041,
-                "src": "3724:24:63",
+                "scope": 17675,
+                "src": "3700:24:62",
                 "stateVariable": false,
                 "storageLocation": "default",
                 "typeDescriptions": {
@@ -748,10 +733,10 @@
                   "typeString": "bool"
                 },
                 "typeName": {
-                  "id": 17039,
+                  "id": 17673,
                   "name": "bool",
                   "nodeType": "ElementaryTypeName",
-                  "src": "3724:4:63",
+                  "src": "3700:4:62",
                   "typeDescriptions": {
                     "typeIdentifier": "t_bool",
                     "typeString": "bool"
@@ -761,40 +746,40 @@
               }
             ],
             "name": "JoinPoolRequest",
-            "nameLocation": "3613:15:63",
+            "nameLocation": "3589:15:62",
             "nodeType": "StructDefinition",
-            "scope": 17116,
-            "src": "3606:150:63",
+            "scope": 17750,
+            "src": "3582:150:62",
             "visibility": "public"
           },
           {
             "documentation": {
-              "id": 17042,
+              "id": 17676,
               "nodeType": "StructuredDocumentation",
-              "src": "3764:2523:63",
+              "src": "3740:2523:62",
               "text": " @dev Called by users to exit a Pool, which transfers tokens from the Pool's balance to `recipient`. This will\n trigger custom Pool behavior, which will typically ask for something in return from `sender` - often tokenized\n Pool shares. The amount of tokens that can be withdrawn is limited by the Pool's `cash` balance (see\n `getPoolTokenInfo`).\n If the caller is not `sender`, it must be an authorized relayer for them.\n The `tokens` and `minAmountsOut` arrays must have the same length, and each entry in these indicates the minimum\n token amount to receive for each token contract. The amounts to send are decided by the Pool and not the Vault:\n it just enforces these minimums.\n If exiting a Pool that holds WETH, it is possible to receive ETH directly: the Vault will do the unwrapping. To\n enable this mechanism, the IAsset sentinel value (the zero address) must be passed in the `assets` array instead\n of the WETH address. Note that it is not possible to combine ETH and WETH in the same exit.\n `assets` must have the same length and order as the array returned by `getPoolTokens`. This prevents issues when\n interacting with Pools that register and deregister tokens frequently. If receiving ETH however, the array must\n be sorted *before* replacing the WETH address with the ETH sentinel value (the zero address), which means the\n final `assets` array might not be sorted. Pools with no registered tokens cannot be exited.\n If `toInternalBalance` is true, the tokens will be deposited to `recipient`'s Internal Balance. Otherwise,\n an ERC20 transfer will be performed. Note that ETH cannot be deposited to Internal Balance: attempting to\n do so will trigger a revert.\n `minAmountsOut` is the minimum amount of tokens the user expects to get out of the Pool, for each token in the\n `tokens` array. This array must match the Pool's registered tokens.\n This causes the Vault to call the `IBasePool.onExitPool` hook on the Pool's contract, where Pools implement\n their own custom logic. This typically requires additional information from the user (such as the expected number\n of Pool shares to return). This can be encoded in the `userData` argument, which is ignored by the Vault and\n passed directly to the Pool's contract.\n Emits a `PoolBalanceChanged` event."
             },
             "functionSelector": "8bdb3913",
-            "id": 17054,
+            "id": 17688,
             "implemented": false,
             "kind": "function",
             "modifiers": [],
             "name": "exitPool",
-            "nameLocation": "6302:8:63",
+            "nameLocation": "6278:8:62",
             "nodeType": "FunctionDefinition",
             "parameters": {
-              "id": 17052,
+              "id": 17686,
               "nodeType": "ParameterList",
               "parameters": [
                 {
                   "constant": false,
-                  "id": 17044,
+                  "id": 17678,
                   "mutability": "mutable",
                   "name": "poolId",
-                  "nameLocation": "6329:6:63",
+                  "nameLocation": "6305:6:62",
                   "nodeType": "VariableDeclaration",
-                  "scope": 17054,
-                  "src": "6321:14:63",
+                  "scope": 17688,
+                  "src": "6297:14:62",
                   "stateVariable": false,
                   "storageLocation": "default",
                   "typeDescriptions": {
@@ -802,10 +787,10 @@
                     "typeString": "bytes32"
                   },
                   "typeName": {
-                    "id": 17043,
+                    "id": 17677,
                     "name": "bytes32",
                     "nodeType": "ElementaryTypeName",
-                    "src": "6321:7:63",
+                    "src": "6297:7:62",
                     "typeDescriptions": {
                       "typeIdentifier": "t_bytes32",
                       "typeString": "bytes32"
@@ -815,13 +800,13 @@
                 },
                 {
                   "constant": false,
-                  "id": 17046,
+                  "id": 17680,
                   "mutability": "mutable",
                   "name": "sender",
-                  "nameLocation": "6354:6:63",
+                  "nameLocation": "6330:6:62",
                   "nodeType": "VariableDeclaration",
-                  "scope": 17054,
-                  "src": "6346:14:63",
+                  "scope": 17688,
+                  "src": "6322:14:62",
                   "stateVariable": false,
                   "storageLocation": "default",
                   "typeDescriptions": {
@@ -829,10 +814,10 @@
                     "typeString": "address"
                   },
                   "typeName": {
-                    "id": 17045,
+                    "id": 17679,
                     "name": "address",
                     "nodeType": "ElementaryTypeName",
-                    "src": "6346:7:63",
+                    "src": "6322:7:62",
                     "stateMutability": "nonpayable",
                     "typeDescriptions": {
                       "typeIdentifier": "t_address",
@@ -843,13 +828,13 @@
                 },
                 {
                   "constant": false,
-                  "id": 17048,
+                  "id": 17682,
                   "mutability": "mutable",
                   "name": "recipient",
-                  "nameLocation": "6387:9:63",
+                  "nameLocation": "6363:9:62",
                   "nodeType": "VariableDeclaration",
-                  "scope": 17054,
-                  "src": "6371:25:63",
+                  "scope": 17688,
+                  "src": "6347:25:62",
                   "stateVariable": false,
                   "storageLocation": "default",
                   "typeDescriptions": {
@@ -857,10 +842,10 @@
                     "typeString": "address payable"
                   },
                   "typeName": {
-                    "id": 17047,
+                    "id": 17681,
                     "name": "address",
                     "nodeType": "ElementaryTypeName",
-                    "src": "6371:15:63",
+                    "src": "6347:15:62",
                     "stateMutability": "payable",
                     "typeDescriptions": {
                       "typeIdentifier": "t_address_payable",
@@ -871,109 +856,109 @@
                 },
                 {
                   "constant": false,
-                  "id": 17051,
+                  "id": 17685,
                   "mutability": "mutable",
                   "name": "request",
-                  "nameLocation": "6430:7:63",
+                  "nameLocation": "6406:7:62",
                   "nodeType": "VariableDeclaration",
-                  "scope": 17054,
-                  "src": "6407:30:63",
+                  "scope": 17688,
+                  "src": "6383:30:62",
                   "stateVariable": false,
                   "storageLocation": "memory",
                   "typeDescriptions": {
-                    "typeIdentifier": "t_struct$_ExitPoolRequest_$17066_memory_ptr",
+                    "typeIdentifier": "t_struct$_ExitPoolRequest_$17700_memory_ptr",
                     "typeString": "struct IVault.ExitPoolRequest"
                   },
                   "typeName": {
-                    "id": 17050,
+                    "id": 17684,
                     "nodeType": "UserDefinedTypeName",
                     "pathNode": {
-                      "id": 17049,
+                      "id": 17683,
                       "name": "ExitPoolRequest",
                       "nodeType": "IdentifierPath",
-                      "referencedDeclaration": 17066,
-                      "src": "6407:15:63"
+                      "referencedDeclaration": 17700,
+                      "src": "6383:15:62"
                     },
-                    "referencedDeclaration": 17066,
-                    "src": "6407:15:63",
+                    "referencedDeclaration": 17700,
+                    "src": "6383:15:62",
                     "typeDescriptions": {
-                      "typeIdentifier": "t_struct$_ExitPoolRequest_$17066_storage_ptr",
+                      "typeIdentifier": "t_struct$_ExitPoolRequest_$17700_storage_ptr",
                       "typeString": "struct IVault.ExitPoolRequest"
                     }
                   },
                   "visibility": "internal"
                 }
               ],
-              "src": "6310:134:63"
+              "src": "6286:134:62"
             },
             "returnParameters": {
-              "id": 17053,
+              "id": 17687,
               "nodeType": "ParameterList",
               "parameters": [],
-              "src": "6453:0:63"
+              "src": "6429:0:62"
             },
-            "scope": 17116,
-            "src": "6293:161:63",
+            "scope": 17750,
+            "src": "6269:161:62",
             "stateMutability": "nonpayable",
             "virtual": false,
             "visibility": "external"
           },
           {
             "canonicalName": "IVault.ExitPoolRequest",
-            "id": 17066,
+            "id": 17700,
             "members": [
               {
                 "constant": false,
-                "id": 17058,
+                "id": 17692,
                 "mutability": "mutable",
                 "name": "assets",
-                "nameLocation": "6505:6:63",
+                "nameLocation": "6481:6:62",
                 "nodeType": "VariableDeclaration",
-                "scope": 17066,
-                "src": "6496:15:63",
+                "scope": 17700,
+                "src": "6472:15:62",
                 "stateVariable": false,
                 "storageLocation": "default",
                 "typeDescriptions": {
-                  "typeIdentifier": "t_array$_t_contract$_IAsset_$15577_$dyn_storage_ptr",
-                  "typeString": "contract IAsset[]"
+                  "typeIdentifier": "t_array$_t_contract$_IERC20_$2941_$dyn_storage_ptr",
+                  "typeString": "contract IERC20[]"
                 },
                 "typeName": {
                   "baseType": {
-                    "id": 17056,
+                    "id": 17690,
                     "nodeType": "UserDefinedTypeName",
                     "pathNode": {
-                      "id": 17055,
-                      "name": "IAsset",
+                      "id": 17689,
+                      "name": "IERC20",
                       "nodeType": "IdentifierPath",
-                      "referencedDeclaration": 15577,
-                      "src": "6496:6:63"
+                      "referencedDeclaration": 2941,
+                      "src": "6472:6:62"
                     },
-                    "referencedDeclaration": 15577,
-                    "src": "6496:6:63",
+                    "referencedDeclaration": 2941,
+                    "src": "6472:6:62",
                     "typeDescriptions": {
-                      "typeIdentifier": "t_contract$_IAsset_$15577",
-                      "typeString": "contract IAsset"
+                      "typeIdentifier": "t_contract$_IERC20_$2941",
+                      "typeString": "contract IERC20"
                     }
                   },
-                  "id": 17057,
+                  "id": 17691,
                   "nodeType": "ArrayTypeName",
-                  "src": "6496:8:63",
+                  "src": "6472:8:62",
                   "typeDescriptions": {
-                    "typeIdentifier": "t_array$_t_contract$_IAsset_$15577_$dyn_storage_ptr",
-                    "typeString": "contract IAsset[]"
+                    "typeIdentifier": "t_array$_t_contract$_IERC20_$2941_$dyn_storage_ptr",
+                    "typeString": "contract IERC20[]"
                   }
                 },
                 "visibility": "internal"
               },
               {
                 "constant": false,
-                "id": 17061,
+                "id": 17695,
                 "mutability": "mutable",
                 "name": "minAmountsOut",
-                "nameLocation": "6532:13:63",
+                "nameLocation": "6508:13:62",
                 "nodeType": "VariableDeclaration",
-                "scope": 17066,
-                "src": "6522:23:63",
+                "scope": 17700,
+                "src": "6498:23:62",
                 "stateVariable": false,
                 "storageLocation": "default",
                 "typeDescriptions": {
@@ -982,18 +967,18 @@
                 },
                 "typeName": {
                   "baseType": {
-                    "id": 17059,
+                    "id": 17693,
                     "name": "uint256",
                     "nodeType": "ElementaryTypeName",
-                    "src": "6522:7:63",
+                    "src": "6498:7:62",
                     "typeDescriptions": {
                       "typeIdentifier": "t_uint256",
                       "typeString": "uint256"
                     }
                   },
-                  "id": 17060,
+                  "id": 17694,
                   "nodeType": "ArrayTypeName",
-                  "src": "6522:9:63",
+                  "src": "6498:9:62",
                   "typeDescriptions": {
                     "typeIdentifier": "t_array$_t_uint256_$dyn_storage_ptr",
                     "typeString": "uint256[]"
@@ -1003,13 +988,13 @@
               },
               {
                 "constant": false,
-                "id": 17063,
+                "id": 17697,
                 "mutability": "mutable",
                 "name": "userData",
-                "nameLocation": "6562:8:63",
+                "nameLocation": "6538:8:62",
                 "nodeType": "VariableDeclaration",
-                "scope": 17066,
-                "src": "6556:14:63",
+                "scope": 17700,
+                "src": "6532:14:62",
                 "stateVariable": false,
                 "storageLocation": "default",
                 "typeDescriptions": {
@@ -1017,10 +1002,10 @@
                   "typeString": "bytes"
                 },
                 "typeName": {
-                  "id": 17062,
+                  "id": 17696,
                   "name": "bytes",
                   "nodeType": "ElementaryTypeName",
-                  "src": "6556:5:63",
+                  "src": "6532:5:62",
                   "typeDescriptions": {
                     "typeIdentifier": "t_bytes_storage_ptr",
                     "typeString": "bytes"
@@ -1030,13 +1015,13 @@
               },
               {
                 "constant": false,
-                "id": 17065,
+                "id": 17699,
                 "mutability": "mutable",
                 "name": "toInternalBalance",
-                "nameLocation": "6586:17:63",
+                "nameLocation": "6562:17:62",
                 "nodeType": "VariableDeclaration",
-                "scope": 17066,
-                "src": "6581:22:63",
+                "scope": 17700,
+                "src": "6557:22:62",
                 "stateVariable": false,
                 "storageLocation": "default",
                 "typeDescriptions": {
@@ -1044,10 +1029,10 @@
                   "typeString": "bool"
                 },
                 "typeName": {
-                  "id": 17064,
+                  "id": 17698,
                   "name": "bool",
                   "nodeType": "ElementaryTypeName",
-                  "src": "6581:4:63",
+                  "src": "6557:4:62",
                   "typeDescriptions": {
                     "typeIdentifier": "t_bool",
                     "typeString": "bool"
@@ -1057,84 +1042,84 @@
               }
             ],
             "name": "ExitPoolRequest",
-            "nameLocation": "6469:15:63",
+            "nameLocation": "6445:15:62",
             "nodeType": "StructDefinition",
-            "scope": 17116,
-            "src": "6462:149:63",
+            "scope": 17750,
+            "src": "6438:149:62",
             "visibility": "public"
           },
           {
             "canonicalName": "IVault.SwapKind",
-            "id": 17069,
+            "id": 17703,
             "members": [
               {
-                "id": 17067,
+                "id": 17701,
                 "name": "GIVEN_IN",
-                "nameLocation": "10263:8:63",
+                "nameLocation": "10239:8:62",
                 "nodeType": "EnumValue",
-                "src": "10263:8:63"
+                "src": "10239:8:62"
               },
               {
-                "id": 17068,
+                "id": 17702,
                 "name": "GIVEN_OUT",
-                "nameLocation": "10273:9:63",
+                "nameLocation": "10249:9:62",
                 "nodeType": "EnumValue",
-                "src": "10273:9:63"
+                "src": "10249:9:62"
               }
             ],
             "name": "SwapKind",
-            "nameLocation": "10252:8:63",
+            "nameLocation": "10228:8:62",
             "nodeType": "EnumDefinition",
-            "src": "10247:37:63"
+            "src": "10223:37:62"
           },
           {
             "documentation": {
-              "id": 17070,
+              "id": 17704,
               "nodeType": "StructuredDocumentation",
-              "src": "10292:2008:63",
+              "src": "10268:2008:62",
               "text": " @dev Performs a series of swaps with one or multiple Pools. In each individual swap, the caller determines either\n the amount of tokens sent to or received from the Pool, depending on the `kind` value.\n Returns an array with the net Vault asset balance deltas. Positive amounts represent tokens (or ETH) sent to the\n Vault, and negative amounts represent tokens (or ETH) sent by the Vault. Each delta corresponds to the asset at\n the same index in the `assets` array.\n Swaps are executed sequentially, in the order specified by the `swaps` array. Each array element describes a\n Pool, the token to be sent to this Pool, the token to receive from it, and an amount that is either `amountIn` or\n `amountOut` depending on the swap kind.\n Multihop swaps can be executed by passing an `amount` value of zero for a swap. This will cause the amount in/out\n of the previous swap to be used as the amount in for the current one. In a 'given in' swap, 'tokenIn' must equal\n the previous swap's `tokenOut`. For a 'given out' swap, `tokenOut` must equal the previous swap's `tokenIn`.\n The `assets` array contains the addresses of all assets involved in the swaps. These are either token addresses,\n or the IAsset sentinel value for ETH (the zero address). Each entry in the `swaps` array specifies tokens in and\n out by referencing an index in `assets`. Note that Pools never interact with ETH directly: it will be wrapped to\n or unwrapped from WETH by the Vault.\n Internal Balance usage, sender, and recipient are determined by the `funds` struct. The `limits` array specifies\n the minimum or maximum amount of each token the vault is allowed to transfer.\n `batchSwap` can be used to make a single swap, like `swap` does, but doing so requires more gas than the\n equivalent `swap` call.\n Emits `Swap` events."
             },
             "functionSelector": "945bcec9",
-            "id": 17095,
+            "id": 17729,
             "implemented": false,
             "kind": "function",
             "modifiers": [],
             "name": "batchSwap",
-            "nameLocation": "12315:9:63",
+            "nameLocation": "12291:9:62",
             "nodeType": "FunctionDefinition",
             "parameters": {
-              "id": 17090,
+              "id": 17724,
               "nodeType": "ParameterList",
               "parameters": [
                 {
                   "constant": false,
-                  "id": 17073,
+                  "id": 17707,
                   "mutability": "mutable",
                   "name": "kind",
-                  "nameLocation": "12344:4:63",
+                  "nameLocation": "12320:4:62",
                   "nodeType": "VariableDeclaration",
-                  "scope": 17095,
-                  "src": "12335:13:63",
+                  "scope": 17729,
+                  "src": "12311:13:62",
                   "stateVariable": false,
                   "storageLocation": "default",
                   "typeDescriptions": {
-                    "typeIdentifier": "t_enum$_SwapKind_$17069",
+                    "typeIdentifier": "t_enum$_SwapKind_$17703",
                     "typeString": "enum IVault.SwapKind"
                   },
                   "typeName": {
-                    "id": 17072,
+                    "id": 17706,
                     "nodeType": "UserDefinedTypeName",
                     "pathNode": {
-                      "id": 17071,
+                      "id": 17705,
                       "name": "SwapKind",
                       "nodeType": "IdentifierPath",
-                      "referencedDeclaration": 17069,
-                      "src": "12335:8:63"
+                      "referencedDeclaration": 17703,
+                      "src": "12311:8:62"
                     },
-                    "referencedDeclaration": 17069,
-                    "src": "12335:8:63",
+                    "referencedDeclaration": 17703,
+                    "src": "12311:8:62",
                     "typeDescriptions": {
-                      "typeIdentifier": "t_enum$_SwapKind_$17069",
+                      "typeIdentifier": "t_enum$_SwapKind_$17703",
                       "typeString": "enum IVault.SwapKind"
                     }
                   },
@@ -1142,42 +1127,42 @@
                 },
                 {
                   "constant": false,
-                  "id": 17077,
+                  "id": 17711,
                   "mutability": "mutable",
                   "name": "swaps",
-                  "nameLocation": "12382:5:63",
+                  "nameLocation": "12358:5:62",
                   "nodeType": "VariableDeclaration",
-                  "scope": 17095,
-                  "src": "12359:28:63",
+                  "scope": 17729,
+                  "src": "12335:28:62",
                   "stateVariable": false,
                   "storageLocation": "memory",
                   "typeDescriptions": {
-                    "typeIdentifier": "t_array$_t_struct$_BatchSwapStep_$17106_memory_ptr_$dyn_memory_ptr",
+                    "typeIdentifier": "t_array$_t_struct$_BatchSwapStep_$17740_memory_ptr_$dyn_memory_ptr",
                     "typeString": "struct IVault.BatchSwapStep[]"
                   },
                   "typeName": {
                     "baseType": {
-                      "id": 17075,
+                      "id": 17709,
                       "nodeType": "UserDefinedTypeName",
                       "pathNode": {
-                        "id": 17074,
+                        "id": 17708,
                         "name": "BatchSwapStep",
                         "nodeType": "IdentifierPath",
-                        "referencedDeclaration": 17106,
-                        "src": "12359:13:63"
+                        "referencedDeclaration": 17740,
+                        "src": "12335:13:62"
                       },
-                      "referencedDeclaration": 17106,
-                      "src": "12359:13:63",
+                      "referencedDeclaration": 17740,
+                      "src": "12335:13:62",
                       "typeDescriptions": {
-                        "typeIdentifier": "t_struct$_BatchSwapStep_$17106_storage_ptr",
+                        "typeIdentifier": "t_struct$_BatchSwapStep_$17740_storage_ptr",
                         "typeString": "struct IVault.BatchSwapStep"
                       }
                     },
-                    "id": 17076,
+                    "id": 17710,
                     "nodeType": "ArrayTypeName",
-                    "src": "12359:15:63",
+                    "src": "12335:15:62",
                     "typeDescriptions": {
-                      "typeIdentifier": "t_array$_t_struct$_BatchSwapStep_$17106_storage_$dyn_storage_ptr",
+                      "typeIdentifier": "t_array$_t_struct$_BatchSwapStep_$17740_storage_$dyn_storage_ptr",
                       "typeString": "struct IVault.BatchSwapStep[]"
                     }
                   },
@@ -1185,76 +1170,76 @@
                 },
                 {
                   "constant": false,
-                  "id": 17081,
+                  "id": 17715,
                   "mutability": "mutable",
                   "name": "assets",
-                  "nameLocation": "12414:6:63",
+                  "nameLocation": "12390:6:62",
                   "nodeType": "VariableDeclaration",
-                  "scope": 17095,
-                  "src": "12398:22:63",
+                  "scope": 17729,
+                  "src": "12374:22:62",
                   "stateVariable": false,
                   "storageLocation": "memory",
                   "typeDescriptions": {
-                    "typeIdentifier": "t_array$_t_contract$_IAsset_$15577_$dyn_memory_ptr",
-                    "typeString": "contract IAsset[]"
+                    "typeIdentifier": "t_array$_t_contract$_IERC20_$2941_$dyn_memory_ptr",
+                    "typeString": "contract IERC20[]"
                   },
                   "typeName": {
                     "baseType": {
-                      "id": 17079,
+                      "id": 17713,
                       "nodeType": "UserDefinedTypeName",
                       "pathNode": {
-                        "id": 17078,
-                        "name": "IAsset",
+                        "id": 17712,
+                        "name": "IERC20",
                         "nodeType": "IdentifierPath",
-                        "referencedDeclaration": 15577,
-                        "src": "12398:6:63"
+                        "referencedDeclaration": 2941,
+                        "src": "12374:6:62"
                       },
-                      "referencedDeclaration": 15577,
-                      "src": "12398:6:63",
+                      "referencedDeclaration": 2941,
+                      "src": "12374:6:62",
                       "typeDescriptions": {
-                        "typeIdentifier": "t_contract$_IAsset_$15577",
-                        "typeString": "contract IAsset"
+                        "typeIdentifier": "t_contract$_IERC20_$2941",
+                        "typeString": "contract IERC20"
                       }
                     },
-                    "id": 17080,
+                    "id": 17714,
                     "nodeType": "ArrayTypeName",
-                    "src": "12398:8:63",
+                    "src": "12374:8:62",
                     "typeDescriptions": {
-                      "typeIdentifier": "t_array$_t_contract$_IAsset_$15577_$dyn_storage_ptr",
-                      "typeString": "contract IAsset[]"
+                      "typeIdentifier": "t_array$_t_contract$_IERC20_$2941_$dyn_storage_ptr",
+                      "typeString": "contract IERC20[]"
                     }
                   },
                   "visibility": "internal"
                 },
                 {
                   "constant": false,
-                  "id": 17084,
+                  "id": 17718,
                   "mutability": "mutable",
                   "name": "funds",
-                  "nameLocation": "12453:5:63",
+                  "nameLocation": "12429:5:62",
                   "nodeType": "VariableDeclaration",
-                  "scope": 17095,
-                  "src": "12431:27:63",
+                  "scope": 17729,
+                  "src": "12407:27:62",
                   "stateVariable": false,
                   "storageLocation": "memory",
                   "typeDescriptions": {
-                    "typeIdentifier": "t_struct$_FundManagement_$17115_memory_ptr",
+                    "typeIdentifier": "t_struct$_FundManagement_$17749_memory_ptr",
                     "typeString": "struct IVault.FundManagement"
                   },
                   "typeName": {
-                    "id": 17083,
+                    "id": 17717,
                     "nodeType": "UserDefinedTypeName",
                     "pathNode": {
-                      "id": 17082,
+                      "id": 17716,
                       "name": "FundManagement",
                       "nodeType": "IdentifierPath",
-                      "referencedDeclaration": 17115,
-                      "src": "12431:14:63"
+                      "referencedDeclaration": 17749,
+                      "src": "12407:14:62"
                     },
-                    "referencedDeclaration": 17115,
-                    "src": "12431:14:63",
+                    "referencedDeclaration": 17749,
+                    "src": "12407:14:62",
                     "typeDescriptions": {
-                      "typeIdentifier": "t_struct$_FundManagement_$17115_storage_ptr",
+                      "typeIdentifier": "t_struct$_FundManagement_$17749_storage_ptr",
                       "typeString": "struct IVault.FundManagement"
                     }
                   },
@@ -1262,13 +1247,13 @@
                 },
                 {
                   "constant": false,
-                  "id": 17087,
+                  "id": 17721,
                   "mutability": "mutable",
                   "name": "limits",
-                  "nameLocation": "12485:6:63",
+                  "nameLocation": "12461:6:62",
                   "nodeType": "VariableDeclaration",
-                  "scope": 17095,
-                  "src": "12469:22:63",
+                  "scope": 17729,
+                  "src": "12445:22:62",
                   "stateVariable": false,
                   "storageLocation": "memory",
                   "typeDescriptions": {
@@ -1277,18 +1262,18 @@
                   },
                   "typeName": {
                     "baseType": {
-                      "id": 17085,
+                      "id": 17719,
                       "name": "int256",
                       "nodeType": "ElementaryTypeName",
-                      "src": "12469:6:63",
+                      "src": "12445:6:62",
                       "typeDescriptions": {
                         "typeIdentifier": "t_int256",
                         "typeString": "int256"
                       }
                     },
-                    "id": 17086,
+                    "id": 17720,
                     "nodeType": "ArrayTypeName",
-                    "src": "12469:8:63",
+                    "src": "12445:8:62",
                     "typeDescriptions": {
                       "typeIdentifier": "t_array$_t_int256_$dyn_storage_ptr",
                       "typeString": "int256[]"
@@ -1298,13 +1283,13 @@
                 },
                 {
                   "constant": false,
-                  "id": 17089,
+                  "id": 17723,
                   "mutability": "mutable",
                   "name": "deadline",
-                  "nameLocation": "12510:8:63",
+                  "nameLocation": "12486:8:62",
                   "nodeType": "VariableDeclaration",
-                  "scope": 17095,
-                  "src": "12502:16:63",
+                  "scope": 17729,
+                  "src": "12478:16:62",
                   "stateVariable": false,
                   "storageLocation": "default",
                   "typeDescriptions": {
@@ -1312,10 +1297,10 @@
                     "typeString": "uint256"
                   },
                   "typeName": {
-                    "id": 17088,
+                    "id": 17722,
                     "name": "uint256",
                     "nodeType": "ElementaryTypeName",
-                    "src": "12502:7:63",
+                    "src": "12478:7:62",
                     "typeDescriptions": {
                       "typeIdentifier": "t_uint256",
                       "typeString": "uint256"
@@ -1324,21 +1309,21 @@
                   "visibility": "internal"
                 }
               ],
-              "src": "12324:201:63"
+              "src": "12300:201:62"
             },
             "returnParameters": {
-              "id": 17094,
+              "id": 17728,
               "nodeType": "ParameterList",
               "parameters": [
                 {
                   "constant": false,
-                  "id": 17093,
+                  "id": 17727,
                   "mutability": "mutable",
                   "name": "",
                   "nameLocation": "-1:-1:-1",
                   "nodeType": "VariableDeclaration",
-                  "scope": 17095,
-                  "src": "12552:15:63",
+                  "scope": 17729,
+                  "src": "12528:15:62",
                   "stateVariable": false,
                   "storageLocation": "memory",
                   "typeDescriptions": {
@@ -1347,18 +1332,18 @@
                   },
                   "typeName": {
                     "baseType": {
-                      "id": 17091,
+                      "id": 17725,
                       "name": "int256",
                       "nodeType": "ElementaryTypeName",
-                      "src": "12552:6:63",
+                      "src": "12528:6:62",
                       "typeDescriptions": {
                         "typeIdentifier": "t_int256",
                         "typeString": "int256"
                       }
                     },
-                    "id": 17092,
+                    "id": 17726,
                     "nodeType": "ArrayTypeName",
-                    "src": "12552:8:63",
+                    "src": "12528:8:62",
                     "typeDescriptions": {
                       "typeIdentifier": "t_array$_t_int256_$dyn_storage_ptr",
                       "typeString": "int256[]"
@@ -1367,27 +1352,27 @@
                   "visibility": "internal"
                 }
               ],
-              "src": "12551:17:63"
+              "src": "12527:17:62"
             },
-            "scope": 17116,
-            "src": "12306:263:63",
+            "scope": 17750,
+            "src": "12282:263:62",
             "stateMutability": "payable",
             "virtual": false,
             "visibility": "external"
           },
           {
             "canonicalName": "IVault.BatchSwapStep",
-            "id": 17106,
+            "id": 17740,
             "members": [
               {
                 "constant": false,
-                "id": 17097,
+                "id": 17731,
                 "mutability": "mutable",
                 "name": "poolId",
-                "nameLocation": "13183:6:63",
+                "nameLocation": "13159:6:62",
                 "nodeType": "VariableDeclaration",
-                "scope": 17106,
-                "src": "13175:14:63",
+                "scope": 17740,
+                "src": "13151:14:62",
                 "stateVariable": false,
                 "storageLocation": "default",
                 "typeDescriptions": {
@@ -1395,10 +1380,10 @@
                   "typeString": "bytes32"
                 },
                 "typeName": {
-                  "id": 17096,
+                  "id": 17730,
                   "name": "bytes32",
                   "nodeType": "ElementaryTypeName",
-                  "src": "13175:7:63",
+                  "src": "13151:7:62",
                   "typeDescriptions": {
                     "typeIdentifier": "t_bytes32",
                     "typeString": "bytes32"
@@ -1408,13 +1393,13 @@
               },
               {
                 "constant": false,
-                "id": 17099,
+                "id": 17733,
                 "mutability": "mutable",
                 "name": "assetInIndex",
-                "nameLocation": "13208:12:63",
+                "nameLocation": "13184:12:62",
                 "nodeType": "VariableDeclaration",
-                "scope": 17106,
-                "src": "13200:20:63",
+                "scope": 17740,
+                "src": "13176:20:62",
                 "stateVariable": false,
                 "storageLocation": "default",
                 "typeDescriptions": {
@@ -1422,10 +1407,10 @@
                   "typeString": "uint256"
                 },
                 "typeName": {
-                  "id": 17098,
+                  "id": 17732,
                   "name": "uint256",
                   "nodeType": "ElementaryTypeName",
-                  "src": "13200:7:63",
+                  "src": "13176:7:62",
                   "typeDescriptions": {
                     "typeIdentifier": "t_uint256",
                     "typeString": "uint256"
@@ -1435,13 +1420,13 @@
               },
               {
                 "constant": false,
-                "id": 17101,
+                "id": 17735,
                 "mutability": "mutable",
                 "name": "assetOutIndex",
-                "nameLocation": "13239:13:63",
+                "nameLocation": "13215:13:62",
                 "nodeType": "VariableDeclaration",
-                "scope": 17106,
-                "src": "13231:21:63",
+                "scope": 17740,
+                "src": "13207:21:62",
                 "stateVariable": false,
                 "storageLocation": "default",
                 "typeDescriptions": {
@@ -1449,10 +1434,10 @@
                   "typeString": "uint256"
                 },
                 "typeName": {
-                  "id": 17100,
+                  "id": 17734,
                   "name": "uint256",
                   "nodeType": "ElementaryTypeName",
-                  "src": "13231:7:63",
+                  "src": "13207:7:62",
                   "typeDescriptions": {
                     "typeIdentifier": "t_uint256",
                     "typeString": "uint256"
@@ -1462,13 +1447,13 @@
               },
               {
                 "constant": false,
-                "id": 17103,
+                "id": 17737,
                 "mutability": "mutable",
                 "name": "amount",
-                "nameLocation": "13271:6:63",
+                "nameLocation": "13247:6:62",
                 "nodeType": "VariableDeclaration",
-                "scope": 17106,
-                "src": "13263:14:63",
+                "scope": 17740,
+                "src": "13239:14:62",
                 "stateVariable": false,
                 "storageLocation": "default",
                 "typeDescriptions": {
@@ -1476,10 +1461,10 @@
                   "typeString": "uint256"
                 },
                 "typeName": {
-                  "id": 17102,
+                  "id": 17736,
                   "name": "uint256",
                   "nodeType": "ElementaryTypeName",
-                  "src": "13263:7:63",
+                  "src": "13239:7:62",
                   "typeDescriptions": {
                     "typeIdentifier": "t_uint256",
                     "typeString": "uint256"
@@ -1489,13 +1474,13 @@
               },
               {
                 "constant": false,
-                "id": 17105,
+                "id": 17739,
                 "mutability": "mutable",
                 "name": "userData",
-                "nameLocation": "13294:8:63",
+                "nameLocation": "13270:8:62",
                 "nodeType": "VariableDeclaration",
-                "scope": 17106,
-                "src": "13288:14:63",
+                "scope": 17740,
+                "src": "13264:14:62",
                 "stateVariable": false,
                 "storageLocation": "default",
                 "typeDescriptions": {
@@ -1503,10 +1488,10 @@
                   "typeString": "bytes"
                 },
                 "typeName": {
-                  "id": 17104,
+                  "id": 17738,
                   "name": "bytes",
                   "nodeType": "ElementaryTypeName",
-                  "src": "13288:5:63",
+                  "src": "13264:5:62",
                   "typeDescriptions": {
                     "typeIdentifier": "t_bytes_storage_ptr",
                     "typeString": "bytes"
@@ -1516,25 +1501,25 @@
               }
             ],
             "name": "BatchSwapStep",
-            "nameLocation": "13150:13:63",
+            "nameLocation": "13126:13:62",
             "nodeType": "StructDefinition",
-            "scope": 17116,
-            "src": "13143:167:63",
+            "scope": 17750,
+            "src": "13119:167:62",
             "visibility": "public"
           },
           {
             "canonicalName": "IVault.FundManagement",
-            "id": 17115,
+            "id": 17749,
             "members": [
               {
                 "constant": false,
-                "id": 17108,
+                "id": 17742,
                 "mutability": "mutable",
                 "name": "sender",
-                "nameLocation": "14303:6:63",
+                "nameLocation": "14279:6:62",
                 "nodeType": "VariableDeclaration",
-                "scope": 17115,
-                "src": "14295:14:63",
+                "scope": 17749,
+                "src": "14271:14:62",
                 "stateVariable": false,
                 "storageLocation": "default",
                 "typeDescriptions": {
@@ -1542,10 +1527,10 @@
                   "typeString": "address"
                 },
                 "typeName": {
-                  "id": 17107,
+                  "id": 17741,
                   "name": "address",
                   "nodeType": "ElementaryTypeName",
-                  "src": "14295:7:63",
+                  "src": "14271:7:62",
                   "stateMutability": "nonpayable",
                   "typeDescriptions": {
                     "typeIdentifier": "t_address",
@@ -1556,13 +1541,13 @@
               },
               {
                 "constant": false,
-                "id": 17110,
+                "id": 17744,
                 "mutability": "mutable",
                 "name": "fromInternalBalance",
-                "nameLocation": "14325:19:63",
+                "nameLocation": "14301:19:62",
                 "nodeType": "VariableDeclaration",
-                "scope": 17115,
-                "src": "14320:24:63",
+                "scope": 17749,
+                "src": "14296:24:62",
                 "stateVariable": false,
                 "storageLocation": "default",
                 "typeDescriptions": {
@@ -1570,10 +1555,10 @@
                   "typeString": "bool"
                 },
                 "typeName": {
-                  "id": 17109,
+                  "id": 17743,
                   "name": "bool",
                   "nodeType": "ElementaryTypeName",
-                  "src": "14320:4:63",
+                  "src": "14296:4:62",
                   "typeDescriptions": {
                     "typeIdentifier": "t_bool",
                     "typeString": "bool"
@@ -1583,13 +1568,13 @@
               },
               {
                 "constant": false,
-                "id": 17112,
+                "id": 17746,
                 "mutability": "mutable",
                 "name": "recipient",
-                "nameLocation": "14371:9:63",
+                "nameLocation": "14347:9:62",
                 "nodeType": "VariableDeclaration",
-                "scope": 17115,
-                "src": "14355:25:63",
+                "scope": 17749,
+                "src": "14331:25:62",
                 "stateVariable": false,
                 "storageLocation": "default",
                 "typeDescriptions": {
@@ -1597,10 +1582,10 @@
                   "typeString": "address payable"
                 },
                 "typeName": {
-                  "id": 17111,
+                  "id": 17745,
                   "name": "address",
                   "nodeType": "ElementaryTypeName",
-                  "src": "14355:15:63",
+                  "src": "14331:15:62",
                   "stateMutability": "payable",
                   "typeDescriptions": {
                     "typeIdentifier": "t_address_payable",
@@ -1611,13 +1596,13 @@
               },
               {
                 "constant": false,
-                "id": 17114,
+                "id": 17748,
                 "mutability": "mutable",
                 "name": "toInternalBalance",
-                "nameLocation": "14396:17:63",
+                "nameLocation": "14372:17:62",
                 "nodeType": "VariableDeclaration",
-                "scope": 17115,
-                "src": "14391:22:63",
+                "scope": 17749,
+                "src": "14367:22:62",
                 "stateVariable": false,
                 "storageLocation": "default",
                 "typeDescriptions": {
@@ -1625,10 +1610,10 @@
                   "typeString": "bool"
                 },
                 "typeName": {
-                  "id": 17113,
+                  "id": 17747,
                   "name": "bool",
                   "nodeType": "ElementaryTypeName",
-                  "src": "14391:4:63",
+                  "src": "14367:4:62",
                   "typeDescriptions": {
                     "typeIdentifier": "t_bool",
                     "typeString": "bool"
@@ -1638,27 +1623,27 @@
               }
             ],
             "name": "FundManagement",
-            "nameLocation": "14269:14:63",
+            "nameLocation": "14245:14:62",
             "nodeType": "StructDefinition",
-            "scope": 17116,
-            "src": "14262:159:63",
+            "scope": 17750,
+            "src": "14238:159:62",
             "visibility": "public"
           }
         ],
-        "scope": 17117,
-        "src": "850:13574:63",
+        "scope": 17751,
+        "src": "826:13574:62",
         "usedErrors": []
       }
     ],
-    "src": "702:13722:63"
+    "src": "702:13698:62"
   },
   "compiler": {
     "name": "solc",
     "version": "0.8.10+commit.fc410830.Emscripten.clang"
   },
   "networks": {},
-  "schemaVersion": "3.4.7",
-  "updatedAt": "2022-09-23T12:56:55.892Z",
+  "schemaVersion": "3.4.10",
+  "updatedAt": "2022-09-29T10:42:11.929Z",
   "devdoc": {
     "kind": "dev",
     "methods": {

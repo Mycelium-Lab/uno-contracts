@@ -39,6 +39,26 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
         uint32 lastDistribution;
         uint256 lastUpdate;
     }
+    /**
+     * @dev SwapInfo:
+     * {swaps} - Data used for token swaps.
+     * {assets} - Assets used in swaps.
+     * {limits} - Swap slippage limits.
+     */
+    struct SwapInfo{
+        IVault.BatchSwapStep[] swaps;
+        IERC20[] assets;
+        int256[] limits;
+    }
+    /**
+     * @dev FeeInfo:
+     * {feeCollector} - Contract to transfer fees to.
+     * {fee} - Fee percentage to collect (10^18 == 100%). 
+     */
+    struct FeeInfo {
+        address feeTo;
+        uint256 fee;
+    }
 
     /**
      * @dev Third Party Contracts:
@@ -125,24 +145,24 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
      * Deposits {amounts} of {tokens} from this contract's balance to the {Vault}.
      */
     function deposit(uint256[] memory amounts, address[] memory tokens, uint256 minAmountLP, uint256 amountLP,  address recipient) external nonReentrant onlyAssetRouter returns(uint256 liquidity){
-        (IERC20[] memory poolTokens, IAsset[] memory assets,) = getTokens();
-        require (amounts.length == poolTokens.length, 'BAD_AMOUNTS_LENGTH');
-        require (tokens.length == poolTokens.length, 'BAD_TOKENS_LENGTH');
+        (IERC20[] memory _tokens, , ) = Vault.getPoolTokens(poolId);
+        require (amounts.length == _tokens.length, 'BAD_AMOUNTS_LENGTH');
+        require (tokens.length == _tokens.length, 'BAD_TOKENS_LENGTH');
 
         bool joinPool = false;
-        for (uint256 i = 0; i < poolTokens.length; i++) {
-            require (IERC20(tokens[i]) == poolTokens[i], 'TOKENS_NOT_MATCH_POOL_TOKENS');
+        for (uint256 i = 0; i < _tokens.length; i++) {
+            require (IERC20(tokens[i]) == _tokens[i], 'TOKENS_NOT_MATCH_POOL_TOKENS');
             if(amounts[i] > 0){
                 if(!joinPool){
                     joinPool = true;
                 }
-                poolTokens[i].approve(address(Vault), amounts[i]);
+                _tokens[i].approve(address(Vault), amounts[i]);
             }
         }
 
         uint256 amountBefore = IERC20(lpPool).balanceOf(address(this));
         if(joinPool){
-            IVault.JoinPoolRequest memory joinPoolRequest = IVault.JoinPoolRequest(assets, amounts, abi.encode(1, amounts, minAmountLP), false);
+            IVault.JoinPoolRequest memory joinPoolRequest = IVault.JoinPoolRequest(_tokens, amounts, abi.encode(1, amounts, minAmountLP), false);
             Vault.joinPool(poolId, address(this), address(this), joinPoolRequest);
         }
         uint256 amountAfter = IERC20(lpPool).balanceOf(address(this));
@@ -160,10 +180,11 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
     /**
      * @dev Withdraws funds from {origin} and sends them to the {recipient}.
      */
-    function withdraw(uint256 amount, uint256[] calldata minAmountsOut, bool withdrawLP, address origin, address recipient) external nonReentrant onlyAssetRouter{
+    function withdraw(uint256 amount, uint256[] calldata minAmountsOut, bool withdrawLP, address origin, address recipient) external nonReentrant onlyAssetRouter returns(uint256[] memory amounts){
         require(amount > 0, 'INSUFFICIENT_AMOUNT');
 
         _updateDeposit(origin);
+        {// scope to avoid stack too deep errors
         UserInfo storage user = userInfo[origin];
         // Subtract amount from user.reward first, then subtract remainder from user.stake.
         if(amount > user.reward){
@@ -175,16 +196,30 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
         } else {
             user.reward -= amount;
         }
+        }
+
+        (IERC20[] memory tokens, , ) = Vault.getPoolTokens(poolId);
+        amounts = new uint256[](tokens.length);
 
         gauge.withdraw(amount);
         if(withdrawLP){
             IERC20Upgradeable(lpPool).safeTransfer(recipient, amount);
-            return;
+            return amounts;
         }
 
-        (, IAsset[] memory assets, ) = getTokens();
-        require (minAmountsOut.length == assets.length, 'MIN_AMOUNTS_OUT_BAD_LENGTH');
-        Vault.exitPool(poolId, address(this), payable(recipient), IVault.ExitPoolRequest(assets, minAmountsOut, abi.encode(1, amount), false));
+        require (minAmountsOut.length == tokens.length, 'MIN_AMOUNTS_OUT_BAD_LENGTH');
+
+        //Collect amounts before pool exit
+        for (uint256 i = 0; i < tokens.length; i++) {
+            amounts[i] = tokens[i].balanceOf(recipient);
+        }
+
+        Vault.exitPool(poolId, address(this), payable(recipient), IVault.ExitPoolRequest(tokens, minAmountsOut, abi.encode(1, amount), false));
+
+        for (uint256 i = 0; i < tokens.length; i++) {
+            uint256 balanceAfter = tokens[i].balanceOf(recipient);
+            amounts[i] = balanceAfter - amounts[i];
+        }
     }
 
     /**
@@ -194,42 +229,39 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
      * 3. It deposits new tokens back to the {gauge}.
      */
     function distribute(
-        IVault.BatchSwapStep[][] calldata swaps,
-        IAsset[][] calldata assets,
-        int256[][] calldata limits
+        SwapInfo[] calldata swapInfos,
+        SwapInfo[] calldata feeSwapInfos,
+        FeeInfo calldata feeInfo
     ) external onlyAssetRouter nonReentrant returns(uint256 reward){
         require(totalDeposits > 0, 'NO_LIQUIDITY');
         require(distributionInfo[distributionID - 1].block != block.number, 'CANT_CALL_ON_THE_SAME_BLOCK');
-        require((swaps.length == streamer.reward_count()) && (swaps.length == assets.length) && (swaps.length == limits.length), 'PARAMS_LENGTHS_NOT_MATCH_REWARD_COUNT');
+
+        uint256 rewardCount = streamer.reward_count();
+        require((swapInfos.length == rewardCount) && (feeSwapInfos.length == rewardCount), 'PARAMS_LENGTHS_NOT_MATCH_REWARD_COUNT');
 
         gauge.claim_rewards();
-        for (uint256 i = 0; i < swaps.length; i++) {
-            IERC20 rewardToken = IERC20(streamer.reward_tokens(i));
+        for (uint256 i = 0; i < rewardCount; i++) {
+            IERC20Upgradeable rewardToken = IERC20Upgradeable(streamer.reward_tokens(i));
             if (address(rewardToken) != address(gauge)) {  //can't use LP tokens in swap
+                collectFees(feeSwapInfos[i], feeInfo, rewardToken);
                 uint256 balance = rewardToken.balanceOf(address(this));
                 if(balance > 0){
                     rewardToken.approve(address(Vault), balance);
-                    Vault.batchSwap(
-                        IVault.SwapKind.GIVEN_IN,
-                        swaps[i],
-                        assets[i],
-                        IVault.FundManagement({sender: address(this), fromInternalBalance:false, recipient: payable(address(this)), toInternalBalance:false}),
-                        limits[i],
-                        type(uint256).max
-                    );
+                    batchSwap(swapInfos[i], payable(address(this)));
                 }
             }
         }
 
-        (IERC20[] memory tokens, IAsset[] memory joinAssets, uint256[] memory joinAmounts) = getTokens();
+        (IERC20[] memory tokens, , ) = Vault.getPoolTokens(poolId);
+        uint256[] memory joinAmounts = new uint256[](tokens.length);
         for (uint256 i = 0; i < tokens.length; i++) {
             joinAmounts[i] = tokens[i].balanceOf(address(this));
             if (joinAmounts[i] > 0){
                 tokens[i].approve(address(Vault), joinAmounts[i]);
             }
         }
-        
-        Vault.joinPool(poolId, address(this), address(this), IVault.JoinPoolRequest(joinAssets, joinAmounts, abi.encode(1, joinAmounts, 1), false));
+        Vault.joinPool(poolId, address(this), address(this), IVault.JoinPoolRequest(tokens, joinAmounts, abi.encode(1, joinAmounts, 1), false));
+
         reward = IERC20(lpPool).balanceOf(address(this));
 
         uint256 rewardPerDepositAge = reward * fractionMultiplier / (totalDepositAge + totalDeposits * (block.number - totalDepositLastUpdate));
@@ -246,6 +278,37 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
         totalDepositAge = 0;
 
         gauge.deposit(reward);
+    }
+
+    /**
+     * @dev Swaps and sends fees to feeTo.
+     */
+    function collectFees(SwapInfo calldata feeSwapInfo, FeeInfo calldata feeInfo, IERC20Upgradeable token) internal {
+        if(feeInfo.feeTo != address(0)){
+            uint256 feeAmount = token.balanceOf(address(this)) * feeInfo.fee / fractionMultiplier;
+            if(feeAmount > 0){
+                if(feeSwapInfo.swaps.length > 0){
+                    token.approve(address(Vault), feeAmount);
+                    batchSwap(feeSwapInfo, payable(feeInfo.feeTo));
+                    return;
+                }
+                token.safeTransfer(feeInfo.feeTo, feeAmount);
+            }
+        }
+    }
+
+    /**
+     * @dev Performs balancer batch swap. Separate function to avoid Stack too deep errors.
+     */
+    function batchSwap(SwapInfo calldata swapInfo, address payable recipient) internal {
+        Vault.batchSwap(
+            IVault.SwapKind.GIVEN_IN,
+            swapInfo.swaps,
+            swapInfo.assets,
+            IVault.FundManagement({sender: address(this), fromInternalBalance:false, recipient: recipient, toInternalBalance:false}),
+            swapInfo.limits,
+            type(uint256).max
+        );
     }
 
     /**
@@ -298,17 +361,5 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
         // Calculate reward from the distributions that have happened after the last user deposit.
         uint256 rewardAfterDistribution = user.stake * (distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge - lastUserDistributionInfo.cumulativeRewardAgePerDepositAge) / fractionMultiplier;
         return user.reward + rewardBeforeDistibution + rewardAfterDistribution;
-    }
-
-    /**
-     * @dev Utility function used to create IAsset array.
-     */ 
-    function getTokens() internal view returns(IERC20[] memory tokens, IAsset[] memory assets, uint256[] memory amounts){
-        (tokens, , ) = Vault.getPoolTokens(poolId);
-        assets = new IAsset[](tokens.length);
-        amounts = new uint256[](tokens.length);
-        for (uint256 i = 0; i < tokens.length; i++) {
-            assets[i] = IAsset(address(tokens[i]));
-        }
     }
 }

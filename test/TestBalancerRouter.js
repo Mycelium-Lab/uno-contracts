@@ -25,13 +25,16 @@ const gaugeFactoryAddress = '0x3b8cA519122CdD8efb272b0D3085453404B25bD0'
 const pool = '0xaF5E0B5425dE1F5a630A8cB5AA9D97B8141C908D' // WMATIC-stMATIC
 const pool2 = '0x06Df3b2bbB68adc8B0e302443692037ED9f91b42' // USDC-DAI-miMATIC-USDT
 
-const account1 = '0x70D04384b5c3a466EC4D8CFB8213Efc31C6a9D15' // has to be unlocked and hold 0xaF5E0B5425dE1F5a630A8cB5AA9D97B8141C908D
-const account2 = '0x78D799BE3Fd3D96f0e024b9B35ADb4479a9556f5' // has to be unlocked and hold 0xaF5E0B5425dE1F5a630A8cB5AA9D97B8141C908D
+const account1 = '0x70D04384b5c3a466EC4D8CFB8213Efc31C6a9D15'// has to be unlocked and hold 0xaF5E0B5425dE1F5a630A8cB5AA9D97B8141C908D
+const account2 = '0x78D799BE3Fd3D96f0e024b9B35ADb4479a9556f5'// has to be unlocked and hold 0xaF5E0B5425dE1F5a630A8cB5AA9D97B8141C908D
 const account3 = '0x27C7e71AEF0dc5cbcF7af511f3aBAC8eE6845685' // has to be unlocked and hold 0x3A58a54C066FdC0f2D55FC9C89F0415C92eBf3C4 (stMATIC)
 
 const amounts = [new BN(1000000), new BN(3000000), new BN(500000), new BN(4000000), new BN('1000000000000000')]
 
-approxeq = function (bn1, bn2, epsilon, message) {
+const feeCollector = '0xFFFf795B802CB03FD664092Ab169f5f5c236335c'
+const fee = new BN('40000000000000000')// 4%
+
+approxeq = (bn1, bn2, epsilon, message) => {
     const amountDelta = bn1.sub(bn2).add(epsilon)
     assert.ok(!amountDelta.isNeg(), message)
 }
@@ -41,21 +44,20 @@ contract('UnoAssetRouterBalancer', (accounts) => {
     const pauser = accounts[1]
     const distributor = accounts[2]
 
-    let accessManager
-    let assetRouter
-    let factory
+    let accessManager; let assetRouter; let
+        factory
 
     let stakingToken
     let snapshotId
 
     const initReceipt = {}
 
-    let poolId
-    let gauge
+    let poolId; let
+        gauge
 
     let Vault
-    let tokens
-    let zeroAmounts
+    let tokens; let
+        zeroAmounts
 
     const tokenContracts = []
 
@@ -64,20 +66,14 @@ contract('UnoAssetRouterBalancer', (accounts) => {
         snapshotId = snapshot.result
 
         const implementation = await Farm.new({ from: account1 })
-        accessManager = await AccessManager.new({ from: admin }) // accounts[0] is admin
+        accessManager = await AccessManager.new({ from: admin })// accounts[0] is admin
 
-        await accessManager.grantRole('0xfbd454f36a7e1a388bd6fc3ab10d434aa4578f811acbbcf33afb1c697486313c', distributor, {
-            from: admin
-        }) // DISTRIBUTOR_ROLE
-        await accessManager.grantRole('0x65d7a28e3265b37a6474929f336521b332c1681b933f6cb9f3376673440d862a', pauser, {
-            from: admin
-        }) // PAUSER_ROLE
+        await accessManager.grantRole('0xfbd454f36a7e1a388bd6fc3ab10d434aa4578f811acbbcf33afb1c697486313c', distributor, { from: admin }) // DISTRIBUTOR_ROLE
+        await accessManager.grantRole('0x65d7a28e3265b37a6474929f336521b332c1681b933f6cb9f3376673440d862a', pauser, { from: admin }) // PAUSER_ROLE
 
         assetRouter = await deployProxy(AssetRouter, { kind: 'uups', initializer: false })
 
-        factory = await FarmFactory.new(implementation.address, accessManager.address, assetRouter.address, {
-            from: account1
-        })
+        factory = await FarmFactory.new(implementation.address, accessManager.address, assetRouter.address, { from: account1 })
 
         const _receipt = await web3.eth.getTransactionReceipt(factory.transactionHash)
         const events = await assetRouter.getPastEvents('AllEvents', {
@@ -125,18 +121,26 @@ contract('UnoAssetRouterBalancer', (accounts) => {
 
     describe('Initializes variables', () => {
         it('Inits pausable ', async () => {
-            assert.equal(await assetRouter.paused(), false, 'Pausable not initialized')
+            assert.equal(
+                await assetRouter.paused(),
+                false,
+                'Pausable not initialized'
+            )
         })
         it('Sets accessManager', async () => {
-            assert.equal(await assetRouter.accessManager(), accessManager.address, 'accessManager not set')
+            assert.equal(
+                await assetRouter.accessManager(),
+                accessManager.address,
+                'accessManager not set'
+            )
         })
 
         it('Sets farmFactory', async () => {
-            assert.equal(await assetRouter.farmFactory(), factory.address, 'farmFactory not set')
-        })
-
-        it('Sets WMATIC', async () => {
-            assert.equal(await assetRouter.WMATIC(), '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270', 'WMATIC not set')
+            assert.equal(
+                await assetRouter.farmFactory(),
+                factory.address,
+                'farmFactory not set'
+            )
         })
     })
 
@@ -147,7 +151,11 @@ contract('UnoAssetRouterBalancer', (accounts) => {
         })
         it('getTokens is correct', async () => {
             for (let i = 0; i < _tokens.length; i++) {
-                assert.equal(_tokens[i], tokens[i], 'getTokens returned incorrect tokens')
+                assert.equal(
+                    _tokens[i],
+                    tokens[i],
+                    'getTokens returned incorrect tokens'
+                )
             }
         })
     })
@@ -155,8 +163,14 @@ contract('UnoAssetRouterBalancer', (accounts) => {
     describe('Pausable', () => {
         describe('reverts', () => {
             it('reverts if called not by a pauser', async () => {
-                await expectRevert(assetRouter.pause({ from: account1 }), 'CALLER_NOT_AUTHORIZED')
-                await expectRevert(assetRouter.unpause({ from: account1 }), 'CALLER_NOT_AUTHORIZED')
+                await expectRevert(
+                    assetRouter.pause({ from: account1 }),
+                    'CALLER_NOT_AUTHORIZED'
+                )
+                await expectRevert(
+                    assetRouter.unpause({ from: account1 }),
+                    'CALLER_NOT_AUTHORIZED'
+                )
             })
         })
 
@@ -169,14 +183,27 @@ contract('UnoAssetRouterBalancer', (accounts) => {
                 expectEvent(receipt, 'Paused', { account: pauser })
             })
             it('switches paused state', async () => {
-                assert.equal(await assetRouter.paused(), true, 'Not paused')
+                assert.equal(
+                    await assetRouter.paused(),
+                    true,
+                    'Not paused'
+                )
             })
             it('prevents function calls', async () => {
-                await expectRevert(assetRouter.deposit(pool, [], [], 0, 0, account1, { from: account1 }), 'Pausable: paused')
-                await expectRevert(assetRouter.distribute(pool, [], [], [], { from: account1 }), 'Pausable: paused')
+                await expectRevert(
+                    assetRouter.deposit(pool, [], [], 0, 0, account1, { from: account1 }),
+                    'Pausable: paused'
+                )
+                await expectRevert(
+                    assetRouter.distribute(pool, [{ swaps: [], assets: [], limits: [] }], [{ swaps: [], assets: [], limits: [] }], feeCollector, { from: account1 }),
+                    'Pausable: paused'
+                )
             })
             it('reverts if called pause on paused contract', async () => {
-                await expectRevert(assetRouter.pause({ from: pauser }), 'Pausable: paused')
+                await expectRevert(
+                    assetRouter.pause({ from: pauser }),
+                    'Pausable: paused'
+                )
             })
         })
 
@@ -189,15 +216,28 @@ contract('UnoAssetRouterBalancer', (accounts) => {
                 expectEvent(receipt, 'Unpaused', { account: pauser })
             })
             it('switches paused state', async () => {
-                assert.equal(await assetRouter.paused(), false, 'Paused')
+                assert.equal(
+                    await assetRouter.paused(),
+                    false,
+                    'Paused'
+                )
             })
             it('allows function calls', async () => {
                 // Pausable: paused check passes. revert for a different reason
-                await expectRevert(assetRouter.deposit(pool, [], [], 0, 0, account1, { from: account1 }), 'BAD_AMOUNTS_LENGTH')
-                await expectRevert(assetRouter.distribute(pool, [], [], [], { from: account1 }), 'CALLER_NOT_AUTHORIZED')
+                await expectRevert(
+                    assetRouter.deposit(pool, [], [], 0, 0, account1, { from: account1 }),
+                    'BAD_AMOUNTS_LENGTH'
+                )
+                await expectRevert(
+                    assetRouter.distribute(pool, [{ swaps: [], assets: [], limits: [] }], [{ swaps: [], assets: [], limits: [] }], feeCollector, { from: account1 }),
+                    'CALLER_NOT_AUTHORIZED'
+                )
             })
             it('reverts if called unpause on unpaused contract', async () => {
-                await expectRevert(assetRouter.unpause({ from: pauser }), 'Pausable: not paused')
+                await expectRevert(
+                    assetRouter.unpause({ from: pauser }),
+                    'Pausable: not paused'
+                )
             })
         })
     })
@@ -341,7 +381,11 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             })
             it('doesnt change stakes for account1', async () => {
                 const stakeLP = await assetRouter.userStake(account1, pool)
-                assert.equal(stakeLP.toString(), amounts[0].add(amounts[1]).toString(), 'stakeLP is not 0')
+                assert.equal(
+                    stakeLP.toString(),
+                    (amounts[0].add(amounts[1])).toString(),
+                    'stakeLP is not 0'
+                )
             })
             it('updates stakes for account2', async () => {
                 const stakeLP = await assetRouter.userStake(account2, pool)
@@ -409,7 +453,7 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             it('withdraws tokens from balance', async () => {
                 for (let i = 0; i < tokenContracts.length; i++) {
                     const balanceAfter = await tokenContracts[i].balanceOf(account1)
-                    assert.ok(balancesBefore[i].sub(balanceAfter).gt('0'), 'Token not withdrawn')
+                    assert.ok((balancesBefore[i].sub(balanceAfter)).gt('0'), 'Token not withdrawn')
                 }
             })
 
@@ -423,7 +467,7 @@ contract('UnoAssetRouterBalancer', (accounts) => {
                 const totalDepositsLP = await assetRouter.totalDeposits(pool)
                 assert.equal(
                     totalDepositsLP.toString(),
-                    amounts[0].add(amounts[1]).add(amounts[2]).add(amounts[3]).add(addedStake)
+                    (amounts[0].add(amounts[1]).add(amounts[2]).add(amounts[3]).add(addedStake))
                         .toString(),
                     "Total amount sent doesn't equal totalDeposits"
                 )
@@ -432,7 +476,7 @@ contract('UnoAssetRouterBalancer', (accounts) => {
                 const stakingRewardBalance = await gauge.balanceOf(farm.address)
                 assert.equal(
                     stakingRewardBalance.toString(),
-                    amounts[0].add(amounts[1]).add(amounts[2]).add(amounts[3]).add(addedStake)
+                    (amounts[0].add(amounts[1]).add(amounts[2]).add(amounts[3]).add(addedStake))
                         .toString(),
                     "Total amount sent doesn't equal gauge balance"
                 )
@@ -467,13 +511,13 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             })
         })
         describe('withdraws for multiple accs', () => {
-            let balance1before
-            let balance2before
-            let stake1before
-            let stake2before
+            let balance1before; let
+                balance2before
+            let stake1before; let
+                stake2before
 
-            let receipt1
-            let receipt2
+            let receipt1; let
+                receipt2
 
             before(async () => {
                 balance1before = await stakingToken.balanceOf(account1)
@@ -502,11 +546,19 @@ contract('UnoAssetRouterBalancer', (accounts) => {
 
             it('correctly updates userStake for account1', async () => {
                 const stakeLP = await assetRouter.userStake(account1, pool)
-                assert.equal(stakeLP.toString(), stake1before.sub(amounts[0]).toString(), 'Stake is not zero for account1')
+                assert.equal(
+                    stakeLP.toString(),
+                    stake1before.sub(amounts[0]).toString(),
+                    'Stake is not zero for account1'
+                )
             })
             it('correctly updates userStake for account2', async () => {
                 const stakeLP = await assetRouter.userStake(account2, pool)
-                assert.equal(stakeLP.toString(), stake2before.sub(amounts[2]).toString(), 'Stake is not right for account2')
+                assert.equal(
+                    stakeLP.toString(),
+                    stake2before.sub(amounts[2]).toString(),
+                    'Stake is not right for account2'
+                )
             })
             it('correctly updates totalDeposits', async () => {
                 const totalDepositsLP = await assetRouter.totalDeposits(pool)
@@ -532,10 +584,10 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             })
         })
         describe('withdraws for different acc', () => {
-            let balance1before
-            let balance2before
-            let stake1before
-            let stake2before
+            let balance1before; let
+                balance2before
+            let stake1before; let
+                stake2before
 
             let receipt
             before(async () => {
@@ -557,15 +609,27 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             })
             it('correctly changes userStake for account1', async () => {
                 const stakeLP = await assetRouter.userStake(account1, pool)
-                assert.equal(stakeLP.toString(), stake1before.sub(amounts[1]).toString(), 'Stake is not right for account1')
+                assert.equal(
+                    stakeLP.toString(),
+                    (stake1before.sub(amounts[1])).toString(),
+                    'Stake is not right for account1'
+                )
             })
             it('doesnt change stake for account2', async () => {
                 const stakeLP = await assetRouter.userStake(account2, pool)
-                assert.equal(stakeLP.toString(), stake2before.toString(), 'Stake is not right for account2')
+                assert.equal(
+                    stakeLP.toString(),
+                    stake2before.toString(),
+                    'Stake is not right for account2'
+                )
             })
             it('transfers tokens to account2', async () => {
                 const balance1after = await stakingToken.balanceOf(account1)
-                assert.equal(balance1after.sub(balance1before).toString(), '0', 'Tokens were withdrawn for account1')
+                assert.equal(
+                    (balance1after.sub(balance1before)).toString(),
+                    '0',
+                    'Tokens were withdrawn for account1'
+                )
                 const balance2after = await stakingToken.balanceOf(account2)
                 assert.equal(
                     balance2after.sub(balance2before).toString(),
@@ -576,8 +640,8 @@ contract('UnoAssetRouterBalancer', (accounts) => {
         })
         describe('withdraws normal tokens', () => {
             const balancesBefore = []
-            let stakeLP2
-            let stakeLP1
+            let stakeLP2; let
+                stakeLP1
 
             let receipt
             before(async () => {
@@ -599,11 +663,19 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             })
             it('correctly updates account1 stake', async () => {
                 const stakeLP = await assetRouter.userStake(account1, pool)
-                assert.equal(stakeLP.toString(), '0', 'stakeLP is wrong')
+                assert.equal(
+                    stakeLP.toString(),
+                    '0',
+                    'stakeLP is wrong'
+                )
             })
             it('doesnt update account2 stake', async () => {
                 const stakeLP = await assetRouter.userStake(account2, pool)
-                assert.equal(stakeLP.toString(), stakeLP2, 'stakeLP is wrong')
+                assert.equal(
+                    stakeLP.toString(),
+                    stakeLP2,
+                    'stakeLP is wrong'
+                )
             })
             it('transfers tokens to user', async () => {
                 for (let i = 0; i < tokenContracts.length; i++) {
@@ -615,8 +687,8 @@ contract('UnoAssetRouterBalancer', (accounts) => {
         })
         describe('withdraws normal tokens for a different user', () => {
             const balancesBefore = []
-            let stakeLP1
-            let stakeLP2
+            let stakeLP1; let
+                stakeLP2
 
             let receipt
             before(async () => {
@@ -638,11 +710,19 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             })
             it('correctly updates account2 stake', async () => {
                 const stakeLP = await assetRouter.userStake(account2, pool)
-                assert.equal(stakeLP.toString(), '0', 'stakeLP is wrong')
+                assert.equal(
+                    stakeLP.toString(),
+                    '0',
+                    'stakeLP is wrong'
+                )
             })
             it('doesnt update account1 stake', async () => {
                 const stakeLP = await assetRouter.userStake(account1, pool)
-                assert.equal(stakeLP.toString(), stakeLP1, 'stakeLP is wrong')
+                assert.equal(
+                    stakeLP.toString(),
+                    stakeLP1,
+                    'stakeLP is wrong'
+                )
             })
             it('transfers tokens to correct user', async () => {
                 for (let i = 0; i < tokenContracts.length; i++) {
@@ -653,22 +733,66 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             })
         })
     })
+
+    describe('Sets Fee', () => {
+        describe('reverts', () => {
+            it('reverts if called not by an admin', async () => {
+                await expectRevert(
+                    assetRouter.setFee(fee, { from: account1 }),
+                    'CALLER_NOT_AUTHORIZED'
+                )
+            })
+            it('reverts if fee is greater than 100%', async () => {
+                await expectRevert(
+                    assetRouter.setFee('1000000000000000001', { from: admin }),
+                    'BAD_FEE'
+                )
+            })
+        })
+        describe('Sets new fee', () => {
+            let receipt
+            before(async () => {
+                receipt = await assetRouter.setFee(fee, { from: admin })
+            })
+            it('fires events', async () => {
+                expectEvent(receipt, 'FeeChanged', { previousFee: new BN(0), newFee: fee })
+            })
+            it('sets new fee', async () => {
+                assert.equal(
+                    (await assetRouter.fee()).toString(),
+                    fee.toString(),
+                    'Fee is not correct'
+                )
+            })
+        })
+    })
+
     describe('Distributions', () => {
         describe('reverts', () => {
             it('reverts if called not by distributor', async () => {
-                await expectRevert(assetRouter.distribute(pool, [], [], [], { from: pauser }), 'CALLER_NOT_AUTHORIZED')
+                await expectRevert(
+                    assetRouter.distribute(pool, [{ swaps: [], assets: [], limits: [] }], [{ swaps: [], assets: [], limits: [] }], feeCollector, { from: pauser }),
+                    'CALLER_NOT_AUTHORIZED'
+                )
             })
             it('reverts if pool doesnt exist', async () => {
-                await expectRevert(assetRouter.distribute(pool2, [], [], [], { from: distributor }), 'FARM_NOT_EXISTS')
+                await expectRevert(
+                    assetRouter.distribute(pool2, [{ swaps: [], assets: [], limits: [] }], [{ swaps: [], assets: [], limits: [] }], feeCollector, { from: distributor }),
+                    'FARM_NOT_EXISTS'
+                )
             })
             it('reverts if there is no liquidity in the pool', async () => {
-                await expectRevert(assetRouter.distribute(pool, [], [], [], { from: distributor }), 'NO_LIQUIDITY')
+                await expectRevert(
+                    assetRouter.distribute(pool, [{ swaps: [], assets: [], limits: [] }], [{ swaps: [], assets: [], limits: [] }], feeCollector, { from: distributor }),
+                    'NO_LIQUIDITY'
+                )
             })
         })
         describe('distributes', () => {
             let receipt
-            let balance1
-            let balance2
+            let balance1; let
+                balance2
+            let feeCollectorBalanceBefore
             before(async () => {
                 balance1 = await stakingToken.balanceOf(account1)
                 await stakingToken.approve(assetRouter.address, balance1, { from: account1 })
@@ -678,30 +802,34 @@ contract('UnoAssetRouterBalancer', (accounts) => {
                 await stakingToken.approve(assetRouter.address, balance2, { from: account2 })
                 await assetRouter.deposit(pool, zeroAmounts, tokens, 0, balance2, account2, { from: account2 })
 
-                await time.increase(50000)
+                await time.increase(5000)
 
-                const farmAddress = await factory.Farms(pool) /// /////////////////////////////////////////////////////////////
+                const farmAddress = await factory.Farms(pool)
                 const gaugeContract = await IGauge.at(gauge.address) // this is not a IUniswapV2Pair, however the abi is sufficient for our purposes
-                const rewardAmount = await gaugeContract.claimable_reward_write.call(
-                    farmAddress,
-                    '0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3'
-                ) /// //////////////
+                const rewardAmount = await gaugeContract.claimable_reward_write.call(farmAddress, '0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3')
+                const WMATIC = await IUniswapV2Pair.at('0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270')
+                feeCollectorBalanceBefore = await WMATIC.balanceOf(feeCollector)
+
+                const reward = rewardAmount.mul(new BN(96)).div(new BN(100))
+                const _fee = rewardAmount.mul(new BN(4)).div(new BN(100))
 
                 receipt = await assetRouter.distribute(
                     pool,
-                    [
-                        [
-                            {
-                                poolId: '0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006',
-                                assetInIndex: 0,
-                                assetOutIndex: 1,
-                                amount: rewardAmount.toString(),
-                                userData: '0x'
-                            }
-                        ]
-                    ], // amount can be any number since it is changed to be set to balance in contract
-                    [['0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3', '0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270']], // reward token to wmatic
-                    [['0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', '0']],
+                    [{
+                        swaps: [{
+                            poolId: '0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006', assetInIndex: 0, assetOutIndex: 1, amount: reward.toString(), userData: '0x'
+                        }],
+                        assets: ['0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3', '0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270'], // reward token to wmatic
+                        limits: ['0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', '0']
+                    }],
+                    [{
+                        swaps: [{
+                            poolId: '0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006', assetInIndex: 0, assetOutIndex: 1, amount: _fee.toString(), userData: '0x'
+                        }],
+                        assets: ['0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3', '0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270'], // reward token to wmatic
+                        limits: ['0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', '0']
+                    }],
+                    feeCollector,
                     { from: distributor }
                 )
             })
@@ -715,7 +843,13 @@ contract('UnoAssetRouterBalancer', (accounts) => {
                 const stake2 = await assetRouter.userStake(account2, pool)
                 assert.ok(stake2.gt(balance2), 'Stake1 not increased')
             })
+            it('collects fees', async () => {
+                const WMATIC = await IUniswapV2Pair.at('0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270')
+                const feeCollectorBalanceAfter = await WMATIC.balanceOf(feeCollector)
+                assert.ok(feeCollectorBalanceAfter.gt(feeCollectorBalanceBefore), 'Fee collector balance not increased')
+            })
         })
+
         describe('bad path reverts', () => {
             before(async () => {
                 await time.increase(50000)
@@ -724,28 +858,28 @@ contract('UnoAssetRouterBalancer', (accounts) => {
                 await expectRevert(
                     assetRouter.distribute(
                         pool,
-                        [
-                            [
-                                {
-                                    poolId: '0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006',
-                                    assetInIndex: 0,
-                                    assetOutIndex: 1,
-                                    amount: 0,
-                                    userData: '0x'
-                                }
-                            ],
-                            [
-                                {
-                                    poolId: '0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006',
-                                    assetInIndex: 0,
-                                    assetOutIndex: 1,
-                                    amount: 0,
-                                    userData: '0x'
-                                }
-                            ]
-                        ],
-                        [['0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3', '0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270']],
-                        [['0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', '0']],
+                        [{
+                            swaps: [{
+                                poolId: '0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006', assetInIndex: 0, assetOutIndex: 1, amount: 0, userData: '0x'
+                            }],
+                            assets: ['0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3', '0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270'], // reward token to wmatic
+                            limits: ['0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', '0']
+                        },
+                        {
+                            swaps: [{
+                                poolId: '0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006', assetInIndex: 0, assetOutIndex: 1, amount: 0, userData: '0x'
+                            }],
+                            assets: ['0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3', '0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270'], // reward token to wmatic
+                            limits: ['0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', '0']
+                        }],
+                        [{
+                            swaps: [{
+                                poolId: '0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006', assetInIndex: 0, assetOutIndex: 1, amount: 0, userData: '0x'
+                            }],
+                            assets: ['0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3', '0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270'], // reward token to wmatic
+                            limits: ['0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', '0']
+                        }],
+                        feeCollector,
                         { from: distributor }
                     ),
                     'PARAMS_LENGTHS_NOT_MATCH_REWARD_COUNT'
@@ -753,45 +887,28 @@ contract('UnoAssetRouterBalancer', (accounts) => {
                 await expectRevert(
                     assetRouter.distribute(
                         pool,
-                        [
-                            [
-                                {
-                                    poolId: '0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006',
-                                    assetInIndex: 0,
-                                    assetOutIndex: 1,
-                                    amount: 0,
-                                    userData: '0x'
-                                }
-                            ]
-                        ],
-                        [
-                            ['0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3', '0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270'],
-                            ['0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3', '0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270']
-                        ],
-                        [['0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', '0']],
-                        { from: distributor }
-                    ),
-                    'PARAMS_LENGTHS_NOT_MATCH_REWARD_COUNT'
-                )
-                await expectRevert(
-                    assetRouter.distribute(
-                        pool,
-                        [
-                            [
-                                {
-                                    poolId: '0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006',
-                                    assetInIndex: 0,
-                                    assetOutIndex: 1,
-                                    amount: 0,
-                                    userData: '0x'
-                                }
-                            ]
-                        ],
-                        [['0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3', '0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270']],
-                        [
-                            ['0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', '0'],
-                            ['0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', '0']
-                        ],
+                        [{
+                            swaps: [{
+                                poolId: '0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006', assetInIndex: 0, assetOutIndex: 1, amount: 0, userData: '0x'
+                            }],
+                            assets: ['0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3', '0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270'], // reward token to wmatic
+                            limits: ['0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', '0']
+                        }],
+                        [{
+                            swaps: [{
+                                poolId: '0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006', assetInIndex: 0, assetOutIndex: 1, amount: 0, userData: '0x'
+                            }],
+                            assets: ['0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3', '0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270'], // reward token to wmatic
+                            limits: ['0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', '0']
+                        },
+                        {
+                            swaps: [{
+                                poolId: '0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006', assetInIndex: 0, assetOutIndex: 1, amount: 0, userData: '0x'
+                            }],
+                            assets: ['0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3', '0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270'], // reward token to wmatic
+                            limits: ['0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', '0']
+                        }],
+                        feeCollector,
                         { from: distributor }
                     ),
                     'PARAMS_LENGTHS_NOT_MATCH_REWARD_COUNT'
@@ -804,18 +921,30 @@ contract('UnoAssetRouterBalancer', (accounts) => {
                 await assetRouter.withdraw(pool, stakeLP, zeroAmounts, true, account1, { from: account1 })
 
                 stakeLP = await assetRouter.userStake(account1, pool)
-                assert.equal(stakeLP.toString(), '0', 'acount1 stake not 0')
+                assert.equal(
+                    stakeLP.toString(),
+                    '0',
+                    'acount1 stake not 0'
+                )
             })
             it('withdraws tokens for account2', async () => {
                 let stakeLP = await assetRouter.userStake(account2, pool)
                 await assetRouter.withdraw(pool, stakeLP, zeroAmounts, true, account2, { from: account2 })
 
                 stakeLP = await assetRouter.userStake(account2, pool)
-                assert.equal(stakeLP.toString(), '0', 'acount2 stake not 0')
+                assert.equal(
+                    stakeLP.toString(),
+                    '0',
+                    'acount2 stake not 0'
+                )
             })
             it('not leaves any tokens', async () => {
                 const totalDepositsLP = await assetRouter.totalDeposits(pool)
-                assert.equal(totalDepositsLP.toString(), '0', 'totalDeposits not 0')
+                assert.equal(
+                    totalDepositsLP.toString(),
+                    '0',
+                    'totalDeposits not 0'
+                )
             })
         })
     })
@@ -1002,9 +1131,21 @@ contract('UnoAssetRouterBalancer', (accounts) => {
                 expectEvent(receipt, 'Upgraded')
             })
             it('Updates', async () => {
-                assert.equal((await assetRouter.version()).toString(), new BN(2).toString(), 'Contract not updated')
-                assert.equal(await assetRouter.farmFactory(), factory.address, 'farmFactory changed')
-                assert.equal(await assetRouter.accessManager(), accessManager.address, 'accessManager changed')
+                assert.equal(
+                    (await assetRouter.version()).toString(),
+                    (new BN(2)).toString(),
+                    'Contract not updated'
+                )
+                assert.equal(
+                    await assetRouter.farmFactory(),
+                    factory.address,
+                    'farmFactory changed'
+                )
+                assert.equal(
+                    await assetRouter.accessManager(),
+                    accessManager.address,
+                    'accessManager changed'
+                )
             })
         })
     })

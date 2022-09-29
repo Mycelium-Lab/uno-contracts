@@ -96,7 +96,9 @@ contract UnoAutoStrategyV2 is Initializable, ERC20Upgradeable, ReentrancyGuardUp
         __ReentrancyGuard_init();
         
         for (uint256 i = 0; i < poolInfos.length; i++) {
-            (address _tokenA, address _tokenB) = poolInfos[i].assetRouter.getTokens(poolInfos[i].pool);
+            address[] memory _tokens = IUnoAssetRouter(poolInfos[i].assetRouter).getTokens(poolInfos[i].pool);
+            address _tokenA = _tokens[0];
+            address _tokenB = _tokens[1];
             PoolInfo memory pool = PoolInfo({
                 pool: poolInfos[i].pool,
                 assetRouter: poolInfos[i].assetRouter,
