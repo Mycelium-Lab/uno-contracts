@@ -83,7 +83,7 @@ contract UnoAssetRouterSushiswap is Initializable, PausableUpgradeable, UUPSUpgr
         }
 
         if(amountLP > 0){
-            IERC20Upgradeable(farm.lpPair()).safeTransferFrom(msg.sender, address(farm), amountLP);
+            IERC20Upgradeable(lpPair).safeTransferFrom(msg.sender, address(farm), amountLP);
         }
         if(amountA > 0){
             IERC20Upgradeable(farm.tokenA()).safeTransferFrom(msg.sender, address(farm), amountA);
@@ -117,7 +117,7 @@ contract UnoAssetRouterSushiswap is Initializable, PausableUpgradeable, UUPSUpgr
         }
 
         if(amountLP > 0){
-            IERC20Upgradeable(farm.lpPair()).safeTransferFrom(msg.sender, address(farm), amountLP);
+            IERC20Upgradeable(lpPair).safeTransferFrom(msg.sender, address(farm), amountLP);
         }
 
         address tokenA = farm.tokenA();
