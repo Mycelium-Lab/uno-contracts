@@ -5,6 +5,8 @@ import { IUnoFarmTrisolarisStandard as Farm } from "../interfaces/IUnoFarmTrisol
 import "../../../interfaces/IUnoFarmFactory.sol";
 import "../../../interfaces/IUnoAccessManager.sol";
 import "../../../interfaces/IUniswapV2Pair.sol";
+import '../../../interfaces/IWETH.sol';
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -27,6 +29,8 @@ contract UnoAssetRouterTrisolarisStandardV2 is Initializable, PausableUpgradeabl
     bytes32 private constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
     uint256 public fee;
+
+    address public constant WETH = 0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB;
 
     uint256 public constant version = 2;
 
@@ -59,6 +63,10 @@ contract UnoAssetRouterTrisolarisStandardV2 is Initializable, PausableUpgradeabl
         ADMIN_ROLE = accessManager.ADMIN_ROLE();
     }
 
+    receive() external payable {
+        require(msg.sender == WETH, 'ONLY_ACCEPT_WETH'); // only accept ETH via fallback from the WETH contract
+    }
+
     /**
      * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpPair} and deposits tokens in it. Emits a {Deposit} event.
      * @param lpPair - Address of the pool to deposit tokens in.
@@ -87,14 +95,14 @@ contract UnoAssetRouterTrisolarisStandardV2 is Initializable, PausableUpgradeabl
             farm = Farm(farmFactory.createFarm(lpPair));
         }
 
+        if (amountLP > 0) {
+            IERC20Upgradeable(lpPair).safeTransferFrom(msg.sender, address(farm), amountLP);
+        }
         if (amountA > 0) {
             IERC20Upgradeable(farm.tokenA()).safeTransferFrom(msg.sender, address(farm), amountA);
         }
         if (amountB > 0) {
             IERC20Upgradeable(farm.tokenB()).safeTransferFrom(msg.sender, address(farm), amountB);
-        }
-        if (amountLP > 0) {
-            IERC20Upgradeable(lpPair).safeTransferFrom(msg.sender, address(farm), amountLP);
         }
 
         (sentA, sentB, liquidity) = farm.deposit(
@@ -106,6 +114,59 @@ contract UnoAssetRouterTrisolarisStandardV2 is Initializable, PausableUpgradeabl
             msg.sender,
             recipient
         );
+        emit Deposit(lpPair, msg.sender, recipient, liquidity);
+    }
+
+    /**
+     * @dev Autoconverts ETH into WETH and deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool} and deposits tokens in it. Emits a {Deposit} event.
+     * @param lpPair - Address of the pool to deposit tokens in.
+     * @param amountToken  - Token amount to deposit.
+     * @param amountTokenMin - Bounds the extent to which the (TOKEN/WETH or TOKEN/WETH) price can go up before the transaction reverts.
+     * @param amountETHMin - Minimum amount of ETH to deposit.
+     * @param amountLP - Additional LP Token amount to deposit.
+     * @param recipient - Address which will receive the deposit.
+     
+     * @return sentToken - Token amount sent to the farm.
+     * @return sentETH - WETH amount sent to the farm.
+     * @return liquidity - Total liquidity sent to the farm (in lpTokens).
+     */
+    function depositETH(address lpPair, uint256 amountToken, uint256 amountTokenMin, uint256 amountETHMin, uint256 amountLP, address recipient) external payable whenNotPaused returns(uint256 sentToken, uint256 sentETH, uint256 liquidity){
+        require(msg.value > 0, "NO_ETH_SENT");
+        Farm farm = Farm(farmFactory.Farms(lpPair));
+        if(farm == Farm(address(0))){
+            farm = Farm(farmFactory.createFarm(lpPair));
+        }
+
+        if(amountLP > 0){
+            IERC20Upgradeable(lpPair).safeTransferFrom(msg.sender, address(farm), amountLP);
+        }
+
+        address tokenA = farm.tokenA();
+        address tokenB = farm.tokenB();
+
+        IWETH(WETH).deposit{value: msg.value}();
+        IERC20Upgradeable(WETH).safeTransfer(address(farm), msg.value);
+        if (tokenA == WETH) {
+            if (amountToken > 0) {
+                IERC20Upgradeable(tokenB).safeTransferFrom(msg.sender, address(farm), amountToken);
+            }
+            (sentETH, sentToken, liquidity) = farm.deposit(msg.value, amountToken, amountETHMin, amountTokenMin, amountLP, address(this), recipient);
+            IERC20Upgradeable(tokenB).safeTransfer(msg.sender, amountToken - sentToken);
+        } else if (tokenB == WETH) {
+            if (amountToken > 0) {
+                IERC20Upgradeable(tokenA).safeTransferFrom(msg.sender, address(farm), amountToken);
+            }
+            (sentToken, sentETH, liquidity) = farm.deposit(amountToken, msg.value, amountTokenMin, amountETHMin, amountLP, address(this), recipient);
+            IERC20Upgradeable(tokenA).safeTransfer(msg.sender, amountToken - sentToken);
+        } else {
+            revert("NOT_WETH_POOL");
+        }
+
+        uint256 dust = msg.value - sentETH;
+        if (dust > 0){
+            IWETH(WETH).withdraw(dust);
+            payable(msg.sender).transfer(dust);
+        }
         emit Deposit(lpPair, msg.sender, recipient, liquidity);
     }
 
@@ -140,6 +201,39 @@ contract UnoAssetRouterTrisolarisStandardV2 is Initializable, PausableUpgradeabl
             msg.sender,
             recipient
         );
+        emit Withdraw(lpPair, msg.sender, recipient, amount);
+    }
+
+    /** 
+     * @dev Autoconverts WETH into ETH and withdraws tokens from the pool. Emits a {Withdraw} event.
+     * @param lpPair - LP pool to withdraw from.
+     * @param amount - LP amount to withdraw. 
+     * @param amountTokenMin - The minimum amount of token that must be received for the transaction not to revert.
+     * @param amountETHMin - The minimum amount of ETH that must be received for the transaction not to revert.
+     * @param recipient - The address which will receive tokens.
+
+     * @return amountToken - Token amount sent to the {recipient}.
+     * @return amountETH - ETH amount sent to the {recipient}.
+     */ 
+    function withdrawETH(address lpPair, uint256 amount, uint256 amountTokenMin, uint256 amountETHMin, address recipient) external payable returns(uint256 amountToken, uint256 amountETH){
+        Farm farm = Farm(farmFactory.Farms(lpPair));
+        require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
+
+        address tokenA = farm.tokenA();
+        address tokenB = farm.tokenB();
+
+        if (tokenA == WETH) {
+            (amountETH, amountToken) = farm.withdraw(amount, amountETHMin, amountTokenMin, false, msg.sender, address(this));
+            IERC20Upgradeable(tokenB).safeTransfer(recipient, amountToken);
+        } else if (tokenB == WETH) {
+            (amountToken, amountETH) = farm.withdraw(amount, amountTokenMin, amountETHMin, false, msg.sender, address(this)); 
+            IERC20Upgradeable(tokenA).safeTransfer(recipient, amountToken);
+        } else {
+            revert("NOT_WETH_POOL");
+        }
+
+        IWETH(WETH).withdraw(amountETH);
+        payable(recipient).transfer(amountETH);
         emit Withdraw(lpPair, msg.sender, recipient, amount);
     }
 
@@ -202,12 +296,12 @@ contract UnoAssetRouterTrisolarisStandardV2 is Initializable, PausableUpgradeabl
      * @dev Returns addresses of tokens in {lpPair}.
      * @param lpPair - LP pair to check tokens in.
 
-     * @return tokenA - Token A address.
-     * @return tokenB - Token B address.
+     * @return tokens - Token addresses.
      */
-    function getTokens(address lpPair) external view returns (address tokenA, address tokenB) {
-        tokenA = IUniswapV2Pair(lpPair).token0();
-        tokenB = IUniswapV2Pair(lpPair).token1();
+    function getTokens(address lpPair) external view returns (IERC20[] memory tokens) {
+        tokens = new IERC20[](2);
+        tokens[0] = IERC20(IUniswapV2Pair(lpPair).token0());
+        tokens[1] = IERC20(IUniswapV2Pair(lpPair).token1());
     }
 
     /**
@@ -230,7 +324,7 @@ contract UnoAssetRouterTrisolarisStandardV2 is Initializable, PausableUpgradeabl
      *
      * Note: This function can only be called by ADMIN_ROLE.
      */ 
-    function setFee(uint256 _fee) external onlyRole(accessManager.ADMIN_ROLE()){
+    function setFee(uint256 _fee) external onlyRole(ADMIN_ROLE){
         require (_fee <= 1 ether, "BAD_FEE");
         if(fee != _fee){
             emit FeeChanged(fee, _fee); 

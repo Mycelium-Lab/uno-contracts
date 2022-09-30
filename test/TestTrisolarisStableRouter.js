@@ -266,6 +266,18 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
                     'NO_LIQUIDITY_PROVIDED'
                 )
             })
+            it('cant deposit using depositETH without value', async () => {
+                await expectRevert(
+                    assetRouter.depositETH(swapAddress, [0, 0, 0], 0, 0, account1, { from: account1 }),
+                    'NO_ETH_SENT'
+                )
+            })
+            it('cant deposit using depositETH in not weth pool', async () => {
+                await expectRevert(
+                    assetRouter.depositETH(swapAddress, [0, 0, 0], 0, 0, account1, { from: account1, value: 1 }),
+                    'NOT_WETH_POOL'
+                )
+            })
         })
         describe('deposit lp tokens in new pool', () => {
             let receipt

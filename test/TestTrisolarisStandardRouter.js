@@ -20,6 +20,7 @@ const AssetRouterV2 = artifacts.require('UnoAssetRouterTrisolarisStandardV2')
 const trisolarisRouter = '0x2CB45Edb4517d5947aFdE3BEAbF95A582506858B'
 const pool = '0x2fe064B6c7D274082aa5d2624709bC9AE7D16C77' // USDC-USDT pool
 const pool2 = '0x03B666f3488a7992b2385B12dF7f35156d7b29cD' // wNEAR-USDT pool
+const pool3 = '0x5eeC60F348cB1D661E4A5122CF4638c7DB7A886e' // AURORA-ETH pool
 
 const masterChefV1 = '0x1f1Ed214bef5E83D8f5d0eB5D7011EB965D0D79B'
 const masterChefV2 = '0x3838956710bcc9D122Dd23863a0549ca8D5675D6'
@@ -278,6 +279,18 @@ contract('UnoAssetRouterTrisolarisStandard', (accounts) => {
                 await expectRevert(
                     assetRouter.deposit(pool, 0, 0, 0, 0, 0, account1, { from: account1 }),
                     'NO_LIQUIDITY_PROVIDED'
+                )
+            })
+            it('cant deposit using depositETH without value', async () => {
+                await expectRevert(
+                    assetRouter.depositETH(pool, 0, 0, 0, 0, account1, { from: account1 }),
+                    'NO_ETH_SENT'
+                )
+            })
+            it('cant deposit using depositETH in not weth pool', async () => {
+                await expectRevert(
+                    assetRouter.depositETH(pool, 0, 0, 0, 0, account1, { from: account1, value: 1 }),
+                    'NOT_WETH_POOL'
                 )
             })
         })
