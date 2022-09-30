@@ -20,7 +20,10 @@ interface IUnoAssetRouterTrisolarisStable {
     function initialize(address _accessManager, address _farmFactory) external;
 
     function deposit(address swap, uint256[] memory amounts, uint256 minAmountLP, uint256 amountLP, address recipient) external returns (uint256 liquidity);
-    function withdraw(address swap, uint256 amount, uint256[] memory minAmounts, bool withdrawLP, address recipient) external returns (uint256[] memory amounts);
+    function depositETH(address swap, uint256[] memory amounts, uint256 minAmountLP, uint256 amountLP, address recipient) external payable returns(uint256 liquidity);
+
+    function withdraw(address swap, uint256 amount, uint256[] calldata minAmounts, bool withdrawLP, address recipient) external returns (uint256[] memory amounts);
+    function withdrawETH(address swap, uint256 amount, uint256[] calldata minAmountsOut, address recipient) external returns(uint256[] memory amounts);
 
     function distribute(
         address swap,
