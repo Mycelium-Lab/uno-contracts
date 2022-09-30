@@ -115,23 +115,21 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
             farm = Farm(farmFactory.createFarm(lpPool));
         }
 
-        bool WMaticInTokens = false;
-        for (uint256 i = 0; i < tokens.length; i++) {
-            if(tokens[i] == WMATIC){
-                WMaticInTokens = true;
-                amounts[i] = msg.value;
-                break;
-            }
-        }
-        require(WMaticInTokens, "NO_WMATIC_IN_TOKENS");
-
+        bool WMATICInTokens;
         IWMATIC(WMATIC).deposit{value: msg.value}();
         IERC20Upgradeable(WMATIC).safeTransfer(address(farm), msg.value);
         for (uint256 i = 0; i < tokens.length; i++) {
-            if(amounts[i] > 0 && tokens[i] != WMATIC){
-                IERC20Upgradeable(tokens[i]).safeTransferFrom(msg.sender, address(farm), amounts[i]);
+            if(tokens[i] != WMATIC){
+                if(amounts[i] > 0){
+                    IERC20Upgradeable(tokens[i]).safeTransferFrom(msg.sender, address(farm), amounts[i]);
+                }
+                continue;
             }
+            amounts[i] = msg.value;
+            WMATICInTokens = true;
         }
+        require(WMATICInTokens, "NO_WMATIC_IN_TOKENS");
+
         if(amountLP > 0){
             IERC20Upgradeable(lpPool).safeTransferFrom(msg.sender, address(farm), amountLP);
         }
