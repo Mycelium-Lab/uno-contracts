@@ -69,7 +69,7 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
      * @param lpPool - Address of the pool to deposit tokens in.
      * @param amounts - Amounts of tokens to deposit.
      * @param tokens - Tokens to deposit.
-     * @param minAmountLP - Minimum LP the user will receive from {{tokens}} deposit.
+     * @param minAmountLP - Minimum LP the user will receive from {tokens} deposit.
      * @param amountLP - Additional amount of LP tokens to deposit.
      * @param recipient - Address which will receive the deposit.
 
@@ -100,7 +100,7 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
      * @param lpPool - Address of the pool to deposit tokens in.
      * @param amounts - Amounts of tokens to deposit.
      * @param tokens - Tokens to deposit.
-     * @param minAmountLP - Minimum LP the user will receive from {{tokens}} deposit.
+     * @param minAmountLP - Minimum LP the user will receive from {tokens} deposit.
      * @param amountLP - Additional amount of LP tokens to deposit.
      * @param recipient - Address which will receive the deposit.
 

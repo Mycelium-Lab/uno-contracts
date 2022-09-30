@@ -101,8 +101,8 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
      * @dev Autoconverts MATIC into WMATIC and deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool} and deposits tokens in it. Emits a {Deposit} event.
      * @param lpStakingPool - Address of the pool to deposit tokens in.
      * @param amountToken  - Token amount to deposit.
-     * @param amountTokenMin - Bounds the extent to which the (TOKEN/WMATIC or TOKEN/WMATIC) price can go up before the transaction reverts.
-     * @param amountETHMin - Minimum amount of Matic to deposit.
+     * @param amountTokenMin - Bounds the extent to which the TOKEN/WMATIC price can go up before the transaction reverts.
+     * @param amountETHMin - Bounds the extent to which the WMATIC/TOKEN price can go up before the transaction reverts.
      * @param amountLP - Additional LP Token amount to deposit.
      * @param recipient - Address which will receive the deposit.
      
