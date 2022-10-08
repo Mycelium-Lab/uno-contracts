@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
 
-import {IUnoFarmApeSwap as Farm} from './interfaces/IUnoFarmApeSwap.sol'; 
+import {IUnoFarmApeswap as Farm} from './interfaces/IUnoFarmApeswap.sol'; 
 import '../../interfaces/IUnoFarmFactory.sol';
 import '../../interfaces/IUnoAccessManager.sol'; 
 import '../../interfaces/IUniswapV2Pair.sol';
@@ -13,7 +13,7 @@ import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 import '@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 
-contract UnoAssetRouterApeSwap is Initializable, PausableUpgradeable, UUPSUpgradeable {
+contract UnoAssetRouterApeswap is Initializable, PausableUpgradeable, UUPSUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     /**

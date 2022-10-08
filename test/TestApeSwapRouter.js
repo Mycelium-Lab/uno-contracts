@@ -14,9 +14,9 @@ const IRewarder = artifacts.require('IMiniComplexRewarderTime')
 const AccessManager = artifacts.require('UnoAccessManager')
 const FarmFactory = artifacts.require('UnoFarmFactory')
 
-const Farm = artifacts.require('UnoFarmApeSwap')
-const AssetRouter = artifacts.require('UnoAssetRouterApeSwap')
-const AssetRouterV2 = artifacts.require('UnoAssetRouterApeSwapV2')
+const Farm = artifacts.require('UnoFarmApeswap')
+const AssetRouter = artifacts.require('UnoAssetRouterApeswap')
+const AssetRouterV2 = artifacts.require('UnoAssetRouterApeswapV2')
 
 const apeswapRouter = '0xC0788A3aD43d79aa53B09c2EaCc313A787d1d607'
 const pool = '0x65D43B64E3B31965Cd5EA367D4c2b94c03084797' // usdt wmatic
@@ -40,7 +40,7 @@ approxeq = (bn1, bn2, epsilon, message) => {
     assert.ok(epsilon.gte(amountDelta), `([|${bn1} - ${bn2}| = ${bn1.sub(bn2).abs()}] >  ${epsilon}), ${message}`)
 }
 
-contract('UnoAssetRouterApeSwap', (accounts) => {
+contract('UnoAssetRouterApeswap', (accounts) => {
     const admin = accounts[0]
     const pauser = accounts[1]
     const distributor = accounts[2]

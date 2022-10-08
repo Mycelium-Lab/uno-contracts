@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
 
-interface IUnoFarmApeSwap {
+interface IUnoFarmApeswap {
     struct SwapInfo{
         address[] route;
         uint256 amountOutMin;

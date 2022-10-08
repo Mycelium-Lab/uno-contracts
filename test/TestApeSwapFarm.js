@@ -5,13 +5,13 @@ const {
 const IUniswapV2Pair = artifacts.require('IUniswapV2Pair')
 const IRewarder = artifacts.require('IMiniComplexRewarderTime')
 
-const Farm = artifacts.require('UnoFarmApeSwap')
+const Farm = artifacts.require('UnoFarmApeswap')
 const IMiniApeV2 = artifacts.require('IMiniApeV2')
 
 const pool = '0x65D43B64E3B31965Cd5EA367D4c2b94c03084797' // usdt wmatic
 const miniApeAddress = '0x54aff400858Dcac39797a81894D9920f16972D1D'
 
-contract('UnoFarmApeSwap', (accounts) => {
+contract('UnoFarmApeswap', (accounts) => {
     const assetRouter = accounts[0]
 
     let implementation

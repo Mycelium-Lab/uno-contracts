@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
 
-import {IUnoFarmApeSwap as Farm} from '../apps/apeswap/interfaces/IUnoFarmApeSwap.sol'; 
+import {IUnoFarmApeswap as Farm} from '../apps/apeswap/interfaces/IUnoFarmApeswap.sol'; 
 import '../interfaces/IUnoFarmFactory.sol';
 import '../interfaces/IUnoAccessManager.sol'; 
 import '../interfaces/IUniswapV2Pair.sol';
