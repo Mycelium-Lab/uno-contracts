@@ -17,8 +17,8 @@ module.exports = {
                 pollingInterval: 30000
             }),
             networkCheckTimeout: 10000,
-            gas: 7500000,
-            gasPrice: 70000000000,
+            gas: 300000,
+            gasPrice: 5000000000,
             network_id: 56,
             addressIndex: 0
         },
