@@ -7,14 +7,14 @@ const path = require('path')
 
 const { distributor, pauser } = require('./addresses/addresses')
 
-const Farm = artifacts.require('UnoFarmApeswap')
-const AssetRouter = artifacts.require('UnoAssetRouterApeswap')
+const Farm = artifacts.require('UnoFarmPancakeswap')
+const AssetRouter = artifacts.require('UnoAssetRouterPancakeswap')
 
 async function addFactoryAddress(address) {
     const data = await fs.readFile(path.resolve(__dirname, './addresses/factories.json'))
     const json = JSON.parse(data)
 
-    json.apeswap = address
+    json.pancakeswap = address
     await fs.writeFile(path.resolve(__dirname, './addresses/factories.json'), JSON.stringify(json))
 }
 
