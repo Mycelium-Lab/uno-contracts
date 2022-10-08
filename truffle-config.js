@@ -9,17 +9,17 @@ module.exports = {
     },
 
     networks: {
-        polygon: {
+        bsc: {
             provider: () => new HDWalletProvider({
                 privateKeys: [process.env.PRIVATE_KEY],
-                providerOrUrl: 'https://polygon-rpc.com/',
-                chainId: 137,
+                providerOrUrl: 'https://rpc.ankr.com/bsc',
+                chainId: 56,
                 pollingInterval: 30000
             }),
             networkCheckTimeout: 10000,
             gas: 7500000,
             gasPrice: 70000000000,
-            network_id: 137,
+            network_id: 56,
             addressIndex: 0
         },
         test: {
@@ -27,7 +27,7 @@ module.exports = {
             port: 8545,
             gas: 7500000,
             gasPrice: 200000,
-            network_id: 137
+            network_id: 56
         }
     },
     plugins: [

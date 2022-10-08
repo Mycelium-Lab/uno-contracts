@@ -12,7 +12,6 @@ interface IUnoFarmApeSwap {
     }
 
     function rewardToken() external view returns (address);
-    function rewarderToken() external view returns (address);
     function lpPair() external view returns (address);
     function tokenA() external view returns (address);
     function tokenB() external view returns (address);
@@ -25,8 +24,8 @@ interface IUnoFarmApeSwap {
     function withdraw(uint256 amount, uint256 amountAMin, uint256 amountBMin, bool withdrawLP, address origin, address recipient) external returns(uint256 amountA, uint256 amountB);
 
     function distribute(
-        SwapInfo[4] calldata swapInfos,
-        SwapInfo[2] calldata feeSwapInfos,
+        SwapInfo[2] calldata swapInfos,
+        SwapInfo calldata feeSwapInfo,
         FeeInfo calldata feeInfo
     ) external returns(uint256 reward);
 

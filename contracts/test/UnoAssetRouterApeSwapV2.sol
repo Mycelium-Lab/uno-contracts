@@ -5,16 +5,15 @@ import {IUnoFarmApeSwap as Farm} from '../apps/apeswap/interfaces/IUnoFarmApeSwa
 import '../interfaces/IUnoFarmFactory.sol';
 import '../interfaces/IUnoAccessManager.sol'; 
 import '../interfaces/IUniswapV2Pair.sol';
-import '../interfaces/IWMATIC.sol';
-import '@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol';
-import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
-import '@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol';
+import '../interfaces/IWBNB.sol';
+import '../libs/SafeBEP20.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
+import '@pancakeswap/pancake-swap-lib/contracts/token/BEP20/IBEP20.sol';
 import '@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 
 contract UnoAssetRouterApeSwapV2 is Initializable, PausableUpgradeable, UUPSUpgradeable {
-    using SafeERC20Upgradeable for IERC20Upgradeable;
+    using SafeBEP20 for IBEP20;
 
     /**
      * @dev Contract Variables:
@@ -29,7 +28,7 @@ contract UnoAssetRouterApeSwapV2 is Initializable, PausableUpgradeable, UUPSUpgr
 
     uint256 public fee;
 
-    address public constant WMATIC = 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270;
+    address public constant WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
 
     uint256 public constant version = 2;
 
@@ -61,7 +60,7 @@ contract UnoAssetRouterApeSwapV2 is Initializable, PausableUpgradeable, UUPSUpgr
     }
 
     receive() external payable {
-        require(msg.sender == WMATIC, 'ONLY_ACCEPT_WMATIC'); // only accept ETH via fallback from the WMATIC contract
+        require(msg.sender == WBNB, 'ONLY_ACCEPT_WBNB'); // only accept ETH via fallback from the WBNB contract
     }
 
     /**
@@ -85,13 +84,13 @@ contract UnoAssetRouterApeSwapV2 is Initializable, PausableUpgradeable, UUPSUpgr
         }
 
         if(amountLP > 0){
-            IERC20Upgradeable(lpPair).safeTransferFrom(msg.sender, address(farm), amountLP);
+            IBEP20(lpPair).safeTransferFrom(msg.sender, address(farm), amountLP);
         }
         if(amountA > 0){
-            IERC20Upgradeable(farm.tokenA()).safeTransferFrom(msg.sender, address(farm), amountA);
+            IBEP20(farm.tokenA()).safeTransferFrom(msg.sender, address(farm), amountA);
         }
         if(amountB > 0){
-            IERC20Upgradeable(farm.tokenB()).safeTransferFrom(msg.sender, address(farm), amountB);
+            IBEP20(farm.tokenB()).safeTransferFrom(msg.sender, address(farm), amountB);
         }
 
         (sentA, sentB, liquidity) = farm.deposit(amountA, amountB, amountAMin, amountBMin, amountLP, msg.sender, recipient);
@@ -99,16 +98,16 @@ contract UnoAssetRouterApeSwapV2 is Initializable, PausableUpgradeable, UUPSUpgr
     }
 
     /**
-     * @dev Autoconverts MATIC into WMATIC and deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool} and deposits tokens in it. Emits a {Deposit} event.
+     * @dev Autoconverts MATIC into WBNB and deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool} and deposits tokens in it. Emits a {Deposit} event.
      * @param lpPair - Address of the pool to deposit tokens in.
      * @param amountToken  - Token amount to deposit.
-     * @param amountTokenMin - Bounds the extent to which the TOKEN/WMATIC price can go up before the transaction reverts.
-     * @param amountETHMin - Bounds the extent to which the WMATIC/TOKEN price can go up before the transaction reverts.
+     * @param amountTokenMin - Bounds the extent to which the TOKEN/WBNB price can go up before the transaction reverts.
+     * @param amountETHMin - Bounds the extent to which the WBNB/TOKEN price can go up before the transaction reverts.
      * @param amountLP - Additional LP Token amount to deposit.
      * @param recipient - Address which will receive the deposit.
      
      * @return sentToken - Token amount sent to the farm.
-     * @return sentETH - WMATIC amount sent to the farm.
+     * @return sentETH - WBNB amount sent to the farm.
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
     function depositETH(address lpPair, uint256 amountToken, uint256 amountTokenMin, uint256 amountETHMin, uint256 amountLP, address recipient) external payable whenNotPaused returns(uint256 sentToken, uint256 sentETH, uint256 liquidity){
@@ -119,33 +118,33 @@ contract UnoAssetRouterApeSwapV2 is Initializable, PausableUpgradeable, UUPSUpgr
         }
 
         if(amountLP > 0){
-            IERC20Upgradeable(lpPair).safeTransferFrom(msg.sender, address(farm), amountLP);
+            IBEP20(lpPair).safeTransferFrom(msg.sender, address(farm), amountLP);
         }
 
         address tokenA = farm.tokenA();
         address tokenB = farm.tokenB();
 
-        IWMATIC(WMATIC).deposit{value: msg.value}();
-        IERC20Upgradeable(WMATIC).safeTransfer(address(farm), msg.value);
-        if (tokenA == WMATIC) {
+        IWBNB(WBNB).deposit{value: msg.value}();
+        IBEP20(WBNB).safeTransfer(address(farm), msg.value);
+        if (tokenA == WBNB) {
             if (amountToken > 0) {
-                IERC20Upgradeable(tokenB).safeTransferFrom(msg.sender, address(farm), amountToken);
+                IBEP20(tokenB).safeTransferFrom(msg.sender, address(farm), amountToken);
             }
             (sentETH, sentToken, liquidity) = farm.deposit(msg.value, amountToken, amountETHMin, amountTokenMin, amountLP, address(this), recipient);
-            IERC20Upgradeable(tokenB).safeTransfer(msg.sender, amountToken - sentToken);
-        } else if (tokenB == WMATIC) {
+            IBEP20(tokenB).safeTransfer(msg.sender, amountToken - sentToken);
+        } else if (tokenB == WBNB) {
             if (amountToken > 0) {
-                IERC20Upgradeable(tokenA).safeTransferFrom(msg.sender, address(farm), amountToken);
+                IBEP20(tokenA).safeTransferFrom(msg.sender, address(farm), amountToken);
             }
             (sentToken, sentETH, liquidity) = farm.deposit(amountToken, msg.value, amountTokenMin, amountETHMin, amountLP, address(this), recipient);
-            IERC20Upgradeable(tokenA).safeTransfer(msg.sender, amountToken - sentToken);
+            IBEP20(tokenA).safeTransfer(msg.sender, amountToken - sentToken);
         } else {
-            revert("NOT_WMATIC_POOL");
+            revert("NOT_WBNB_POOL");
         }
 
         uint256 dust = msg.value - sentETH;
         if (dust > 0){
-            IWMATIC(WMATIC).withdraw(dust);
+            IWBNB(WBNB).withdraw(dust);
             payable(msg.sender).transfer(dust);
         }
         emit Deposit(lpPair, msg.sender, recipient, liquidity);
@@ -172,7 +171,7 @@ contract UnoAssetRouterApeSwapV2 is Initializable, PausableUpgradeable, UUPSUpgr
     }
 
     /** 
-     * @dev Autoconverts WMATIC into MATIC and withdraws tokens from the pool. Emits a {Withdraw} event.
+     * @dev Autoconverts WBNB into MATIC and withdraws tokens from the pool. Emits a {Withdraw} event.
      * @param lpPair - LP pool to withdraw from.
      * @param amount - LP amount to withdraw. 
      * @param amountTokenMin - The minimum amount of token that must be received for the transaction not to revert.
@@ -189,17 +188,17 @@ contract UnoAssetRouterApeSwapV2 is Initializable, PausableUpgradeable, UUPSUpgr
         address tokenA = farm.tokenA();
         address tokenB = farm.tokenB();
 
-        if (tokenA == WMATIC) {
+        if (tokenA == WBNB) {
             (amountETH, amountToken) = farm.withdraw(amount, amountETHMin, amountTokenMin, false, msg.sender, address(this));
-            IERC20Upgradeable(tokenB).safeTransfer(recipient, amountToken);
-        } else if (tokenB == WMATIC) {
+            IBEP20(tokenB).safeTransfer(recipient, amountToken);
+        } else if (tokenB == WBNB) {
             (amountToken, amountETH) = farm.withdraw(amount, amountTokenMin, amountETHMin, false, msg.sender, address(this)); 
-            IERC20Upgradeable(tokenA).safeTransfer(recipient, amountToken);
+            IBEP20(tokenA).safeTransfer(recipient, amountToken);
         } else {
             revert("NOT_WMATIC_POOL");
         }
 
-        IWMATIC(WMATIC).withdraw(amountETH);
+        IWBNB(WBNB).withdraw(amountETH);
         payable(recipient).transfer(amountETH);
         emit Withdraw(lpPair, msg.sender, recipient, amount);
     }
@@ -208,21 +207,21 @@ contract UnoAssetRouterApeSwapV2 is Initializable, PausableUpgradeable, UUPSUpgr
      * @dev Distributes tokens between users.
      * @param lpPair - LP pool to distribute tokens in.
      * @param swapInfos - Arrays of structs with token arrays describing swap routes (rewardTokenToTokenA, rewardTokenToTokenB, rewarderTokenToTokenA, rewarderTokenToTokenB) and minimum amounts of output tokens that must be received for the transaction not to revert.
-     * @param feeSwapInfos - Arrays of structs with token arrays describing swap routes (rewardTokenToFeeToken, rewarderTokenToFeeToken) and minimum amounts of output tokens that must be received for the transaction not to revert.
+     * @param feeSwapInfo - Struct with token arrays describing swap route (rewardTokenToFeeToken, rewarderTokenToFeeToken) and minimum amounts of output tokens that must be received for the transaction not to revert.
      * @param feeTo - Address to collect fees to.
      *
      * Note: This function can only be called by the distributor.
      */ 
     function distribute(
         address lpPair,
-        Farm.SwapInfo[4] calldata swapInfos,
-        Farm.SwapInfo[2] calldata feeSwapInfos,
+        Farm.SwapInfo[2] calldata swapInfos,
+        Farm.SwapInfo calldata feeSwapInfo,
         address feeTo
     ) external whenNotPaused onlyRole(DISTRIBUTOR_ROLE) {
         Farm farm = Farm(farmFactory.Farms(lpPair));
         require(farm != Farm(address(0)), 'FARM_NOT_EXISTS');
 
-        uint256 reward = farm.distribute(swapInfos, feeSwapInfos, Farm.FeeInfo(feeTo, fee));
+        uint256 reward = farm.distribute(swapInfos, feeSwapInfo, Farm.FeeInfo(feeTo, fee));
         emit Distribute(lpPair, reward);
     }
 
@@ -265,10 +264,10 @@ contract UnoAssetRouterApeSwapV2 is Initializable, PausableUpgradeable, UUPSUpgr
 
      * @return tokens - Tokens addresses.
      */  
-    function getTokens(address lpPair) external view returns(IERC20[] memory tokens){
-        tokens = new IERC20[](2);
-        tokens[0] = IERC20(IUniswapV2Pair(lpPair).token0());
-        tokens[1] = IERC20(IUniswapV2Pair(lpPair).token1());
+    function getTokens(address lpPair) external view returns(IBEP20[] memory tokens){
+        tokens = new IBEP20[](2);
+        tokens[0] = IBEP20(IUniswapV2Pair(lpPair).token0());
+        tokens[1] = IBEP20(IUniswapV2Pair(lpPair).token1());
     }
 
     /**
@@ -280,9 +279,9 @@ contract UnoAssetRouterApeSwapV2 is Initializable, PausableUpgradeable, UUPSUpgr
      * @return amountB - Token B amount.
      */ 
     function getTokenStake(address lpPair, uint256 amountLP) internal view returns (uint256 amountA, uint256 amountB) {
-        uint256 totalSupply = IERC20Upgradeable(lpPair).totalSupply();
-        amountA = amountLP * IERC20Upgradeable(IUniswapV2Pair(lpPair).token0()).balanceOf(lpPair) / totalSupply;
-        amountB = amountLP * IERC20Upgradeable(IUniswapV2Pair(lpPair).token1()).balanceOf(lpPair) / totalSupply;
+        uint256 totalSupply = IBEP20(lpPair).totalSupply();
+        amountA = amountLP * IBEP20(IUniswapV2Pair(lpPair).token0()).balanceOf(lpPair) / totalSupply;
+        amountB = amountLP * IBEP20(IUniswapV2Pair(lpPair).token1()).balanceOf(lpPair) / totalSupply;
     }
 
     /**
