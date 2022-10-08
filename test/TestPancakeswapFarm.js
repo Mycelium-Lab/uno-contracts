@@ -4,18 +4,18 @@ const {
 
 const IUniswapV2Pair = artifacts.require('IUniswapV2Pair')
 
-const Farm = artifacts.require('UnoFarmApeswap')
-const IMasterApe = artifacts.require('IMasterApe')
+const Farm = artifacts.require('UnoFarmPancakeswap')
+const IMasterChef = artifacts.require('IMasterChef')
 
-const pool = '0x51e6D27FA57373d8d4C256231241053a70Cb1d93' // busd wbnb
-const masterApeAddress = '0x5c8D727b265DBAfaba67E050f2f739cAeEB4A6F9'
+const pool = '0x58F876857a02D6762E0101bb5C46A8c1ED44Dc16' // busd wbnb
+const masterChefAddress = '0xa5f8C5Dbd5F286960b9d90548680aE5ebFf07652'
 
-contract('UnoFarmApeswap', (accounts) => {
+contract('UnoFarmPancakeswap', (accounts) => {
     const assetRouter = accounts[0]
 
     let implementation
     let stakingToken
-    let masterApe
+    let masterChef
     let pid
     let rewardToken
 
@@ -26,11 +26,11 @@ contract('UnoFarmApeswap', (accounts) => {
 
         receipt = await implementation.initialize(pool, assetRouter, { from: accounts[0] })
 
-        masterApe = await IMasterApe.at(masterApeAddress)
-        const poolLength = await masterApe.poolLength()
+        masterChef = await IMasterChef.at(masterChefAddress)
+        const poolLength = await masterChef.poolLength()
 
         for (let i = 0; i < poolLength.toNumber(); i++) {
-            const lpToken = (await masterApe.poolInfo(i)).lpToken
+            const lpToken = await masterChef.lpToken(i)
             if (lpToken.toString() === pool) {
                 pid = i
                 break
@@ -38,7 +38,7 @@ contract('UnoFarmApeswap', (accounts) => {
         }
 
         stakingToken = await IUniswapV2Pair.at(pool)
-        rewardToken = await masterApe.cake()
+        rewardToken = await masterChef.CAKE()
     })
 
     describe('Emits initialize event', () => {

@@ -7,25 +7,25 @@ const timeMachine = require('ganache-time-traveler')
 
 const IUniswapV2Pair = artifacts.require('IUniswapV2Pair')
 const IUniswapV2Router01 = artifacts.require('IUniswapV2Router01')
-const IMasterApe = artifacts.require('IMasterApe')
+const IMasterChef = artifacts.require('IMasterChef')
 const IBEP20 = artifacts.require('IBEP20')
 
 const AccessManager = artifacts.require('UnoAccessManager')
 const FarmFactory = artifacts.require('UnoFarmFactory')
 
-const Farm = artifacts.require('UnoFarmApeswap')
-const AssetRouter = artifacts.require('UnoAssetRouterApeswap')
-const AssetRouterV2 = artifacts.require('UnoAssetRouterApeswapV2')
+const Farm = artifacts.require('UnoFarmPancakeswap')
+const AssetRouter = artifacts.require('UnoAssetRouterPancakeswap')
+const AssetRouterV2 = artifacts.require('UnoAssetRouterPancakeswapV2')
 
-const apeswapRouter = '0xcF0feBd3f17CEf5b47b0cD257aCf6025c5BFf3b7'
-const pool = '0x51e6D27FA57373d8d4C256231241053a70Cb1d93' // busd wbnb
-const pool2 = '0x47A0B7bA18Bb80E4888ca2576c2d34BE290772a6' // ftm wbnb
-const masterApeAddress = '0x5c8D727b265DBAfaba67E050f2f739cAeEB4A6F9'
+const pancakeswapRouter = '0x10ED43C718714eb63d5aA57B78B54704E256024E'
+const pool = '0x58F876857a02D6762E0101bb5C46A8c1ED44Dc16' // busd wbnb
+const pool2 = '0x0eD7e52944161450477ee417DE9Cd3a859b14fD0' // cake wbnb
+const masterChefAddress = '0xa5f8C5Dbd5F286960b9d90548680aE5ebFf07652'
 
-const BANANAHolder = '0x827c5CA6CDE1Ff3A9C44E54d9A28f661D369DC93'// has to be unlocked and hold 0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a
+const CAKEHolder = '0x5a52E96BAcdaBb82fd05763E25335261B270Efcb'// has to be unlocked and hold 0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82 (CAKE)
 
-const account1 = '0x2872bb8b5A809731fC97C39F9C811f79c2171EF0'// has to be unlocked and hold 0x51e6D27FA57373d8d4C256231241053a70Cb1d93
-const account2 = '0x975Dd80ED6055a38807a89E9d01C48cd4E40D35c'// has to be unlocked and hold 0x51e6D27FA57373d8d4C256231241053a70Cb1d93
+const account1 = '0x14B2e8329b8e06BCD524eb114E23fAbD21910109'// has to be unlocked and hold 0x58F876857a02D6762E0101bb5C46A8c1ED44Dc16
+const account2 = '0x81d8068FF88bB058878017D2A613fD55936fF599'// has to be unlocked and hold 0x58F876857a02D6762E0101bb5C46A8c1ED44Dc16
 const account3 = '0x5a52E96BAcdaBb82fd05763E25335261B270Efcb'// has to be unlocked and hold BUSD and BNB
 
 const amounts = [new BN(100000), new BN(300000), new BN(500000), new BN(400000000), new BN(4400000000)]
@@ -38,7 +38,7 @@ approxeq = (bn1, bn2, epsilon, message) => {
     assert.ok(epsilon.gte(amountDelta), `([|${bn1} - ${bn2}| = ${bn1.sub(bn2).abs()}] >  ${epsilon}), ${message}`)
 }
 
-contract('UnoAssetRouterApeswap', (accounts) => {
+contract('UnoAssetRouterPancakeswap', (accounts) => {
     const admin = accounts[0]
     const pauser = accounts[1]
     const distributor = accounts[2]
@@ -52,7 +52,7 @@ contract('UnoAssetRouterApeswap', (accounts) => {
 
     let tokenA
     let tokenB
-    let masterApe
+    let masterChef
     let pid
     let rewardToken
 
@@ -91,22 +91,22 @@ contract('UnoAssetRouterApeswap', (accounts) => {
         tokenA = await IBEP20.at(tokenAAddress)
         tokenB = await IBEP20.at(tokenBAddress)
 
-        masterApe = await IMasterApe.at(masterApeAddress)
-        const poolLength = await masterApe.poolLength()
+        masterChef = await IMasterChef.at(masterChefAddress)
+        const poolLength = await masterChef.poolLength()
 
         for (let i = 0; i < poolLength.toNumber(); i++) {
-            const _lpToken = (await masterApe.poolInfo(i)).lpToken
+            const _lpToken = await masterChef.lpToken(i)
             if (_lpToken.toString() === pool) {
                 pid = i
                 break
             }
         }
 
-        rewardToken = await masterApe.cake()
+        rewardToken = await masterChef.CAKE()
 
-        const BANANAtoken = await IBEP20.at(rewardToken)
-        const BANANAbalance = await BANANAtoken.balanceOf(BANANAHolder)
-        await BANANAtoken.transfer(masterApeAddress, BANANAbalance, { from: BANANAHolder })
+        const CAKEtoken = await IBEP20.at(rewardToken)
+        const CAKEbalance = await CAKEtoken.balanceOf(CAKEHolder)
+        await CAKEtoken.transfer(masterChefAddress, CAKEbalance, { from: CAKEHolder })
     })
 
     describe('Emits initialize event', () => {
@@ -314,7 +314,7 @@ contract('UnoAssetRouterApeswap', (accounts) => {
             })
             it('stakes tokens in StakingRewards contract', async () => {
                 assert.equal(
-                    (await masterApe.userInfo(pid, farm.address)).amount.toString(),
+                    (await masterChef.userInfo(pid, farm.address)).amount.toString(),
                     amounts[0].toString(),
                     "Total amount sent doesn't equal StakingRewards farm balance"
                 )
@@ -352,7 +352,7 @@ contract('UnoAssetRouterApeswap', (accounts) => {
             })
             it('stakes tokens in StakingRewards contract', async () => {
                 assert.equal(
-                    (await masterApe.userInfo(pid, farm.address)).amount.toString(),
+                    (await masterChef.userInfo(pid, farm.address)).amount.toString(),
                     (amounts[0].add(amounts[1])).toString(),
                     "Total amount sent doesn't equal StakingRewards farm balance"
                 )
@@ -398,7 +398,7 @@ contract('UnoAssetRouterApeswap', (accounts) => {
             })
             it('stakes tokens in StakingRewards contract', async () => {
                 assert.equal(
-                    (await masterApe.userInfo(pid, farm.address)).amount.toString(),
+                    (await masterChef.userInfo(pid, farm.address)).amount.toString(),
                     (amounts[0].add(amounts[1]).add(amounts[2])).toString(),
                     "Total amount sent doesn't equal StakingRewards farm balance"
                 )
@@ -440,7 +440,7 @@ contract('UnoAssetRouterApeswap', (accounts) => {
             })
             it('stakes tokens in StakingRewards contract', async () => {
                 assert.equal(
-                    (await masterApe.userInfo(pid, farm.address)).amount.toString(),
+                    (await masterChef.userInfo(pid, farm.address)).amount.toString(),
                     (amounts[0].add(amounts[1]).add(amounts[2]).add(amounts[3])).toString(),
                     "Total amount sent doesn't equal StakingRewards farm balance"
                 )
@@ -459,8 +459,8 @@ contract('UnoAssetRouterApeswap', (accounts) => {
             let amountB
 
             before(async () => {
-                const routerContract = await IUniswapV2Router01.at(apeswapRouter)
-                await stakingToken.approve(apeswapRouter, amounts[4], { from: account1 })
+                const routerContract = await IUniswapV2Router01.at(pancakeswapRouter)
+                await stakingToken.approve(pancakeswapRouter, amounts[4], { from: account1 })
                 const tx = await routerContract.removeLiquidity(
                     tokenA.address,
                     tokenB.address,
@@ -482,7 +482,7 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                 balanceBbefore = await tokenB.balanceOf(account1);
                 ({ stakeLP: stakeLPBefore, stakeA: stakeABefore, stakeB: stakeBBefore } = await assetRouter.userStake(account1, pool));
                 ({ totalDepositsLP: totalDepositsLPBefore } = await assetRouter.totalDeposits(pool))
-                stakingRewardsBalanceBefore = new BN((await masterApe.userInfo(pid, farm.address))['0'])
+                stakingRewardsBalanceBefore = new BN((await masterChef.userInfo(pid, farm.address))['0'])
 
                 await tokenA.approve(assetRouter.address, amountA, { from: account1 })
                 await tokenB.approve(assetRouter.address, amountB, { from: account1 })
@@ -519,7 +519,7 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                 assert.ok(totalDepositsLP.gt(totalDepositsLPBefore), 'TokenA was not withdrawn from user balance')
             })
             it('stakes tokens in StakingRewards contract', async () => {
-                assert.ok(new BN((await masterApe.userInfo(pid, farm.address))['0']).gt(stakingRewardsBalanceBefore), 'StakingRewards balance was not increased')
+                assert.ok(new BN((await masterChef.userInfo(pid, farm.address))['0']).gt(stakingRewardsBalanceBefore), 'StakingRewards balance was not increased')
             })
         })
     })
@@ -930,14 +930,15 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                 BUSD = await IUniswapV2Pair.at('0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56')
 
                 feeCollectorBalanceBefore = await BUSD.balanceOf(feeCollector)
+
                 await time.increase(5000000)
+
                 receipt = await assetRouter.distribute(
                     pool,
                     [
                         {
                             route: [
                                 rewardToken,
-                                '0xA719b8aB7EA7AF0DDb4358719a34631bb79d15Dc',
                                 tokenA.address
                             ],
                             amountOutMin: 0
@@ -945,8 +946,6 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                         {
                             route: [
                                 rewardToken,
-                                '0xA719b8aB7EA7AF0DDb4358719a34631bb79d15Dc',
-                                '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
                                 tokenB.address
                             ],
                             amountOutMin: 0
@@ -955,8 +954,6 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                     {
                         route: [
                             rewardToken,
-                            '0xA719b8aB7EA7AF0DDb4358719a34631bb79d15Dc',
-                            '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
                             BUSD.address
                         ],
                         amountOutMin: 0
@@ -992,7 +989,6 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                             {
                                 route: [
                                     constants.ZERO_ADDRESS,
-                                    '0xA719b8aB7EA7AF0DDb4358719a34631bb79d15Dc',
                                     tokenA.address
                                 ],
                                 amountOutMin: 0
@@ -1000,8 +996,6 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                             {
                                 route: [
                                     rewardToken,
-                                    '0xA719b8aB7EA7AF0DDb4358719a34631bb79d15Dc',
-                                    '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
                                     tokenB.address
                                 ],
                                 amountOutMin: 0
@@ -1010,8 +1004,6 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                         {
                             route: [
                                 rewardToken,
-                                '0xA719b8aB7EA7AF0DDb4358719a34631bb79d15Dc',
-                                '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
                                 BUSD.address
                             ],
                             amountOutMin: 0
@@ -1028,7 +1020,6 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                             {
                                 route: [
                                     rewardToken,
-                                    '0xA719b8aB7EA7AF0DDb4358719a34631bb79d15Dc',
                                     tokenA.address
                                 ],
                                 amountOutMin: 0
@@ -1036,8 +1027,6 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                             {
                                 route: [
                                     constants.ZERO_ADDRESS,
-                                    '0xA719b8aB7EA7AF0DDb4358719a34631bb79d15Dc',
-                                    '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
                                     tokenB.address
                                 ],
                                 amountOutMin: 0
@@ -1046,8 +1035,6 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                         {
                             route: [
                                 rewardToken,
-                                '0xA719b8aB7EA7AF0DDb4358719a34631bb79d15Dc',
-                                '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
                                 BUSD.address
                             ],
                             amountOutMin: 0
@@ -1064,7 +1051,6 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                             {
                                 route: [
                                     rewardToken,
-                                    '0xA719b8aB7EA7AF0DDb4358719a34631bb79d15Dc',
                                     tokenA.address
                                 ],
                                 amountOutMin: 0
@@ -1072,8 +1058,6 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                             {
                                 route: [
                                     rewardToken,
-                                    '0xA719b8aB7EA7AF0DDb4358719a34631bb79d15Dc',
-                                    '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
                                     tokenB.address
                                 ],
                                 amountOutMin: 0
@@ -1082,8 +1066,6 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                         {
                             route: [
                                 constants.ZERO_ADDRESS,
-                                '0xA719b8aB7EA7AF0DDb4358719a34631bb79d15Dc',
-                                '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
                                 BUSD.address
                             ],
                             amountOutMin: 0
@@ -1102,7 +1084,6 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                             {
                                 route: [
                                     rewardToken,
-                                    '0xA719b8aB7EA7AF0DDb4358719a34631bb79d15Dc',
                                     constants.ZERO_ADDRESS
                                 ],
                                 amountOutMin: 0
@@ -1110,8 +1091,6 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                             {
                                 route: [
                                     rewardToken,
-                                    '0xA719b8aB7EA7AF0DDb4358719a34631bb79d15Dc',
-                                    '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
                                     tokenB.address
                                 ],
                                 amountOutMin: 0
@@ -1120,8 +1099,6 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                         {
                             route: [
                                 rewardToken,
-                                '0xA719b8aB7EA7AF0DDb4358719a34631bb79d15Dc',
-                                '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
                                 BUSD.address
                             ],
                             amountOutMin: 0
@@ -1140,7 +1117,6 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                             {
                                 route: [
                                     rewardToken,
-                                    '0xA719b8aB7EA7AF0DDb4358719a34631bb79d15Dc',
                                     tokenA.address
                                 ],
                                 amountOutMin: 0
@@ -1148,8 +1124,6 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                             {
                                 route: [
                                     rewardToken,
-                                    '0xA719b8aB7EA7AF0DDb4358719a34631bb79d15Dc',
-                                    '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
                                     constants.ZERO_ADDRESS
                                 ],
                                 amountOutMin: 0
@@ -1158,8 +1132,6 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                         {
                             route: [
                                 rewardToken,
-                                '0xA719b8aB7EA7AF0DDb4358719a34631bb79d15Dc',
-                                '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
                                 BUSD.address
                             ],
                             amountOutMin: 0
@@ -1219,10 +1191,10 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                 ethPooltokenA = await IUniswapV2Pair.at(tokenAAddress)
                 ethPooltokenB = await IUniswapV2Pair.at(tokenBAddress)
 
-                const poolLength = await masterApe.poolLength()
+                const poolLength = await masterChef.poolLength()
 
                 for (let i = 0; i < poolLength.toNumber(); i++) {
-                    const lpToken = (await masterApe.poolInfo(i)).lpToken
+                    const lpToken = await masterChef.lpToken(i)
                     if (lpToken.toString() === pool) {
                         ETHPid = i
                         break
@@ -1234,7 +1206,7 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                     stakingRewardsBalanceBefore = new BN(0)
                 } else {
                     const farmETH = await Farm.at(farmAddress)
-                    stakingRewardsBalanceBefore = new BN((await masterApe.userInfo(ETHPid, farmETH.address))['0'])
+                    stakingRewardsBalanceBefore = new BN((await masterChef.userInfo(ETHPid, farmETH.address))['0'])
                 }
 
                 ({
@@ -1294,11 +1266,11 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                 const { totalDepositsLP } = await assetRouter.totalDeposits(pool)
                 assert.ok(totalDepositsLP.gt(totalDepositsLPBefore), 'Stake not increased')
             })
-            it('stakes tokens in masterApe', async () => {
+            it('stakes tokens in masterChef', async () => {
                 const farmAddress = await factory.Farms(pool)
                 const farmETH = await Farm.at(farmAddress)
 
-                const stakingRewardsBalance = new BN((await masterApe.userInfo(ETHPid, farmETH.address))['0'])
+                const stakingRewardsBalance = new BN((await masterChef.userInfo(ETHPid, farmETH.address))['0'])
                 assert.ok(stakingRewardsBalance.gt(stakingRewardsBalanceBefore), 'staking balance not increased')
             })
         })
@@ -1326,10 +1298,10 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                 ethPooltokenB = await IUniswapV2Pair.at(tokenBAddress);
                 ({ totalDepositsLP: totalDepositsLPBefore } = await assetRouter.totalDeposits(pool))
 
-                const poolLength = await masterApe.poolLength()
+                const poolLength = await masterChef.poolLength()
 
                 for (let i = 0; i < poolLength.toNumber(); i++) {
-                    const lpToken = (await masterApe.poolInfo(i)).lpToken
+                    const lpToken = await masterChef.lpToken(i)
                     if (lpToken.toString() === pool) {
                         ETHPid = i
                         break
@@ -1341,7 +1313,7 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                     stakingRewardsBalanceBefore = new BN(0)
                 } else {
                     const farmETH = await Farm.at(farmAddress)
-                    stakingRewardsBalanceBefore = new BN((await masterApe.userInfo(ETHPid, farmETH.address))['0'])
+                    stakingRewardsBalanceBefore = new BN((await masterChef.userInfo(ETHPid, farmETH.address))['0'])
                 }
 
                 ({
@@ -1384,7 +1356,7 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                 const farmAddress = await factory.Farms(pool)
                 const farmETH = await Farm.at(farmAddress)
 
-                const stakingRewardsBalance = new BN((await masterApe.userInfo(ETHPid, farmETH.address))['0'])
+                const stakingRewardsBalance = new BN((await masterChef.userInfo(ETHPid, farmETH.address))['0'])
                 assert.ok(stakingRewardsBalanceBefore.gt(stakingRewardsBalance), 'StakingRewards balance not increased')
             })
             it('adds tokens and ETH to balance', async () => {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
 
-import {IUnoFarmApeswap as Farm} from '../apps/apeswap/interfaces/IUnoFarmApeswap.sol'; 
+import {IUnoFarmPancakeswap as Farm} from '../apps/pancakeswap/interfaces/IUnoFarmPancakeswap.sol'; 
 import '../interfaces/IUnoFarmFactory.sol';
 import '../interfaces/IUnoAccessManager.sol'; 
 import '../interfaces/IUniswapV2Pair.sol';
@@ -12,7 +12,7 @@ import '@pancakeswap/pancake-swap-lib/contracts/token/BEP20/IBEP20.sol';
 import '@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 
-contract UnoAssetRouterApeSwapV2 is Initializable, PausableUpgradeable, UUPSUpgradeable {
+contract UnoAssetRouterPancakeswapV2 is Initializable, PausableUpgradeable, UUPSUpgradeable {
     using SafeBEP20 for IBEP20;
 
     /**

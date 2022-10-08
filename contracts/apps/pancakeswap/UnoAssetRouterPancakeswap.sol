@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
 
-import {IUnoFarmApeswap as Farm} from '../apps/apeswap/interfaces/IUnoFarmApeswap.sol'; 
-import '../interfaces/IUnoFarmFactory.sol';
-import '../interfaces/IUnoAccessManager.sol'; 
-import '../interfaces/IUniswapV2Pair.sol';
-import '../interfaces/IWBNB.sol';
-import '../libs/SafeBEP20.sol';
+import {IUnoFarmPancakeswap as Farm} from './interfaces/IUnoFarmPancakeswap.sol'; 
+import '../../interfaces/IUnoFarmFactory.sol';
+import '../../interfaces/IUnoAccessManager.sol'; 
+import '../../interfaces/IUniswapV2Pair.sol';
+import '../../interfaces/IWBNB.sol';
+import '../../libs/SafeBEP20.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 import '@pancakeswap/pancake-swap-lib/contracts/token/BEP20/IBEP20.sol';
 import '@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 
-contract UnoAssetRouterApeSwapV2 is Initializable, PausableUpgradeable, UUPSUpgradeable {
+contract UnoAssetRouterPancakeswap is Initializable, PausableUpgradeable, UUPSUpgradeable {
     using SafeBEP20 for IBEP20;
 
     /**
@@ -29,8 +29,6 @@ contract UnoAssetRouterApeSwapV2 is Initializable, PausableUpgradeable, UUPSUpgr
     uint256 public fee;
 
     address public constant WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
-
-    uint256 public constant version = 2;
 
     event Deposit(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Withdraw(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
