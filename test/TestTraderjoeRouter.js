@@ -26,10 +26,10 @@ const pool = '0xf4003F4efBE8691B60249E6afbD307aBE7758adb' // wAVAX-USDC
 const pool2 = '0xFE15c2695F1F920da45C30AAE47d11dE51007AF9' // wAVAX-WETH.e
 const masterJoeAddress = '0x4483f0b6e2F5486D06958C20f8C39A7aBe87bf8F'
 
-const BANANAHolder = '0x827c5CA6CDE1Ff3A9C44E54d9A28f661D369DC93' // has to be unlocked and hold 0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a
+const JOEHolder = '0x799d4c5e577cf80221a076064a2054430d2af5cd' // has to be unlocked and hold 0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a
 
 const account1 = '0x9f27E7D6466c47FC214086D6b969Ee3C52407d01' // has to be unlocked and hold 0x51e6D27FA57373d8d4C256231241053a70Cb1d93
-const account2 = '0x975Dd80ED6055a38807a89E9d01C48cd4E40D35c' // has to be unlocked and hold 0x51e6D27FA57373d8d4C256231241053a70Cb1d93
+const account2 = '0x8a5658c67c5a28885e8dac103b3400b186025e93' // has to be unlocked and hold 0x51e6D27FA57373d8d4C256231241053a70Cb1d93
 const account3 = '0x5a52E96BAcdaBb82fd05763E25335261B270Efcb' // has to be unlocked and hold BUSD and BNB
 
 const amounts = [
@@ -76,26 +76,20 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
         const snapshot = await timeMachine.takeSnapshot()
         snapshotId = snapshot.result
 
-        // const implementation = await Farm.new({ from: account1 })
-        // accessManager = await AccessManager.new({ from: admin }) // accounts[0] is admin
+        const implementation = await Farm.new({ from: account1 })
+        accessManager = await AccessManager.new({ from: admin }) // accounts[0] is admin
 
-        // await accessManager.grantRole(
-        //     '0xfbd454f36a7e1a388bd6fc3ab10d434aa4578f811acbbcf33afb1c697486313c',
-        //     distributor,
-        //     { from: admin }
-        // ) // DISTRIBUTOR_ROLE
-        // await accessManager.grantRole(
-        //     '0x65d7a28e3265b37a6474929f336521b332c1681b933f6cb9f3376673440d862a',
-        //     pauser,
-        //     { from: admin }
-        // ) // PAUSER_ROLE
+        await accessManager.grantRole(
+            '0xfbd454f36a7e1a388bd6fc3ab10d434aa4578f811acbbcf33afb1c697486313c',
+            distributor,
+            { from: admin }
+        ) // DISTRIBUTOR_ROLE
+        await accessManager.grantRole(
+            '0x65d7a28e3265b37a6474929f336521b332c1681b933f6cb9f3376673440d862a',
+            pauser,
+            { from: admin }
+        ) // PAUSER_ROLE
 
-        // console.log(
-        //     await accessManager.hasRole(
-        //         '0x65d7a28e3265b37a6474929f336521b332c1681b933f6cb9f3376673440d862a',
-        //         pauser
-        //     )
-        // )
 
         assetRouter = await deployProxy(AssetRouter, {
             kind: 'uups',
@@ -142,12 +136,12 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
             }
         }
 
-        rewardToken = await masterJoe.cake()
+        rewardToken = await masterJoe.JOE()
 
-        const BANANAtoken = await IERC20.at(rewardToken)
-        const BANANAbalance = await BANANAtoken.balanceOf(BANANAHolder)
-        await BANANAtoken.transfer(masterJoeAddress, BANANAbalance, {
-            from: BANANAHolder,
+        const JOEtoken = await IERC20.at(rewardToken)
+        const JOEbalance = await JOEtoken.balanceOf(JOEHolder)
+        await JOEtoken.transfer(masterJoeAddress, JOEbalance, {
+            from: JOEHolder,
         })
     })
 
@@ -194,8 +188,8 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
 
         it('Sets WBNB', async () => {
             assert.equal(
-                await assetRouter.WBNB(),
-                '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
+                await assetRouter.WAVAX(),
+                '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7',
                 'farmFactory not set'
             )
         })
@@ -1860,6 +1854,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
         })
     })
     after(async () => {
+        console.log("asdf");
         await timeMachine.revertToSnapshot(snapshotId)
     })
 })
