@@ -20,12 +20,14 @@ const AssetRouterV2 = artifacts.require('UnoAssetRouterTrisolarisStandardV2')
 const trisolarisRouter = '0x2CB45Edb4517d5947aFdE3BEAbF95A582506858B'
 const pool = '0x2fe064B6c7D274082aa5d2624709bC9AE7D16C77' // USDC-USDT pool
 const pool2 = '0x03B666f3488a7992b2385B12dF7f35156d7b29cD' // wNEAR-USDT pool
+const pool3 = '0x5eeC60F348cB1D661E4A5122CF4638c7DB7A886e' // AURORA-ETH pool
 
 const masterChefV1 = '0x1f1Ed214bef5E83D8f5d0eB5D7011EB965D0D79B'
 const masterChefV2 = '0x3838956710bcc9D122Dd23863a0549ca8D5675D6'
 
 const account1 = '0x631A44F635c8fF85848324Be5F8f5aCbed0b9ce5' // has to be unlocked
 const account2 = '0xe73AAF36edd9BDE33DBf9eb42047d326333319e0' // has to be unlocked
+const account3 = '0xDca192b98BB4EA03076b3b52845519C30d68524D' // has to be unlocked
 
 const TRIholder = '0x670FBcd11fD54908cabE97384F0D2785d369DCD5' // has to be unlocked
 
@@ -278,6 +280,18 @@ contract('UnoAssetRouterTrisolarisStandard', (accounts) => {
                 await expectRevert(
                     assetRouter.deposit(pool, 0, 0, 0, 0, 0, account1, { from: account1 }),
                     'NO_LIQUIDITY_PROVIDED'
+                )
+            })
+            it('cant deposit using depositETH without value', async () => {
+                await expectRevert(
+                    assetRouter.depositETH(pool, 0, 0, 0, 0, account1, { from: account1 }),
+                    'NO_ETH_SENT'
+                )
+            })
+            it('cant deposit using depositETH in not weth pool', async () => {
+                await expectRevert(
+                    assetRouter.depositETH(pool, 0, 0, 0, 0, account1, { from: account1, value: 1 }),
+                    'NOT_WETH_POOL'
                 )
             })
         })
@@ -1273,6 +1287,163 @@ contract('UnoAssetRouterTrisolarisStandard', (accounts) => {
             it('not leaves any tokens', async () => {
                 const { totalDepositsLP } = await assetRouter.totalDeposits(pool)
                 assert.equal(totalDepositsLP.toString(), '0', 'totalDeposits not 0')
+            })
+        })
+    })
+    describe('ETH deposit and withdraw', () => {
+        describe('deposit ETH', () => {
+            let stakeABefore
+            let stakeBBefore
+
+            let amountETH
+            let amountToken
+            let tokenAAddress
+            let tokenBAddress
+            let token
+            let tokenBalanceBefore
+            let ethBalanceBefore
+
+            let receipt
+            before(async () => {
+                amountETH = new BN(40000000)
+                amountToken = new BN(4000000000);
+                ([tokenAAddress, tokenBAddress] = await assetRouter.getTokens(pool3))
+
+                ethPooltokenA = await IERC20.at(tokenAAddress)
+                ethPooltokenB = await IERC20.at(tokenBAddress);// ETH
+
+                ({
+                    stakeA: stakeABefore,
+                    stakeB: stakeBBefore
+                } = await assetRouter.userStake(account3, pool3))
+
+                if (tokenAAddress.toLowerCase() === '0xc9bdeed33cd01541e1eed10f90519d2c06fe3feb') {
+                    await ethPooltokenB.approve(assetRouter.address, amountToken, { from: account3 })
+                    token = ethPooltokenB
+                    tokenBalanceBefore = await token.balanceOf(account3)
+                } else {
+                    await ethPooltokenA.approve(assetRouter.address, amountToken, { from: account3 })
+                    token = ethPooltokenA
+                    tokenBalanceBefore = await token.balanceOf(account3)
+                }
+
+                ethBalanceBefore = new BN(await web3.eth.getBalance(account3))
+                receipt = await assetRouter.depositETH(pool3, amountToken, 0, 0, 0, account3, {
+                    from: account3,
+                    value: amountETH
+                })
+            })
+            it('fires events', async () => {
+                expectEvent(receipt, 'Deposit', { lpPool: pool3, sender: account3, recipient: account3 })
+            })
+            it('withdraws tokens and ETH from balance', async () => {
+                const { stakeA: stakeAAfter, stakeB: stakeBAfter } = await assetRouter.userStake(account3, pool3)
+                const tokenBalanceAfter = await token.balanceOf(account3)
+                const ethBalanceAfter = new BN(await web3.eth.getBalance(account3))
+
+                const gasUsed = new BN(receipt.receipt.gasUsed)
+                const effectiveGasPrice = new BN(receipt.receipt.effectiveGasPrice)
+                const ETHDiff = ethBalanceBefore.sub(ethBalanceAfter).sub(gasUsed.mul(effectiveGasPrice))
+                const tokenDiff = tokenBalanceBefore.sub(tokenBalanceAfter)
+
+                let tokenStakeDiff
+                let ETHStakeDiff
+
+                if (tokenAAddress.toLowerCase() === '0xc9bdeed33cd01541e1eed10f90519d2c06fe3feb') {
+                    tokenStakeDiff = stakeBAfter.sub(stakeBBefore)
+                    ETHStakeDiff = stakeAAfter.sub(stakeABefore)
+                } else {
+                    tokenStakeDiff = stakeAAfter.sub(stakeABefore)
+                    ETHStakeDiff = stakeBAfter.sub(stakeBBefore)
+                }
+
+                approxeq(tokenDiff, tokenStakeDiff, new BN(10), 'Token Stake is not correct')
+                approxeq(ETHDiff, ETHStakeDiff, new BN(10), 'ETH Stake is not correct')
+            })
+            it('updates stakes', async () => {
+                const { stakeLP } = await assetRouter.userStake(account3, pool3)
+                assert.ok(stakeLP.gt(new BN('0')), 'Stake not increased')
+            })
+            it('updates totalDeposits', async () => {
+                const { totalDepositsLP } = await assetRouter.totalDeposits(pool3)
+                assert.ok(totalDepositsLP.gt(new BN('0')), 'Stake not increased')
+            })
+        })
+        describe('withdraw ETH', () => {
+            let stakeABefore
+            let stakeBBefore
+            let stakeLPBefore
+
+            let tokenAAddress
+            let tokenBAddress
+            let token
+            let tokenBalanceBefore
+            let totalDepositsLPBefore
+            let ethBalanceBefore
+
+            let receipt
+
+            before(async () => {
+                ([tokenAAddress, tokenBAddress] = await assetRouter.getTokens(pool3))
+
+                ethPooltokenA = await IERC20.at(tokenAAddress)
+                ethPooltokenB = await IERC20.at(tokenBAddress);
+                ({ totalDepositsLP: totalDepositsLPBefore } = await assetRouter.totalDeposits(pool3));
+                ({
+                    stakeLP: stakeLPBefore,
+                    stakeA: stakeABefore,
+                    stakeB: stakeBBefore
+                } = await assetRouter.userStake(account3, pool3))
+
+                if (tokenAAddress.toLowerCase() === '0xc9bdeed33cd01541e1eed10f90519d2c06fe3feb') {
+                    token = ethPooltokenB
+                    tokenBalanceBefore = await token.balanceOf(account3)
+                } else {
+                    token = ethPooltokenA
+                    tokenBalanceBefore = await token.balanceOf(account3)
+                }
+
+                ethBalanceBefore = new BN(await web3.eth.getBalance(account3))
+
+                receipt = await assetRouter.withdrawETH(pool3, stakeLPBefore, 0, 0, account3, {
+                    from: account3
+                })
+            })
+            it('fires events', async () => {
+                expectEvent(receipt, 'Withdraw', { lpPool: pool3, sender: account3, recipient: account3 })
+            })
+            it('updates stakes', async () => {
+                const { stakeLP } = await assetRouter.userStake(account3, pool3)
+                assert.equal(stakeLP.toString(), '0', 'Stake not reduced')
+            })
+            it('updates totalDeposits', async () => {
+                const { totalDepositsLP } = await assetRouter.totalDeposits(pool3)
+                assert.equal((totalDepositsLPBefore.sub(stakeLPBefore)).toString(), totalDepositsLP, 'totalDeposits not reduced')
+            })
+            it('adds tokens and ETH to balance', async () => {
+                const { stakeA: stakeAAfter, stakeB: stakeBAfter } = await assetRouter.userStake(account3, pool3)
+                const tokenBalanceAfter = await token.balanceOf(account3)
+                const ethBalanceAfter = new BN(await web3.eth.getBalance(account3))
+
+                const gasUsed = new BN(receipt.receipt.gasUsed)
+                const effectiveGasPrice = new BN(receipt.receipt.effectiveGasPrice)
+
+                const ETHDiff = ethBalanceBefore.sub(ethBalanceAfter).sub(gasUsed.mul(effectiveGasPrice))
+                const tokenDiff = tokenBalanceBefore.sub(tokenBalanceAfter)
+
+                let tokenStakeDiff
+                let ETHStakeDiff
+
+                if (tokenAAddress.toLowerCase() === '0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270') {
+                    tokenStakeDiff = stakeBAfter.sub(stakeBBefore)
+                    ETHStakeDiff = stakeAAfter.sub(stakeABefore)
+                } else {
+                    tokenStakeDiff = stakeAAfter.sub(stakeABefore)
+                    ETHStakeDiff = stakeBAfter.sub(stakeBBefore)
+                }
+
+                approxeq(tokenDiff, tokenStakeDiff, new BN(10), 'Token Stake is not correct')
+                approxeq(ETHDiff, ETHStakeDiff, new BN(10), 'ETH Stake is not correct')
             })
         })
     })

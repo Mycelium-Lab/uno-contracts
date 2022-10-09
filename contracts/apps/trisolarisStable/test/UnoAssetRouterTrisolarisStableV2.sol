@@ -5,6 +5,7 @@ import { IUnoFarmTrisolarisStable as Farm } from "../interfaces/IUnoFarmTrisolar
 import "../../../interfaces/IUnoFarmFactory.sol";
 import "../../../interfaces/IUnoAccessManager.sol";
 import "../../../interfaces/ISwap.sol";
+import '../../../interfaces/IWETH.sol';
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -27,6 +28,8 @@ contract UnoAssetRouterTrisolarisStableV2 is Initializable, PausableUpgradeable,
     bytes32 private constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
     uint256 public fee;
+
+    address public constant WETH = 0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB;
 
     uint256 public constant version = 2;
 
@@ -59,12 +62,16 @@ contract UnoAssetRouterTrisolarisStableV2 is Initializable, PausableUpgradeable,
         ADMIN_ROLE = accessManager.ADMIN_ROLE();
     }
 
+    receive() external payable {
+        require(msg.sender == WETH, 'ONLY_ACCEPT_WETH'); // only accept ETH via fallback from the WETH contract
+    }
+
     /**
      * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {swap} and deposits tokens in it. Emits a {Deposit} event.
      * @param swap - Address of the Swap contract.
      * @param amounts - Amounts of tokens to deposit.
-     * @param minAmountLP - Minimum LP the user will receive from {{amounts}} deposit.
-     * @param amountLP - Amount of LP tokens to deposit.
+     * @param minAmountLP - Minimum LP the user will receive from {amounts} deposit.
+     * @param amountLP - Additional amount of LP tokens to deposit.
      * @param recipient - Address which will receive the deposit.
 
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
@@ -95,6 +102,53 @@ contract UnoAssetRouterTrisolarisStableV2 is Initializable, PausableUpgradeable,
         emit Deposit(swap, msg.sender, recipient, liquidity);
     }
 
+    /**
+     * @dev Autoconverts ETH into WETH and deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpPool} and deposits tokens in it.
+     * @param swap - Address of the Swap contract.
+     * @param amounts - Amounts of tokens to deposit.
+     * @param minAmountLP - Minimum LP the user will receive from {amounts} deposit.
+     * @param amountLP - Additional amount of LP tokens to deposit.
+     * @param recipient - Address which will receive the deposit.
+
+     * @return liquidity - Total liquidity sent to the farm (in lpTokens).
+     */
+    function depositETH(
+        address swap,
+        uint256[] memory amounts,
+        uint256 minAmountLP,
+        uint256 amountLP,
+        address recipient
+    ) external payable whenNotPaused returns(uint256 liquidity){
+        require(msg.value > 0, "NO_ETH_SENT");
+        Farm farm = Farm(farmFactory.Farms(swap));
+        if (farm == Farm(address(0))) {
+            farm = Farm(farmFactory.createFarm(swap));
+        }
+
+        bool WETHInTokens;
+        IWETH(WETH).deposit{value: msg.value}();
+        IERC20Upgradeable(WETH).safeTransfer(address(farm), msg.value);
+        for (uint256 i = 0; i < amounts.length; i++) {
+            address token = farm.tokens(i);
+            if(token != WETH){
+                if(amounts[i] > 0){
+                    IERC20Upgradeable(token).safeTransferFrom(msg.sender, address(farm), amounts[i]);
+                }
+                continue;
+            }
+            amounts[i] = msg.value;
+            WETHInTokens = true;
+        }
+        require(WETHInTokens, "NOT_WETH_POOL");
+
+        if(amountLP > 0){
+            IERC20Upgradeable(farm.lpPair()).safeTransferFrom(msg.sender, address(farm), amountLP);
+        }
+        
+        liquidity = farm.deposit(amounts, minAmountLP, amountLP, recipient);
+        emit Deposit(swap, msg.sender, recipient, liquidity); 
+    }
+
     /** 
      * @dev Withdraws tokens from the given pool. Emits a {Withdraw} event.
      * @param swap - Address of the Swap contract.
@@ -108,7 +162,7 @@ contract UnoAssetRouterTrisolarisStableV2 is Initializable, PausableUpgradeable,
     function withdraw(
         address swap,
         uint256 amount,
-        uint256[] memory minAmounts,
+        uint256[] calldata minAmounts,
         bool withdrawLP,
         address recipient
     ) external returns (uint256[] memory amounts) {
@@ -117,6 +171,32 @@ contract UnoAssetRouterTrisolarisStableV2 is Initializable, PausableUpgradeable,
 
         amounts = farm.withdraw(amount, minAmounts, withdrawLP, msg.sender, recipient);
         emit Withdraw(swap, msg.sender, recipient, amount);
+    }
+
+        /** 
+     * @dev Autoconverts WETH into ETH and withdraws tokens from the given pool. 
+     * @param swap - LP pool to withdraw from.
+     * @param amount - LP amount to withdraw. 
+     * @param minAmountsOut - Minimum token amounts the user will receive.
+     * @param recipient - The address which will receive tokens.
+
+     * @return amounts - Token amounts sent to the {recipient}
+     */ 
+    function withdrawETH(address swap, uint256 amount, uint256[] calldata minAmountsOut, address recipient) external returns(uint256[] memory amounts){ 
+        Farm farm = Farm(farmFactory.Farms(swap));
+        require(farm != Farm(address(0)), "FARM_NOT_EXISTS");
+
+        amounts = farm.withdraw(amount, minAmountsOut, false, msg.sender, address(this));
+        for (uint256 i = 0; i < amounts.length; i++) {
+            address token = farm.tokens(i);
+            if (token != WETH) {
+                IERC20Upgradeable(token).safeTransfer(recipient, amounts[i]);
+                continue;
+            }
+            IWETH(WETH).withdraw(amounts[i]);
+            payable(recipient).transfer(amounts[i]);
+        } 
+        emit Withdraw(swap, msg.sender, recipient, amount);  
     }
 
     /**
@@ -182,7 +262,7 @@ contract UnoAssetRouterTrisolarisStableV2 is Initializable, PausableUpgradeable,
 
      * @return tokens - Array of token addresses.
      */  
-    function getTokens(address swap) external view returns(address[] memory tokens){
+    function getTokens(address swap) public view returns(IERC20[] memory tokens){
         uint8 tokenCount;
         address[] memory _tokens = new address[](type(uint8).max);
         for (uint8 i = 0; i < type(uint8).max; i++) {
@@ -195,9 +275,9 @@ contract UnoAssetRouterTrisolarisStableV2 is Initializable, PausableUpgradeable,
         }
         require(tokenCount > 0, "NO_TOKENS_IN_SWAP");
 
-        tokens = new address[](tokenCount);
+        tokens = new IERC20[](tokenCount);
         for (uint8 i = 0; i < tokenCount; i++) {
-            tokens[i] = _tokens[i];
+            tokens[i] = IERC20(_tokens[i]);
         }
         return tokens;
     }
@@ -208,7 +288,7 @@ contract UnoAssetRouterTrisolarisStableV2 is Initializable, PausableUpgradeable,
      *
      * Note: This function can only be called by ADMIN_ROLE.
      */ 
-    function setFee(uint256 _fee) external onlyRole(accessManager.ADMIN_ROLE()){
+    function setFee(uint256 _fee) external onlyRole(ADMIN_ROLE){
         require (_fee <= 1 ether, "BAD_FEE");
         if(fee != _fee){
             emit FeeChanged(fee, _fee); 
