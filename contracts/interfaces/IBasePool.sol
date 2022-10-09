@@ -12,10 +12,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pragma solidity 0.8.10;
+pragma solidity 0.8.17;
 pragma experimental ABIEncoderV2;
 
 import "./IVault.sol";
+
 interface IBasePool {
-    function getPoolId() external view returns (bytes32);
+	function getPoolId() external view returns (bytes32);
 }

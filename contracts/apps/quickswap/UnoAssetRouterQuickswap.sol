@@ -1,62 +1,82 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.10;
+pragma solidity 0.8.17;
 
-import {IUnoFarmQuickswap as Farm} from './interfaces/IUnoFarmQuickswap.sol'; 
-import '../../interfaces/IUnoFarmFactory.sol';
-import '../../interfaces/IUnoAccessManager.sol'; 
-import '../../interfaces/IUniswapV2Pair.sol';
-import '../../interfaces/IStakingRewards.sol';
-import '@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol';
-import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
-import '@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol';
-import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
-import '@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol';
-import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
+import { IUnoFarmQuickswap as Farm } from "./interfaces/IUnoFarmQuickswap.sol";
+import "../../interfaces/IUnoFarmFactory.sol";
+import "../../interfaces/IUnoAccessManager.sol";
+import "../../interfaces/IUniswapV2Pair.sol";
+import "../../interfaces/IStakingRewards.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgradeable {
-    using SafeERC20Upgradeable for IERC20Upgradeable;
+contract UnoAssetRouterQuickswap is
+	Initializable,
+	PausableUpgradeable,
+	UUPSUpgradeable
+{
+	using SafeERC20Upgradeable for IERC20Upgradeable;
 
-    /**
-     * @dev Contract Variables:
-     * farmFactory - The contract that deploys new Farms and links them to {lpStakingPool}s.
-     * accessManager - Role manager contract.
-     */
-    IUnoFarmFactory public farmFactory;
-    IUnoAccessManager public accessManager;
+	/**
+	 * @dev Contract Variables:
+	 * farmFactory - The contract that deploys new Farms and links them to {lpStakingPool}s.
+	 * accessManager - Role manager contract.
+	 */
+	IUnoFarmFactory public farmFactory;
+	IUnoAccessManager public accessManager;
 
-    bytes32 private constant DISTRIBUTOR_ROLE = keccak256('DISTRIBUTOR_ROLE');
-    bytes32 private constant PAUSER_ROLE = keccak256('PAUSER_ROLE');
+	bytes32 private constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
+	bytes32 private constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
-    uint256 public fee;
+	uint256 public fee;
 
-    event Deposit(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
-    event Withdraw(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
-    event Distribute(address indexed lpPool, uint256 reward);
+	event Deposit(
+		address indexed lpPool,
+		address indexed sender,
+		address indexed recipient,
+		uint256 amount
+	);
+	event Withdraw(
+		address indexed lpPool,
+		address indexed sender,
+		address indexed recipient,
+		uint256 amount
+	);
+	event Distribute(address indexed lpPool, uint256 reward);
 
-    event FeeChanged(uint256 previousFee, uint256 newFee);
+	event FeeChanged(uint256 previousFee, uint256 newFee);
 
-    modifier onlyRole(bytes32 role){
-        require(accessManager.hasRole(role, msg.sender), 'CALLER_NOT_AUTHORIZED');
-        _;
-    }
+	modifier onlyRole(bytes32 role) {
+		require(
+			accessManager.hasRole(role, msg.sender),
+			"CALLER_NOT_AUTHORIZED"
+		);
+		_;
+	}
 
-    // ============ Methods ============
+	// ============ Methods ============
 
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        _disableInitializers();
-    }
+	/// @custom:oz-upgrades-unsafe-allow constructor
+	constructor() {
+		_disableInitializers();
+	}
 
-    function initialize(address _accessManager, address _farmFactory) external initializer{
-        require (_accessManager != address(0), 'BAD_ACCESS_MANAGER');
-        require (_farmFactory != address(0), 'BAD_FARM_FACTORY');
+	function initialize(address _accessManager, address _farmFactory)
+		external
+		initializer
+	{
+		require(_accessManager != address(0), "BAD_ACCESS_MANAGER");
+		require(_farmFactory != address(0), "BAD_FARM_FACTORY");
 
-        __Pausable_init();
-        accessManager = IUnoAccessManager(_accessManager);
-        farmFactory = IUnoFarmFactory(_farmFactory);
-    }
+		__Pausable_init();
+		accessManager = IUnoAccessManager(_accessManager);
+		farmFactory = IUnoFarmFactory(_farmFactory);
+	}
 
-    /**
+	/**
      * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool} and deposits tokens in it. Emits a {Deposit} event.
      * @param lpStakingPool - Address of the pool to deposit tokens in.
      * @param amountA  - Token A amount to deposit.
@@ -70,27 +90,63 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
      * @return sentB - Token B amount sent to the farm.
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
-    function deposit(address lpStakingPool, uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin, uint256 amountLP, address recipient) external whenNotPaused returns(uint256 sentA, uint256 sentB, uint256 liquidity){
-        Farm farm = Farm(farmFactory.Farms(lpStakingPool));
-        if(farm == Farm(address(0))){
-            farm = Farm(farmFactory.createFarm(lpStakingPool));
-        }
+	function deposit(
+		address lpStakingPool,
+		uint256 amountA,
+		uint256 amountB,
+		uint256 amountAMin,
+		uint256 amountBMin,
+		uint256 amountLP,
+		address recipient
+	)
+		external
+		whenNotPaused
+		returns (
+			uint256 sentA,
+			uint256 sentB,
+			uint256 liquidity
+		)
+	{
+		Farm farm = Farm(farmFactory.Farms(lpStakingPool));
+		if (farm == Farm(address(0))) {
+			farm = Farm(farmFactory.createFarm(lpStakingPool));
+		}
 
-        if(amountA > 0){
-            IERC20Upgradeable(farm.tokenA()).safeTransferFrom(msg.sender, address(farm), amountA);
-        }
-        if(amountB > 0){
-            IERC20Upgradeable(farm.tokenB()).safeTransferFrom(msg.sender, address(farm), amountB);
-        }
-        if(amountLP > 0){
-            IERC20Upgradeable(farm.lpPair()).safeTransferFrom(msg.sender, address(farm), amountLP);
-        }
-        
-        (sentA, sentB, liquidity) = farm.deposit(amountA, amountB, amountAMin, amountBMin, amountLP, msg.sender, recipient);
-        emit Deposit(lpStakingPool, msg.sender, recipient, liquidity); 
-    }
+		if (amountA > 0) {
+			IERC20Upgradeable(farm.tokenA()).safeTransferFrom(
+				msg.sender,
+				address(farm),
+				amountA
+			);
+		}
+		if (amountB > 0) {
+			IERC20Upgradeable(farm.tokenB()).safeTransferFrom(
+				msg.sender,
+				address(farm),
+				amountB
+			);
+		}
+		if (amountLP > 0) {
+			IERC20Upgradeable(farm.lpPair()).safeTransferFrom(
+				msg.sender,
+				address(farm),
+				amountLP
+			);
+		}
 
-    /** 
+		(sentA, sentB, liquidity) = farm.deposit(
+			amountA,
+			amountB,
+			amountAMin,
+			amountBMin,
+			amountLP,
+			msg.sender,
+			recipient
+		);
+		emit Deposit(lpStakingPool, msg.sender, recipient, liquidity);
+	}
+
+	/** 
      * @dev Withdraws tokens from the given pool. Emits a {Withdraw} event.
      * @param lpStakingPool - LP pool to withdraw from.
      * @param amount - LP amount to withdraw. 
@@ -101,38 +157,56 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
 
      * @return amountA - Token A amount sent to the {recipient}, 0 if withdrawLP == false.
      * @return amountB - Token B amount sent to the {recipient}, 0 if withdrawLP == false.
-     */ 
-    function withdraw(address lpStakingPool, uint256 amount, uint256 amountAMin, uint256 amountBMin, bool withdrawLP, address recipient) external returns(uint256 amountA, uint256 amountB){
-        Farm farm = Farm(farmFactory.Farms(lpStakingPool));
-        require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
-        
-        (amountA, amountB) = farm.withdraw(amount, amountAMin, amountBMin, withdrawLP, msg.sender, recipient); 
-        emit Withdraw(lpStakingPool, msg.sender, recipient, amount);  
-    }
+     */
+	function withdraw(
+		address lpStakingPool,
+		uint256 amount,
+		uint256 amountAMin,
+		uint256 amountBMin,
+		bool withdrawLP,
+		address recipient
+	) external returns (uint256 amountA, uint256 amountB) {
+		Farm farm = Farm(farmFactory.Farms(lpStakingPool));
+		require(farm != Farm(address(0)), "FARM_NOT_EXISTS");
 
-    /**
-     * @dev Distributes tokens between users. Emits a {Distribute} event.
-     * @param lpStakingPool - LP pool to distribute tokens in.
-     * @param swapInfos - Arrays of structs with token arrays describing swap routes (rewardTokenToTokenA, rewardTokenToTokenB) and minimum amounts of output tokens that must be received for the transaction not to revert.
-     * @param feeSwapInfo - Struct with token array describing swap route (rewardTokenToFeeToken) and minimum amounts of output tokens that must be received for the transaction not to revert.
-     * @param feeTo - Address to collect fees to.
-     *
-     * Note: This function can only be called by the distributor.
-     */ 
-    function distribute(
-        address lpStakingPool,
-        Farm.SwapInfo[2] calldata swapInfos,
-        Farm.SwapInfo calldata feeSwapInfo,
-        address feeTo
-    ) external whenNotPaused onlyRole(DISTRIBUTOR_ROLE) {
-        Farm farm = Farm(farmFactory.Farms(lpStakingPool));
-        require(farm != Farm(address(0)), 'FARM_NOT_EXISTS');
+		(amountA, amountB) = farm.withdraw(
+			amount,
+			amountAMin,
+			amountBMin,
+			withdrawLP,
+			msg.sender,
+			recipient
+		);
+		emit Withdraw(lpStakingPool, msg.sender, recipient, amount);
+	}
 
-        uint256 reward = farm.distribute(swapInfos, feeSwapInfo, Farm.FeeInfo(feeTo, fee));
-        emit Distribute(lpStakingPool, reward);
-    }
+	/**
+	 * @dev Distributes tokens between users. Emits a {Distribute} event.
+	 * @param lpStakingPool - LP pool to distribute tokens in.
+	 * @param swapInfos - Arrays of structs with token arrays describing swap routes (rewardTokenToTokenA, rewardTokenToTokenB) and minimum amounts of output tokens that must be received for the transaction not to revert.
+	 * @param feeSwapInfo - Struct with token array describing swap route (rewardTokenToFeeToken) and minimum amounts of output tokens that must be received for the transaction not to revert.
+	 * @param feeTo - Address to collect fees to.
+	 *
+	 * Note: This function can only be called by the distributor.
+	 */
+	function distribute(
+		address lpStakingPool,
+		Farm.SwapInfo[2] calldata swapInfos,
+		Farm.SwapInfo calldata feeSwapInfo,
+		address feeTo
+	) external whenNotPaused onlyRole(DISTRIBUTOR_ROLE) {
+		Farm farm = Farm(farmFactory.Farms(lpStakingPool));
+		require(farm != Farm(address(0)), "FARM_NOT_EXISTS");
 
-    /**
+		uint256 reward = farm.distribute(
+			swapInfos,
+			feeSwapInfo,
+			Farm.FeeInfo(feeTo, fee)
+		);
+		emit Distribute(lpStakingPool, reward);
+	}
+
+	/**
      * @dev Returns tokens staked by the {_address} for the given {lpStakingPool}.
      * @param _address - The address to check stakes for.
      * @param lpStakingPool - LP pool to check stakes in.
@@ -141,82 +215,126 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
      * @return stakeA - Token A stake.
      * @return stakeB - Token B stake.
      */
-    function userStake(address _address, address lpStakingPool) external view returns (uint256 stakeLP, uint256 stakeA, uint256 stakeB) {
-        Farm farm = Farm(farmFactory.Farms(lpStakingPool));
-        if (farm != Farm(address(0))) {
-            stakeLP = farm.userBalance(_address);
-            address lpPair = farm.lpPair();
-            (stakeA, stakeB) = getTokenStake(lpPair, stakeLP);
-        }
-    }
+	function userStake(address _address, address lpStakingPool)
+		external
+		view
+		returns (
+			uint256 stakeLP,
+			uint256 stakeA,
+			uint256 stakeB
+		)
+	{
+		Farm farm = Farm(farmFactory.Farms(lpStakingPool));
+		if (farm != Farm(address(0))) {
+			stakeLP = farm.userBalance(_address);
+			address lpPair = farm.lpPair();
+			(stakeA, stakeB) = getTokenStake(lpPair, stakeLP);
+		}
+	}
 
-    /**
+	/**
      * @dev Returns total amount locked in the pool. Doesn't take pending rewards into account.
      * @param lpStakingPool - LP pool to check total deposits in.
 
      * @return totalDepositsLP - Total deposits (in LP tokens).
      * @return totalDepositsA - Token A deposits.
      * @return totalDepositsB - Token B deposits.
-     */  
-    function totalDeposits(address lpStakingPool) external view returns (uint256 totalDepositsLP, uint256 totalDepositsA, uint256 totalDepositsB) {
-        Farm farm = Farm(farmFactory.Farms(lpStakingPool));
-        if (farm != Farm(address(0))) {
-            totalDepositsLP = farm.getTotalDeposits();
-            address lpPair = farm.lpPair();
-            (totalDepositsA, totalDepositsB) = getTokenStake(lpPair, totalDepositsLP);
-        }
-    }
+     */
+	function totalDeposits(address lpStakingPool)
+		external
+		view
+		returns (
+			uint256 totalDepositsLP,
+			uint256 totalDepositsA,
+			uint256 totalDepositsB
+		)
+	{
+		Farm farm = Farm(farmFactory.Farms(lpStakingPool));
+		if (farm != Farm(address(0))) {
+			totalDepositsLP = farm.getTotalDeposits();
+			address lpPair = farm.lpPair();
+			(totalDepositsA, totalDepositsB) = getTokenStake(
+				lpPair,
+				totalDepositsLP
+			);
+		}
+	}
 
-    /**
+	/**
      * @dev Returns addresses of pair of tokens in {lpStakingPool}.
      * @param lpStakingPool - LP pool to check tokens in.
 
      * @return tokens - Tokens addresses.
-     */  
-    function getTokens(address lpStakingPool) external view returns(IERC20[] memory tokens){
-        tokens = new IERC20[](2);
-        IUniswapV2Pair stakingToken = IUniswapV2Pair(address(IStakingRewards(lpStakingPool).stakingToken()));
-        tokens[0] = IERC20(stakingToken.token0());
-        tokens[1] = IERC20(stakingToken.token1());
-    }
+     */
+	function getTokens(address lpStakingPool)
+		external
+		view
+		returns (IERC20[] memory tokens)
+	{
+		tokens = new IERC20[](2);
+		IUniswapV2Pair stakingToken = IUniswapV2Pair(
+			address(IStakingRewards(lpStakingPool).stakingToken())
+		);
+		tokens[0] = IERC20(stakingToken.token0());
+		tokens[1] = IERC20(stakingToken.token1());
+	}
 
-    /**
+	/**
      * @dev Converts LP tokens to normal tokens, value(amountA) == value(amountB) == 0.5*amountLP
      * @param lpPair - LP pair for conversion.
      * @param amountLP - Amount of LP tokens to convert.
 
      * @return amountA - Token A amount.
      * @return amountB - Token B amount.
-     */ 
-    function getTokenStake(address lpPair, uint256 amountLP) internal view returns (uint256 amountA, uint256 amountB) {
-        uint256 totalSupply = IERC20Upgradeable(lpPair).totalSupply();
-        amountA = amountLP * IERC20Upgradeable(IUniswapV2Pair(lpPair).token0()).balanceOf(lpPair) / totalSupply;
-        amountB = amountLP * IERC20Upgradeable(IUniswapV2Pair(lpPair).token1()).balanceOf(lpPair) / totalSupply;
-    }
+     */
+	function getTokenStake(address lpPair, uint256 amountLP)
+		internal
+		view
+		returns (uint256 amountA, uint256 amountB)
+	{
+		uint256 totalSupply = IERC20Upgradeable(lpPair).totalSupply();
+		amountA =
+			(amountLP *
+				IERC20Upgradeable(IUniswapV2Pair(lpPair).token0()).balanceOf(
+					lpPair
+				)) /
+			totalSupply;
+		amountB =
+			(amountLP *
+				IERC20Upgradeable(IUniswapV2Pair(lpPair).token1()).balanceOf(
+					lpPair
+				)) /
+			totalSupply;
+	}
 
-    /**
-     * @dev Change fee amount.
-     * @param _fee -New fee to collect from farms. [10^18 == 100%]
-     *
-     * Note: This function can only be called by ADMIN_ROLE.
-     */ 
-    function setFee(uint256 _fee) external onlyRole(accessManager.ADMIN_ROLE()){
-        require (_fee <= 1 ether, "BAD_FEE");
-        if(fee != _fee){
-            emit FeeChanged(fee, _fee); 
-            fee = _fee;
-        }
-    }
- 
-    function pause() external onlyRole(PAUSER_ROLE) {
-        _pause();
-    }
+	/**
+	 * @dev Change fee amount.
+	 * @param _fee -New fee to collect from farms. [10^18 == 100%]
+	 *
+	 * Note: This function can only be called by ADMIN_ROLE.
+	 */
+	function setFee(uint256 _fee)
+		external
+		onlyRole(accessManager.ADMIN_ROLE())
+	{
+		require(_fee <= 1 ether, "BAD_FEE");
+		if (fee != _fee) {
+			emit FeeChanged(fee, _fee);
+			fee = _fee;
+		}
+	}
 
-    function unpause() external onlyRole(PAUSER_ROLE) {
-        _unpause();
-    }
+	function pause() external onlyRole(PAUSER_ROLE) {
+		_pause();
+	}
 
-    function _authorizeUpgrade(address) internal override onlyRole(accessManager.ADMIN_ROLE()) {
+	function unpause() external onlyRole(PAUSER_ROLE) {
+		_unpause();
+	}
 
-    }
+	function _authorizeUpgrade(address)
+		internal
+		override
+		onlyRole(accessManager.ADMIN_ROLE())
+	{}
 }
