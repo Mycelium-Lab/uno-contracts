@@ -13,7 +13,7 @@ import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 import '@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 
-contract UnoAssetRouterApeSwapV2 is Initializable, PausableUpgradeable, UUPSUpgradeable {
+contract UnoAssetRouterApeswapV2 is Initializable, PausableUpgradeable, UUPSUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     /**
