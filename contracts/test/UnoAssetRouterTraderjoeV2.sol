@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.17;
 
-import { IUnoFarmTraderjoe as Farm } from "./interfaces/IUnoFarmTraderjoe.sol";
-import "../../interfaces/IUnoFarmFactory.sol";
-import "../../interfaces/IUnoAccessManager.sol";
-import "../../interfaces/IUniswapV2Pair.sol";
-import "../../interfaces/IWAVAX.sol";
+import { IUnoFarmTraderjoe as Farm } from "../apps/traderjoe/interfaces/IUnoFarmTraderjoe.sol";
+import "../interfaces/IUnoFarmFactory.sol";
+import "../interfaces/IUnoAccessManager.sol";
+import "../interfaces/IUniswapV2Pair.sol";
+import "../interfaces/IWAVAX.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract UnoAssetRouterTraderjoe is
+contract UnoAssetRouterTraderjoeV2 is
 	Initializable,
 	PausableUpgradeable,
 	UUPSUpgradeable

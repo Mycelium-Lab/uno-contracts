@@ -11,24 +11,24 @@ const timeMachine = require('ganache-time-traveler')
 
 const IUniswapV2Pair = artifacts.require('IUniswapV2Pair')
 const IUniswapV2Router01 = artifacts.require('IUniswapV2Router01')
-const IMasterApe = artifacts.require('IMasterApe')
-const IBEP20 = artifacts.require('IBEP20')
+const IMasterJoe = artifacts.require('IMasterChefJoe')
+const IERC20 = artifacts.require('IERC20')
 
 const AccessManager = artifacts.require('UnoAccessManager')
 const FarmFactory = artifacts.require('UnoFarmFactory')
 
-const Farm = artifacts.require('UnoFarmApeswap')
-const AssetRouter = artifacts.require('UnoAssetRouterApeswap')
-const AssetRouterV2 = artifacts.require('UnoAssetRouterApeswapV2')
+const Farm = artifacts.require('UnoFarmTraderjoe')
+const AssetRouter = artifacts.require('UnoAssetRouterTraderjoe')
+const AssetRouterV2 = artifacts.require('UnoAssetRouterTraderjoeV2')
 
-const apeswapRouter = '0xcF0feBd3f17CEf5b47b0cD257aCf6025c5BFf3b7'
-const pool = '0x51e6D27FA57373d8d4C256231241053a70Cb1d93' // busd wbnb
-const pool2 = '0x47A0B7bA18Bb80E4888ca2576c2d34BE290772a6' // ftm wbnb
-const masterApeAddress = '0x5c8D727b265DBAfaba67E050f2f739cAeEB4A6F9'
+const traderjoeRouter = '0x60aE616a2155Ee3d9A68541Ba4544862310933d4'
+const pool = '0xf4003F4efBE8691B60249E6afbD307aBE7758adb' // wAVAX-USDC
+const pool2 = '0xFE15c2695F1F920da45C30AAE47d11dE51007AF9' // wAVAX-WETH.e
+const masterJoeAddress = '0x4483f0b6e2F5486D06958C20f8C39A7aBe87bf8F'
 
 const BANANAHolder = '0x827c5CA6CDE1Ff3A9C44E54d9A28f661D369DC93' // has to be unlocked and hold 0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a
 
-const account1 = '0x2872bb8b5A809731fC97C39F9C811f79c2171EF0' // has to be unlocked and hold 0x51e6D27FA57373d8d4C256231241053a70Cb1d93
+const account1 = '0x9f27E7D6466c47FC214086D6b969Ee3C52407d01' // has to be unlocked and hold 0x51e6D27FA57373d8d4C256231241053a70Cb1d93
 const account2 = '0x975Dd80ED6055a38807a89E9d01C48cd4E40D35c' // has to be unlocked and hold 0x51e6D27FA57373d8d4C256231241053a70Cb1d93
 const account3 = '0x5a52E96BAcdaBb82fd05763E25335261B270Efcb' // has to be unlocked and hold BUSD and BNB
 
@@ -53,7 +53,7 @@ approxeq = (bn1, bn2, epsilon, message) => {
     )
 }
 
-contract('UnoAssetRouterApeswap', (accounts) => {
+contract('UnoAssetRouterTraderjoe', (accounts) => {
     const admin = accounts[0]
     const pauser = accounts[1]
     const distributor = accounts[2]
@@ -67,7 +67,7 @@ contract('UnoAssetRouterApeswap', (accounts) => {
 
     let tokenA
     let tokenB
-    let masterApe
+    let masterJoe
     let pid
     let rewardToken
 
@@ -76,19 +76,26 @@ contract('UnoAssetRouterApeswap', (accounts) => {
         const snapshot = await timeMachine.takeSnapshot()
         snapshotId = snapshot.result
 
-        const implementation = await Farm.new({ from: account1 })
-        accessManager = await AccessManager.new({ from: admin }) // accounts[0] is admin
+        // const implementation = await Farm.new({ from: account1 })
+        // accessManager = await AccessManager.new({ from: admin }) // accounts[0] is admin
 
-        await accessManager.grantRole(
-            '0xfbd454f36a7e1a388bd6fc3ab10d434aa4578f811acbbcf33afb1c697486313c',
-            distributor,
-            { from: admin }
-        ) // DISTRIBUTOR_ROLE
-        await accessManager.grantRole(
-            '0x65d7a28e3265b37a6474929f336521b332c1681b933f6cb9f3376673440d862a',
-            pauser,
-            { from: admin }
-        ) // PAUSER_ROLE
+        // await accessManager.grantRole(
+        //     '0xfbd454f36a7e1a388bd6fc3ab10d434aa4578f811acbbcf33afb1c697486313c',
+        //     distributor,
+        //     { from: admin }
+        // ) // DISTRIBUTOR_ROLE
+        // await accessManager.grantRole(
+        //     '0x65d7a28e3265b37a6474929f336521b332c1681b933f6cb9f3376673440d862a',
+        //     pauser,
+        //     { from: admin }
+        // ) // PAUSER_ROLE
+
+        // console.log(
+        //     await accessManager.hasRole(
+        //         '0x65d7a28e3265b37a6474929f336521b332c1681b933f6cb9f3376673440d862a',
+        //         pauser
+        //     )
+        // )
 
         assetRouter = await deployProxy(AssetRouter, {
             kind: 'uups',
@@ -114,32 +121,32 @@ contract('UnoAssetRouterApeswap', (accounts) => {
         initReceipt.receipt = _receipt
         initReceipt.logs = events
 
-        stakingToken = await IBEP20.at(pool)
+        stakingToken = await IERC20.at(pool)
 
         const lpToken = await IUniswapV2Pair.at(pool)
 
         const tokenAAddress = await lpToken.token0()
         const tokenBAddress = await lpToken.token1()
 
-        tokenA = await IBEP20.at(tokenAAddress)
-        tokenB = await IBEP20.at(tokenBAddress)
+        tokenA = await IERC20.at(tokenAAddress)
+        tokenB = await IERC20.at(tokenBAddress)
 
-        masterApe = await IMasterApe.at(masterApeAddress)
-        const poolLength = await masterApe.poolLength()
+        masterJoe = await IMasterJoe.at(masterJoeAddress)
+        const poolLength = await masterJoe.poolLength()
 
         for (let i = 0; i < poolLength.toNumber(); i++) {
-            const _lpToken = (await masterApe.poolInfo(i)).lpToken
+            const _lpToken = (await masterJoe.poolInfo(i)).lpToken
             if (_lpToken.toString() === pool) {
                 pid = i
                 break
             }
         }
 
-        rewardToken = await masterApe.cake()
+        rewardToken = await masterJoe.cake()
 
-        const BANANAtoken = await IBEP20.at(rewardToken)
+        const BANANAtoken = await IERC20.at(rewardToken)
         const BANANAbalance = await BANANAtoken.balanceOf(BANANAHolder)
-        await BANANAtoken.transfer(masterApeAddress, BANANAbalance, {
+        await BANANAtoken.transfer(masterJoeAddress, BANANAbalance, {
             from: BANANAHolder,
         })
     })
@@ -364,7 +371,7 @@ contract('UnoAssetRouterApeswap', (accounts) => {
             it('stakes tokens in StakingRewards contract', async () => {
                 assert.equal(
                     (
-                        await masterApe.userInfo(pid, farm.address)
+                        await masterJoe.userInfo(pid, farm.address)
                     ).amount.toString(),
                     amounts[0].toString(),
                     "Total amount sent doesn't equal StakingRewards farm balance"
@@ -417,7 +424,7 @@ contract('UnoAssetRouterApeswap', (accounts) => {
             it('stakes tokens in StakingRewards contract', async () => {
                 assert.equal(
                     (
-                        await masterApe.userInfo(pid, farm.address)
+                        await masterJoe.userInfo(pid, farm.address)
                     ).amount.toString(),
                     amounts[0].add(amounts[1]).toString(),
                     "Total amount sent doesn't equal StakingRewards farm balance"
@@ -478,7 +485,7 @@ contract('UnoAssetRouterApeswap', (accounts) => {
             it('stakes tokens in StakingRewards contract', async () => {
                 assert.equal(
                     (
-                        await masterApe.userInfo(pid, farm.address)
+                        await masterJoe.userInfo(pid, farm.address)
                     ).amount.toString(),
                     amounts[0].add(amounts[1]).add(amounts[2]).toString(),
                     "Total amount sent doesn't equal StakingRewards farm balance"
@@ -543,7 +550,7 @@ contract('UnoAssetRouterApeswap', (accounts) => {
             it('stakes tokens in StakingRewards contract', async () => {
                 assert.equal(
                     (
-                        await masterApe.userInfo(pid, farm.address)
+                        await masterJoe.userInfo(pid, farm.address)
                     ).amount.toString(),
                     amounts[0]
                         .add(amounts[1])
@@ -568,9 +575,9 @@ contract('UnoAssetRouterApeswap', (accounts) => {
 
             before(async () => {
                 const routerContract = await IUniswapV2Router01.at(
-                    apeswapRouter
+                    traderjoeRouter
                 )
-                await stakingToken.approve(apeswapRouter, amounts[4], {
+                await stakingToken.approve(traderjoeRouter, amounts[4], {
                     from: account1,
                 })
                 const tx = await routerContract.removeLiquidity(
@@ -606,7 +613,7 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                 ;({ totalDepositsLP: totalDepositsLPBefore } =
                     await assetRouter.totalDeposits(pool))
                 stakingRewardsBalanceBefore = new BN(
-                    (await masterApe.userInfo(pid, farm.address))['0']
+                    (await masterJoe.userInfo(pid, farm.address))['0']
                 )
 
                 await tokenA.approve(assetRouter.address, amountA, {
@@ -704,7 +711,7 @@ contract('UnoAssetRouterApeswap', (accounts) => {
             it('stakes tokens in StakingRewards contract', async () => {
                 assert.ok(
                     new BN(
-                        (await masterApe.userInfo(pid, farm.address))['0']
+                        (await masterJoe.userInfo(pid, farm.address))['0']
                     ).gt(stakingRewardsBalanceBefore),
                     'StakingRewards balance was not increased'
                 )
@@ -940,7 +947,6 @@ contract('UnoAssetRouterApeswap', (accounts) => {
             before(async () => {
                 balanceAbefore = await tokenA.balanceOf(account1)
                 balanceBbefore = await tokenB.balanceOf(account1)
-
                 ;({
                     stakeLP: stakeLP1,
                     stakeA: stakeA1,
@@ -1018,7 +1024,6 @@ contract('UnoAssetRouterApeswap', (accounts) => {
             before(async () => {
                 balanceAbefore = await tokenA.balanceOf(account1)
                 balanceBbefore = await tokenB.balanceOf(account1)
-
                 ;({
                     stakeLP: stakeLP1,
                     stakeA: stakeA1,
@@ -1473,7 +1478,6 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                     account1,
                     { from: account1 }
                 )
-
                 ;({ stakeLP } = await assetRouter.userStake(account1, pool))
                 assert.equal(stakeLP.toString(), '0', 'acount1 stake not 0')
             })
@@ -1488,7 +1492,6 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                     account2,
                     { from: account2 }
                 )
-
                 ;({ stakeLP } = await assetRouter.userStake(account2, pool))
                 assert.equal(stakeLP.toString(), '0', 'acount2 stake not 0')
             })
@@ -1529,10 +1532,10 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                 ethPooltokenA = await IUniswapV2Pair.at(tokenAAddress)
                 ethPooltokenB = await IUniswapV2Pair.at(tokenBAddress)
 
-                const poolLength = await masterApe.poolLength()
+                const poolLength = await masterJoe.poolLength()
 
                 for (let i = 0; i < poolLength.toNumber(); i++) {
-                    const lpToken = (await masterApe.poolInfo(i)).lpToken
+                    const lpToken = (await masterJoe.poolInfo(i)).lpToken
                     if (lpToken.toString() === pool) {
                         ETHPid = i
                         break
@@ -1545,7 +1548,7 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                 } else {
                     const farmETH = await Farm.at(farmAddress)
                     stakingRewardsBalanceBefore = new BN(
-                        (await masterApe.userInfo(ETHPid, farmETH.address))['0']
+                        (await masterJoe.userInfo(ETHPid, farmETH.address))['0']
                     )
                 }
 
@@ -1554,7 +1557,6 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                     stakeA: stakeABefore,
                     stakeB: stakeBBefore,
                 } = await assetRouter.userStake(account3, pool))
-
                 ;({ totalDepositsLP: totalDepositsLPBefore } =
                     await assetRouter.totalDeposits(pool))
 
@@ -1641,12 +1643,12 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                     'Stake not increased'
                 )
             })
-            it('stakes tokens in masterApe', async () => {
+            it('stakes tokens in masterJoe', async () => {
                 const farmAddress = await factory.Farms(pool)
                 const farmETH = await Farm.at(farmAddress)
 
                 const stakingRewardsBalance = new BN(
-                    (await masterApe.userInfo(ETHPid, farmETH.address))['0']
+                    (await masterJoe.userInfo(ETHPid, farmETH.address))['0']
                 )
                 assert.ok(
                     stakingRewardsBalance.gt(stakingRewardsBalanceBefore),
@@ -1681,10 +1683,10 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                 ;({ totalDepositsLP: totalDepositsLPBefore } =
                     await assetRouter.totalDeposits(pool))
 
-                const poolLength = await masterApe.poolLength()
+                const poolLength = await masterJoe.poolLength()
 
                 for (let i = 0; i < poolLength.toNumber(); i++) {
-                    const lpToken = (await masterApe.poolInfo(i)).lpToken
+                    const lpToken = (await masterJoe.poolInfo(i)).lpToken
                     if (lpToken.toString() === pool) {
                         ETHPid = i
                         break
@@ -1697,7 +1699,7 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                 } else {
                     const farmETH = await Farm.at(farmAddress)
                     stakingRewardsBalanceBefore = new BN(
-                        (await masterApe.userInfo(ETHPid, farmETH.address))['0']
+                        (await masterJoe.userInfo(ETHPid, farmETH.address))['0']
                     )
                 }
 
@@ -1763,7 +1765,7 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                 const farmETH = await Farm.at(farmAddress)
 
                 const stakingRewardsBalance = new BN(
-                    (await masterApe.userInfo(ETHPid, farmETH.address))['0']
+                    (await masterJoe.userInfo(ETHPid, farmETH.address))['0']
                 )
                 assert.ok(
                     stakingRewardsBalanceBefore.gt(stakingRewardsBalance),
