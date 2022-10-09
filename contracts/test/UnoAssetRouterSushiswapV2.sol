@@ -5,6 +5,8 @@ import {IUnoFarmSushiswap as Farm} from '../apps/sushiswap/interfaces/IUnoFarmSu
 import '../interfaces/IUnoFarmFactory.sol';
 import '../interfaces/IUnoAccessManager.sol'; 
 import '../interfaces/IUniswapV2Pair.sol';
+import '../interfaces/IWMATIC.sol';
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
@@ -26,6 +28,8 @@ contract UnoAssetRouterSushiswapV2 is Initializable, PausableUpgradeable, UUPSUp
     bytes32 private constant PAUSER_ROLE = keccak256('PAUSER_ROLE');
 
     uint256 public fee;
+
+    address public constant WMATIC = 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270;
 
     uint256 public constant version = 2;
 
@@ -56,6 +60,10 @@ contract UnoAssetRouterSushiswapV2 is Initializable, PausableUpgradeable, UUPSUp
         farmFactory = IUnoFarmFactory(_farmFactory);
     }
 
+    receive() external payable {
+        require(msg.sender == WMATIC, 'ONLY_ACCEPT_WMATIC'); // only accept ETH via fallback from the WMATIC contract
+    }
+
     /**
      * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpPair} and deposits tokens in it. Emits a {Deposit} event.
      * @param lpPair - Address of the pool to deposit tokens in.
@@ -76,18 +84,71 @@ contract UnoAssetRouterSushiswapV2 is Initializable, PausableUpgradeable, UUPSUp
             farm = Farm(farmFactory.createFarm(lpPair));
         }
 
+        if(amountLP > 0){
+            IERC20Upgradeable(farm.lpPair()).safeTransferFrom(msg.sender, address(farm), amountLP);
+        }
         if(amountA > 0){
             IERC20Upgradeable(farm.tokenA()).safeTransferFrom(msg.sender, address(farm), amountA);
         }
         if(amountB > 0){
             IERC20Upgradeable(farm.tokenB()).safeTransferFrom(msg.sender, address(farm), amountB);
         }
-        if(amountLP > 0){
-            IERC20Upgradeable(lpPair).safeTransferFrom(msg.sender, address(farm), amountLP);
-        }
-        
+
         (sentA, sentB, liquidity) = farm.deposit(amountA, amountB, amountAMin, amountBMin, amountLP, msg.sender, recipient);
         emit Deposit(lpPair, msg.sender, recipient, liquidity); 
+    }
+
+    /**
+     * @dev Autoconverts MATIC into WMATIC and deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool} and deposits tokens in it. Emits a {Deposit} event.
+     * @param lpPair - Address of the pool to deposit tokens in.
+     * @param amountToken  - Token amount to deposit.
+     * @param amountTokenMin - Bounds the extent to which the (TOKEN/WMATIC or TOKEN/WMATIC) price can go up before the transaction reverts.
+     * @param amountETHMin - Minimum amount of Matic to deposit.
+     * @param amountLP - Additional LP Token amount to deposit.
+     * @param recipient - Address which will receive the deposit.
+     
+     * @return sentToken - Token amount sent to the farm.
+     * @return sentETH - WMATIC amount sent to the farm.
+     * @return liquidity - Total liquidity sent to the farm (in lpTokens).
+     */
+    function depositETH(address lpPair, uint256 amountToken, uint256 amountTokenMin, uint256 amountETHMin, uint256 amountLP, address recipient) external payable whenNotPaused returns(uint256 sentToken, uint256 sentETH, uint256 liquidity){
+        require(msg.value > 0, "NO_MATIC_SENT");
+        Farm farm = Farm(farmFactory.Farms(lpPair));
+        if(farm == Farm(address(0))){
+            farm = Farm(farmFactory.createFarm(lpPair));
+        }
+
+        if(amountLP > 0){
+            IERC20Upgradeable(farm.lpPair()).safeTransferFrom(msg.sender, address(farm), amountLP);
+        }
+
+        address tokenA = farm.tokenA();
+        address tokenB = farm.tokenB();
+
+        IWMATIC(WMATIC).deposit{value: msg.value}();
+        IERC20Upgradeable(WMATIC).safeTransfer(address(farm), msg.value);
+        if (tokenA == WMATIC) {
+            if (amountToken > 0) {
+                IERC20Upgradeable(tokenB).safeTransferFrom(msg.sender, address(farm), amountToken);
+            }
+            (sentETH, sentToken, liquidity) = farm.deposit(msg.value, amountToken, amountETHMin, amountTokenMin, amountLP, address(this), recipient);
+            IERC20Upgradeable(tokenB).safeTransfer(msg.sender, amountToken - sentToken);
+        } else if (tokenB == WMATIC) {
+            if (amountToken > 0) {
+                IERC20Upgradeable(tokenA).safeTransferFrom(msg.sender, address(farm), amountToken);
+            }
+            (sentToken, sentETH, liquidity) = farm.deposit(amountToken, msg.value, amountTokenMin, amountETHMin, amountLP, address(this), recipient);
+            IERC20Upgradeable(tokenA).safeTransfer(msg.sender, amountToken - sentToken);
+        } else {
+            revert("NOT_WMATIC_POOL");
+        }
+
+        uint256 dust = msg.value - sentETH;
+        if (dust > 0){
+            IWMATIC(WMATIC).withdraw(dust);
+            payable(msg.sender).transfer(dust);
+        }
+        emit Deposit(lpPair, msg.sender, recipient, liquidity);
     }
 
     /** 
@@ -106,8 +167,41 @@ contract UnoAssetRouterSushiswapV2 is Initializable, PausableUpgradeable, UUPSUp
         Farm farm = Farm(farmFactory.Farms(lpPair));
         require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
         
-        (amountA, amountB) = farm.withdraw(amount, amountAMin, amountBMin, withdrawLP, msg.sender, recipient); 
+        (amountA, amountB) = farm.withdraw(amount, amountAMin, amountBMin, withdrawLP, msg.sender, recipient);
         emit Withdraw(lpPair, msg.sender, recipient, amount);  
+    }
+
+    /** 
+     * @dev Autoconverts WMATIC into MATIC and withdraws tokens from the pool. Emits a {Withdraw} event.
+     * @param lpPair - LP pool to withdraw from.
+     * @param amount - LP amount to withdraw. 
+     * @param amountTokenMin - The minimum amount of token that must be received for the transaction not to revert.
+     * @param amountETHMin - The minimum amount of MATIC that must be received for the transaction not to revert.
+     * @param recipient - The address which will receive tokens.
+
+     * @return amountToken - Token amount sent to the {recipient}.
+     * @return amountETH - MATIC amount sent to the {recipient}.
+     */ 
+    function withdrawETH(address lpPair, uint256 amount, uint256 amountTokenMin, uint256 amountETHMin, address recipient) external payable returns(uint256 amountToken, uint256 amountETH){
+        Farm farm = Farm(farmFactory.Farms(lpPair));
+        require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
+
+        address tokenA = farm.tokenA();
+        address tokenB = farm.tokenB();
+
+        if (tokenA == WMATIC) {
+            (amountETH, amountToken) = farm.withdraw(amount, amountETHMin, amountTokenMin, false, msg.sender, address(this));
+            IERC20Upgradeable(tokenB).safeTransfer(recipient, amountToken);
+        } else if (tokenB == WMATIC) {
+            (amountToken, amountETH) = farm.withdraw(amount, amountTokenMin, amountETHMin, false, msg.sender, address(this)); 
+            IERC20Upgradeable(tokenA).safeTransfer(recipient, amountToken);
+        } else {
+            revert("NOT_WMATIC_POOL");
+        }
+
+        IWMATIC(WMATIC).withdraw(amountETH);
+        payable(recipient).transfer(amountETH);
+        emit Withdraw(lpPair, msg.sender, recipient, amount);
     }
 
     /**
@@ -169,12 +263,12 @@ contract UnoAssetRouterSushiswapV2 is Initializable, PausableUpgradeable, UUPSUp
      * @dev Returns addresses of tokens in {lpPair}.
      * @param lpPair - LP pair to check tokens in.
 
-     * @return tokenA - Token A address.
-     * @return tokenB - Token B address.
+     * @return tokens - Tokens addresses.
      */  
-    function getTokens(address lpPair) external view returns(address tokenA, address tokenB){
-        tokenA = IUniswapV2Pair(lpPair).token0();
-        tokenB = IUniswapV2Pair(lpPair).token1();
+    function getTokens(address lpPair) external view returns(IERC20[] memory tokens){
+        tokens = new IERC20[](2);
+        tokens[0] = IERC20(IUniswapV2Pair(lpPair).token0());
+        tokens[1] = IERC20(IUniswapV2Pair(lpPair).token1());
     }
 
     /**

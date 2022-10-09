@@ -27,11 +27,17 @@ const pool2 = '0x06Df3b2bbB68adc8B0e302443692037ED9f91b42' // USDC-DAI-miMATIC-U
 
 const account1 = '0x70D04384b5c3a466EC4D8CFB8213Efc31C6a9D15'// has to be unlocked and hold 0xaF5E0B5425dE1F5a630A8cB5AA9D97B8141C908D
 const account2 = '0x78D799BE3Fd3D96f0e024b9B35ADb4479a9556f5'// has to be unlocked and hold 0xaF5E0B5425dE1F5a630A8cB5AA9D97B8141C908D
+const account3 = '0x27C7e71AEF0dc5cbcF7af511f3aBAC8eE6845685' // has to be unlocked and hold 0x3A58a54C066FdC0f2D55FC9C89F0415C92eBf3C4 (stMATIC)
 
 const amounts = [new BN(1000000), new BN(3000000), new BN(500000), new BN(4000000), new BN('1000000000000000')]
 
 const feeCollector = '0xFFFf795B802CB03FD664092Ab169f5f5c236335c'
 const fee = new BN('40000000000000000')// 4%
+
+approxeq = (bn1, bn2, epsilon, message) => {
+    const amountDelta = bn1.sub(bn2).add(epsilon)
+    assert.ok(!amountDelta.isNeg(), message)
+}
 
 contract('UnoAssetRouterBalancer', (accounts) => {
     const admin = accounts[0]
@@ -65,10 +71,7 @@ contract('UnoAssetRouterBalancer', (accounts) => {
         await accessManager.grantRole('0xfbd454f36a7e1a388bd6fc3ab10d434aa4578f811acbbcf33afb1c697486313c', distributor, { from: admin }) // DISTRIBUTOR_ROLE
         await accessManager.grantRole('0x65d7a28e3265b37a6474929f336521b332c1681b933f6cb9f3376673440d862a', pauser, { from: admin }) // PAUSER_ROLE
 
-        assetRouter = await deployProxy(
-            AssetRouter,
-            { kind: 'uups', initializer: false }
-        )
+        assetRouter = await deployProxy(AssetRouter, { kind: 'uups', initializer: false })
 
         factory = await FarmFactory.new(implementation.address, accessManager.address, assetRouter.address, { from: account1 })
 
@@ -260,16 +263,15 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             })
             it('fires events', async () => {
                 expectEvent(receipt, 'Deposit', {
-                    lpPool: pool, sender: account1, recipient: account1, amount: amounts[0]
+                    lpPool: pool,
+                    sender: account1,
+                    recipient: account1,
+                    amount: amounts[0]
                 })
             })
             it('updates stakes', async () => {
                 const stakeLP = await assetRouter.userStake(account1, pool)
-                assert.equal(
-                    stakeLP.toString(),
-                    amounts[0].toString(),
-                    "Amount sent doesn't equal userStake"
-                )
+                assert.equal(stakeLP.toString(), amounts[0].toString(), "Amount sent doesn't equal userStake")
             })
             it('updates totalDeposits', async () => {
                 const totalDepositsLP = await assetRouter.totalDeposits(pool)
@@ -295,29 +297,28 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             })
             it('fires events', async () => {
                 expectEvent(receipt, 'Deposit', {
-                    lpPool: pool, sender: account1, recipient: account1, amount: amounts[1]
+                    lpPool: pool,
+                    sender: account1,
+                    recipient: account1,
+                    amount: amounts[1]
                 })
             })
             it('updates stakes', async () => {
                 const stakeLP = await assetRouter.userStake(account1, pool)
-                assert.equal(
-                    stakeLP.toString(),
-                    (amounts[0].add(amounts[1])).toString(),
-                    "Amount sent doesn't equal userStake"
-                )
+                assert.equal(stakeLP.toString(), amounts[0].add(amounts[1]).toString(), "Amount sent doesn't equal userStake")
             })
             it('updates totalDeposits', async () => {
                 const totalDepositsLP = await assetRouter.totalDeposits(pool)
                 assert.equal(
                     totalDepositsLP.toString(),
-                    (amounts[0].add(amounts[1])).toString(),
+                    amounts[0].add(amounts[1]).toString(),
                     "Total amount sent doesn't equal totalDeposits"
                 )
             })
             it('stakes tokens in Gauge contract', async () => {
                 assert.equal(
                     (await gauge.balanceOf(farm.address)).toString(),
-                    (amounts[0].add(amounts[1])).toString(),
+                    amounts[0].add(amounts[1]).toString(),
                     "Total amount sent doesn't equal gauge balance"
                 )
             })
@@ -330,37 +331,36 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             })
             it('fires events', async () => {
                 expectEvent(receipt, 'Deposit', {
-                    lpPool: pool, sender: account2, recipient: account2, amount: amounts[2]
+                    lpPool: pool,
+                    sender: account2,
+                    recipient: account2,
+                    amount: amounts[2]
                 })
             })
             it("doesn't change stakes for account[0]", async () => {
                 const stakeLP = await assetRouter.userStake(account1, pool)
                 assert.equal(
                     stakeLP.toString(),
-                    (amounts[0].add(amounts[1])).toString(),
+                    amounts[0].add(amounts[1]).toString(),
                     'Amount sent changed userStake for account1'
                 )
             })
             it('updates stakes for account[1]', async () => {
                 const stakeLP = await assetRouter.userStake(account2, pool)
-                assert.equal(
-                    stakeLP.toString(),
-                    amounts[2].toString(),
-                    "Amount sent doesn't equal userStake"
-                )
+                assert.equal(stakeLP.toString(), amounts[2].toString(), "Amount sent doesn't equal userStake")
             })
             it('updates totalDeposits', async () => {
                 const totalDepositsLP = await assetRouter.totalDeposits(pool)
                 assert.equal(
                     totalDepositsLP.toString(),
-                    (amounts[0].add(amounts[1]).add(amounts[2])).toString(),
+                    amounts[0].add(amounts[1]).add(amounts[2]).toString(),
                     "Total amount sent doesn't equal totalDeposits"
                 )
             })
             it('stakes tokens in Gauge contract', async () => {
                 assert.equal(
-                    (await gauge.balanceOf(farm.address)),
-                    (amounts[0].add(amounts[1]).add(amounts[2])).toString(),
+                    await gauge.balanceOf(farm.address),
+                    amounts[0].add(amounts[1]).add(amounts[2]).toString(),
                     "Total amount sent doesn't equal gauge balance"
                 )
             })
@@ -373,7 +373,10 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             })
             it('fires event', async () => {
                 expectEvent(receipt, 'Deposit', {
-                    lpPool: pool, sender: account1, recipient: account2, amount: amounts[3]
+                    lpPool: pool,
+                    sender: account1,
+                    recipient: account2,
+                    amount: amounts[3]
                 })
             })
             it('doesnt change stakes for account1', async () => {
@@ -386,24 +389,20 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             })
             it('updates stakes for account2', async () => {
                 const stakeLP = await assetRouter.userStake(account2, pool)
-                assert.equal(
-                    stakeLP.toString(),
-                    (amounts[2].add(amounts[3])).toString(),
-                    "Amount sent doesn't equal userStake"
-                )
+                assert.equal(stakeLP.toString(), amounts[2].add(amounts[3]).toString(), "Amount sent doesn't equal userStake")
             })
             it('updates totalDeposits', async () => {
                 const totalDepositsLP = await assetRouter.totalDeposits(pool)
                 assert.equal(
                     totalDepositsLP.toString(),
-                    (amounts[0].add(amounts[1]).add(amounts[2]).add(amounts[3])).toString(),
+                    amounts[0].add(amounts[1]).add(amounts[2]).add(amounts[3]).toString(),
                     "Total amount sent doesn't equal totalDeposits"
                 )
             })
             it('stakes tokens in Gauge contract', async () => {
                 assert.equal(
                     (await gauge.balanceOf(farm.address)).toString(),
-                    (amounts[0].add(amounts[1]).add(amounts[2]).add(amounts[3])).toString(),
+                    amounts[0].add(amounts[1]).add(amounts[2]).add(amounts[3]).toString(),
                     "Total amount sent doesn't equal gauge balance"
                 )
             })
@@ -532,10 +531,16 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             })
             it('fires events', async () => {
                 expectEvent(receipt1, 'Withdraw', {
-                    lpPool: pool, sender: account1, recipient: account1, amount: amounts[0]
+                    lpPool: pool,
+                    sender: account1,
+                    recipient: account1,
+                    amount: amounts[0]
                 })
                 expectEvent(receipt2, 'Withdraw', {
-                    lpPool: pool, sender: account2, recipient: account2, amount: amounts[2]
+                    lpPool: pool,
+                    sender: account2,
+                    recipient: account2,
+                    amount: amounts[2]
                 })
             })
 
@@ -566,13 +571,13 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             it('transfers tokens to user', async () => {
                 const balance1after = await stakingToken.balanceOf(account1)
                 assert.equal(
-                    (balance1after.sub(balance1before)).toString(),
+                    balance1after.sub(balance1before).toString(),
                     amounts[0].toString(),
                     'Tokens withdrawn for account1 do not equal provided in the withdraw function'
                 )
                 const balance2after = await stakingToken.balanceOf(account2)
                 assert.equal(
-                    (balance2after.sub(balance2before)),
+                    balance2after.sub(balance2before),
                     amounts[2].toString(),
                     'Tokens withdrawn for account2 do not equal provided in the withdraw function'
                 )
@@ -596,7 +601,10 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             })
             it('fires events', async () => {
                 expectEvent(receipt, 'Withdraw', {
-                    lpPool: pool, sender: account1, recipient: account2, amount: amounts[1]
+                    lpPool: pool,
+                    sender: account1,
+                    recipient: account2,
+                    amount: amounts[1]
                 })
             })
             it('correctly changes userStake for account1', async () => {
@@ -624,7 +632,7 @@ contract('UnoAssetRouterBalancer', (accounts) => {
                 )
                 const balance2after = await stakingToken.balanceOf(account2)
                 assert.equal(
-                    (balance2after.sub(balance2before)).toString(),
+                    balance2after.sub(balance2before).toString(),
                     amounts[1].toString(),
                     'Tokens withdrawn for account2 do not equal provided in the withdraw function'
                 )
@@ -647,7 +655,10 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             })
             it('fires events', async () => {
                 expectEvent(receipt, 'Withdraw', {
-                    lpPool: pool, sender: account1, recipient: account1, amount: stakeLP1
+                    lpPool: pool,
+                    sender: account1,
+                    recipient: account1,
+                    amount: stakeLP1
                 })
             })
             it('correctly updates account1 stake', async () => {
@@ -691,7 +702,10 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             })
             it('fires events', async () => {
                 expectEvent(receipt, 'Withdraw', {
-                    lpPool: pool, sender: account2, recipient: account1, amount: stakeLP2
+                    lpPool: pool,
+                    sender: account2,
+                    recipient: account1,
+                    amount: stakeLP2
                 })
             })
             it('correctly updates account2 stake', async () => {
@@ -932,6 +946,167 @@ contract('UnoAssetRouterBalancer', (accounts) => {
                     'totalDeposits not 0'
                 )
             })
+        })
+    })
+
+    describe('depoit ETH', () => {
+        const balancesBefore = []
+        const tokensWithoutWMATIC = []
+        const _amounts = []
+        const amountETH = new BN(1000000000000)
+
+        let ethBalanceBefore
+        let ETHSpentOnGas
+        let stakesBefore
+        let totalDepositsLPBefore
+        let stakingRewardBalanceBefore
+        before(async () => {
+            for (let i = 0; i < tokenContracts.length; i++) {
+                if (tokenContracts[i].address !== '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270') {
+                    tokensWithoutWMATIC.push(tokenContracts[i])
+                    const balance = await tokenContracts[i].balanceOf(account3)
+                    balancesBefore.push(balance)
+                    await tokenContracts[i].approve(assetRouter.address, balance, { from: account3 })
+                    _amounts.push(new BN(1000000000000))
+                } else {
+                    _amounts.push(new BN(0))
+                }
+                stakesBefore = await assetRouter.userStake(account3, pool)
+                totalDepositsLPBefore = await assetRouter.totalDeposits(pool)
+
+                const farmAddress = await factory.Farms(pool)
+                if (farmAddress === constants.ZERO_ADDRESS) {
+                    stakingRewardBalanceBefore = new BN(0)
+                } else {
+                    const farmETH = await Farm.at(farmAddress)
+                    stakingRewardBalanceBefore = await gauge.balanceOf(farmETH.address)
+                }
+            }
+        })
+        it('fires events', async () => {
+            ethBalanceBefore = new BN(await web3.eth.getBalance(account3))
+            const receipt = await assetRouter.depositETH(pool, _amounts, tokens, 0, 0, account3, {
+                from: account3,
+                value: amountETH
+            })
+
+            const gasUsed = new BN(receipt.receipt.gasUsed)
+            const effectiveGasPrice = new BN(receipt.receipt.effectiveGasPrice)
+
+            ETHSpentOnGas = gasUsed.mul(effectiveGasPrice)
+
+            expectEvent(receipt, 'Deposit', { lpPool: pool, sender: account3, recipient: account3 })
+        })
+        it('withdraws tokens from balance', async () => {
+            for (let i = 0; i < tokensWithoutWMATIC.length; i++) {
+                const balanceAfter = await tokensWithoutWMATIC[i].balanceOf(account3)
+                assert.ok(balancesBefore[i].sub(balanceAfter).gt('0'), 'Token not withdrawn')
+            }
+        })
+        it('withdraws ETH from balance', async () => {
+            const ethBalanceAfter = new BN(await web3.eth.getBalance(account3))
+            approxeq(
+                ethBalanceBefore.sub(ethBalanceAfter).sub(ETHSpentOnGas),
+                amountETH,
+                new BN(10),
+                'Amount ETH withdrawn is not correct'
+            )
+        })
+        let addedStake
+        it('updates stakes', async () => {
+            const stakeLP = await assetRouter.userStake(account3, pool)
+            assert.ok(stakeLP.gt(stakesBefore), 'LP stake not increased')
+            addedStake = stakeLP.sub(stakesBefore)
+        })
+        it('updates totalDeposits', async () => {
+            const totalDepositsLP = await assetRouter.totalDeposits(pool)
+            assert.ok(totalDepositsLP.gt(totalDepositsLPBefore), 'totalDepositsLP not increased')
+        })
+        it('stakes tokens in Gauge contract', async () => {
+            const farmAddress = await factory.Farms(pool)
+            const farmETH = await Farm.at(farmAddress)
+            const stakingRewardBalance = await gauge.balanceOf(farmETH.address)
+            assert.equal(
+                stakingRewardBalance.toString(),
+                stakingRewardBalanceBefore.add(addedStake).toString(),
+                "Total amount sent doesn't equal gauge balance"
+            )
+        })
+    })
+    describe('withdraw ETH', () => {
+        const balancesBefore = []
+        const tokensWithoutWMATIC = []
+        const _amounts = []
+
+        let ethBalanceBefore
+        let ETHSpentOnGas
+        let stakesBefore
+        let totalDepositsLPBefore
+        let stakingRewardBalanceBefore
+        before(async () => {
+            for (let i = 0; i < tokenContracts.length; i++) {
+                if (tokenContracts[i].address !== '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270') {
+                    tokensWithoutWMATIC.push(tokenContracts[i])
+                    const balance = await tokenContracts[i].balanceOf(account3)
+                    balancesBefore.push(balance)
+                    _amounts.push(new BN(1000000000000))
+                } else {
+                    _amounts.push(new BN(0))
+                }
+                stakesBefore = await assetRouter.userStake(account3, pool)
+                totalDepositsLPBefore = await assetRouter.totalDeposits(pool)
+
+                const farmAddress = await factory.Farms(pool)
+                if (farmAddress === constants.ZERO_ADDRESS) {
+                    stakingRewardBalanceBefore = new BN(0)
+                } else {
+                    const farmETH = await Farm.at(farmAddress)
+                    stakingRewardBalanceBefore = await gauge.balanceOf(farmETH.address)
+                }
+            }
+        })
+        it('fires events', async () => {
+            ethBalanceBefore = new BN(await web3.eth.getBalance(account3))
+            const receipt = await assetRouter.withdrawETH(pool, stakesBefore, [0, 0], account3, {
+                from: account3
+            })
+
+            const gasUsed = new BN(receipt.receipt.gasUsed)
+            const effectiveGasPrice = new BN(receipt.receipt.effectiveGasPrice)
+
+            ETHSpentOnGas = gasUsed.mul(effectiveGasPrice)
+
+            expectEvent(receipt, 'Withdraw', { lpPool: pool, sender: account3, recipient: account3 })
+        })
+        it('tokens to balance', async () => {
+            for (let i = 0; i < tokensWithoutWMATIC.length; i++) {
+                const balanceAfter = await tokensWithoutWMATIC[i].balanceOf(account3)
+                assert.ok(balanceAfter.sub(balancesBefore[i]).gt('0'), 'Token not added')
+            }
+        })
+        it('adds ETH to balance', async () => {
+            const ethBalanceAfter = new BN(await web3.eth.getBalance(account3))
+            assert.ok(ethBalanceAfter.sub(ethBalanceBefore).add(ETHSpentOnGas).gt('0'), 'ETH not added')
+        })
+        let removedStake
+        it('updates stakes', async () => {
+            const stakeLP = await assetRouter.userStake(account3, pool)
+            assert.ok(stakesBefore.gt(stakeLP), 'LP stake not reduced')
+            removedStake = stakesBefore.sub(stakeLP)
+        })
+        it('updates totalDeposits', async () => {
+            const totalDepositsLP = await assetRouter.totalDeposits(pool)
+            assert.ok(totalDepositsLPBefore.gt(totalDepositsLP), 'totalDepositsLP not increased')
+        })
+        it('stakes tokens in Gauge contract', async () => {
+            const farmAddress = await factory.Farms(pool)
+            const farmETH = await Farm.at(farmAddress)
+            const stakingRewardBalance = await gauge.balanceOf(farmETH.address)
+            assert.equal(
+                stakingRewardBalanceBefore.toString(),
+                stakingRewardBalance.add(removedStake).toString(),
+                "Total amount sent doesn't equal gauge balance"
+            )
         })
     })
     describe('Upgradeability', () => {

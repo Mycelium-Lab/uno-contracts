@@ -10,7 +10,7 @@ interface IUnoFarmBalancer {
     }
     struct SwapInfo{
         IVault.BatchSwapStep[] swaps;
-        IAsset[] assets;
+        IERC20[] assets;
         int256[] limits;
     }
 
@@ -21,7 +21,7 @@ interface IUnoFarmBalancer {
     function initialize( address _lpPool, address _assetRouter) external;
 
     function deposit(uint256[] memory amounts, address[] memory tokens, uint256 minAmountLP, uint256 amountLP, address recipient) external returns(uint256 liquidity);
-    function withdraw(uint256 amount, uint256[] calldata minAmountsOut, bool withdrawLP, address origin, address recipient) external;
+    function withdraw(uint256 amount, uint256[] calldata minAmountsOut, bool withdrawLP, address origin, address recipient) external returns(uint256[] memory amounts);
 
     function distribute(
         SwapInfo[] calldata swapInfos,
