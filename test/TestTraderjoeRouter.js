@@ -29,7 +29,7 @@ const masterJoeAddress = '0x4483f0b6e2F5486D06958C20f8C39A7aBe87bf8F'
 const JOEHolder = '0x799d4c5e577cf80221a076064a2054430d2af5cd' // has to be unlocked and hold 0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a
 
 const account1 = '0x05810778827F97e742AB4657660901F4d6FA9dCf' // has to be unlocked and hold 0xf4003F4efBE8691B60249E6afbD307aBE7758adb
-const account2 = '0x8a5658c67c5a28885e8dac103b3400b186025e93' // has to be unlocked and hold 0xf4003F4efBE8691B60249E6afbD307aBE7758adb
+const account2 = '0x8a5658C67C5a28885E8DAc103B3400b186025E93' // has to be unlocked and hold 0xf4003F4efBE8691B60249E6afbD307aBE7758adb
 const account3 = '0xBF14DB80D9275FB721383a77C00Ae180fc40ae98' // has to be unlocked and hold wAVAX-USDC
 
 const amounts = [
@@ -389,12 +389,12 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                 )
             })
             it('fires events', async () => {
-                // expectEvent(receipt, 'Deposit', {
-                //     lpPool: pool,
-                //     sender: account1,
-                //     recipient: account1,
-                //     amount: amounts[1],
-                // })
+                expectEvent(receipt, 'Deposit', {
+                    lpPool: pool,
+                    sender: account1,
+                    recipient: account1,
+                    amount: amounts[1],
+                })
             })
             it('updates stakes', async () => {
                 const { stakeLP } = await assetRouter.userStake(account1, pool)
@@ -441,17 +441,14 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                     { from: account2 }
                 )
             })
-            afterEach(async () => {
-                console.log('_+_+_+_+_+_+_+_+_+_+_+_=-=-=-=-=---=')
-            })
+
             it('fires events', async () => {
-                console.log(account2)
-                // expectEvent(receipt, 'Deposit', {
-                //     lpPool: pool,
-                //     sender: account2,
-                //     recipient: account2,
-                //     amount: amounts[2],
-                // })
+                expectEvent(receipt, 'Deposit', {
+                    lpPool: pool,
+                    sender: account2,
+                    recipient: account2,
+                    amount: amounts[2],
+                })
             })
             it("doesn't change stakes for account[0]", async () => {
                 const { stakeLP } = await assetRouter.userStake(account1, pool)
@@ -507,12 +504,12 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                 )
             })
             it('fires event', async () => {
-                // expectEvent(receipt, 'Deposit', {
-                //     lpPool: pool,
-                //     sender: account1,
-                //     recipient: account2,
-                //     amount: amounts[3],
-                // })
+                expectEvent(receipt, 'Deposit', {
+                    lpPool: pool,
+                    sender: account1,
+                    recipient: account2,
+                    amount: amounts[3],
+                })
             })
             it('doesnt change stakes for account1', async () => {
                 const { stakeLP } = await assetRouter.userStake(account1, pool)
@@ -803,18 +800,18 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                 )
             })
             it('fires events', async () => {
-                // expectEvent(receipt1, 'Withdraw', {
-                //     lpPool: pool,
-                //     sender: account1,
-                //     recipient: account1,
-                //     amount: amounts[0],
-                // })
-                // expectEvent(receipt2, 'Withdraw', {
-                //     lpPool: pool,
-                //     sender: account2,
-                //     recipient: account2,
-                //     amount: amounts[2],
-                // })
+                expectEvent(receipt1, 'Withdraw', {
+                    lpPool: pool,
+                    sender: account1,
+                    recipient: account1,
+                    amount: amounts[0],
+                })
+                expectEvent(receipt2, 'Withdraw', {
+                    lpPool: pool,
+                    sender: account2,
+                    recipient: account2,
+                    amount: amounts[2],
+                })
             })
 
             it('correctly updates userStake for account1', async () => {
@@ -891,12 +888,12 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                 )
             })
             it('fires events', async () => {
-                // expectEvent(receipt, 'Withdraw', {
-                //     lpPool: pool,
-                //     sender: account1,
-                //     recipient: account2,
-                //     amount: amounts[1],
-                // })
+                expectEvent(receipt, 'Withdraw', {
+                    lpPool: pool,
+                    sender: account1,
+                    recipient: account2,
+                    amount: amounts[1],
+                })
             })
             it('correctly changes userStake for account1', async () => {
                 const { stakeLP } = await assetRouter.userStake(account1, pool)
@@ -965,12 +962,12 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                 )
             })
             it('fires events', async () => {
-                // expectEvent(receipt, 'Withdraw', {
-                //     lpPool: pool,
-                //     sender: account1,
-                //     recipient: account1,
-                //     amount: stakeLP1,
-                // })
+                expectEvent(receipt, 'Withdraw', {
+                    lpPool: pool,
+                    sender: account1,
+                    recipient: account1,
+                    amount: stakeLP1,
+                })
             })
             it('correctly updates account1 stake', async () => {
                 const { stakeLP, stakeA, stakeB } = await assetRouter.userStake(
@@ -1042,12 +1039,12 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                 )
             })
             it('fires events', async () => {
-                // expectEvent(receipt, 'Withdraw', {
-                //     lpPool: pool,
-                //     sender: account2,
-                //     recipient: account1,
-                //     amount: stakeLP2,
-                // })
+                expectEvent(receipt, 'Withdraw', {
+                    lpPool: pool,
+                    sender: account2,
+                    recipient: account1,
+                    amount: stakeLP2,
+                })
             })
             it('correctly updates account2 stake', async () => {
                 const { stakeLP, stakeA, stakeB } = await assetRouter.userStake(
@@ -1568,7 +1565,6 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
             })
             it('fires events', async () => {
                 ethBalanceBefore = new BN(await web3.eth.getBalance(account3))
-                console.log(ethBalanceBefore)
                 const receipt = await assetRouter.depositETH(
                     pool,
                     amountToken,
