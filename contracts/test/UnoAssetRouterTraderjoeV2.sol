@@ -30,6 +30,8 @@ contract UnoAssetRouterTraderjoeV2 is
 	bytes32 private constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
 	bytes32 private constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
+    uint256 public constant version = 2;
+
 	uint256 public fee;
 
 	address public constant WAVAX = 0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7;
