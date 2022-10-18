@@ -3,35 +3,33 @@ const {
 } = require('@openzeppelin/test-helpers')
 const { deployProxy, upgradeProxy } = require('@openzeppelin/truffle-upgrades')
 
-const timeMachine = require('ganache-time-traveler')
-
-const IStakingDualRewards = artifacts.require('IStakingDualRewards')
-const IStakingDualRewardsFactory = artifacts.require('IStakingDualRewardsFactory')
 const IUniswapV2Pair = artifacts.require('IUniswapV2Pair')
 const IUniswapV2Router01 = artifacts.require('IUniswapV2Router01')
+const IMiniChefV2 = artifacts.require('IMiniChefV2')
+const IERC20 = artifacts.require('IERC20')
+const IRewarder = artifacts.require('IRewarder')
 
 const AccessManager = artifacts.require('UnoAccessManager')
 const FarmFactory = artifacts.require('UnoFarmFactory')
 
-const Farm = artifacts.require('UnoFarmQuickswapDual')
-const AssetRouter = artifacts.require('UnoAssetRouterQuickswapDual')
-const AssetRouterV2 = artifacts.require('UnoAssetRouterQuickswapDualV2')
+const Farm = artifacts.require('UnoFarmSushiswap')
+const AssetRouter = artifacts.require('UnoAssetRouterSushiswap')
+const AssetRouterV2 = artifacts.require('UnoAssetRouterSushiswapV2')
 
-const quickswapRouter = '0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff'
-const pool = '0x14977e7E263FF79c4c3159F497D9551fbE769625' // WMATIC-USDC
-const pool2 = '0x3c1f53fed2238176419F8f897aEc8791C499e3c8' // MATIC-ETH
-const pool3 = '0x8ECbc9B0741C000fd7aaE9cb559e5eEe1D1883F3' // WMATIC-stMATIC
+const sushiswapRouter = '0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506'
+const pool = '0x4B1F1e2435A9C96f7330FAea190Ef6A7C8D70001' // usdt usdc
+const pool2 = '0x34965ba0ac2451A34a0471F04CCa3F990b8dea27' // usdc weth
+const pool3 = '0xc4e595acDD7d12feC385E5dA5D43160e8A0bAC0E' // wmatic weth
+const miniChefAddress = '0x0769fd68dFb93167989C6f7254cd0D766Fb2841F'
 
-const DQuickHolder = '0xcf0b86f9944a60a0ba22b51a33c11d9e4de1ce9f'// has to be unlocked and hold 0xf28164A485B0B2C90639E47b0f377b4a438a16B1
-const WMaticHolder = '0xFffbCD322cEace527C8ec6Da8de2461C6D9d4e6e'// has to be unlocked and hold 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270
+const SUSHIHolder = '0x0f0c716B007C289C0011e470CC7f14DE4fE9Fc80'// has to be unlocked and hold 0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a
+const WMATICHolder = '0xFffbCD322cEace527C8ec6Da8de2461C6D9d4e6e'// has to be unlocked and hold 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270
 
-const stakingRewardsOwner = '0x476307dac3fd170166e007fcaa14f0a129721463'// has to be unlocked
+const account1 = '0x8Bb92f62DF8b60B1b87e63C35f887D5b61ee585b'// has to be unlocked and hold 0x4B1F1e2435A9C96f7330FAea190Ef6A7C8D70001
+const account2 = '0x4C5f1D9A89B822D2C3D600A07F24f311aC8E6162'// has to be unlocked and hold 0x4B1F1e2435A9C96f7330FAea190Ef6A7C8D70001
+const account3 = '0x9bdB521a97E95177BF252C253E256A60C3e14447' // has to be unlocked and hold 0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619 (WETH)
 
-const account1 = '0xDaBDab6115D32136d0E663A5d0e867923A923EeF'// has to be unlocked and hold 0x6e7a5FAFcec6BB1e78bAE2A1F0B612012BF14827
-const account2 = '0x531d7e9Fbb690B76d9462a06d9036B24f2F3Ff12'// has to be unlocked and hold 0x6e7a5FAFcec6BB1e78bAE2A1F0B612012BF14827
-const account3 = '0xAbb0Da08A53f378F2d559ee24e1ABf1A4785c908' // has to be unlocked and hold 0x3A58a54C066FdC0f2D55FC9C89F0415C92eBf3C4 (stMATIC)
-
-const amounts = [new BN(1000000), new BN(3000000), new BN(500000), new BN(4000000), new BN('1000000000000000')]
+const amounts = [new BN(1000), new BN(3000), new BN(500), new BN(4000), new BN(4400000000)]
 
 const feeCollector = '0xFFFf795B802CB03FD664092Ab169f5f5c236335c'
 const fee = new BN('40000000000000000')// 4%
@@ -41,7 +39,7 @@ approxeq = (bn1, bn2, epsilon, message) => {
     assert.ok(!amountDelta.isNeg(), message)
 }
 
-contract('UnoAssetRouterQuickswapDual', (accounts) => {
+contract('UnoAssetRouterSushiswap', (accounts) => {
     const admin = accounts[0]
     const pauser = accounts[1]
     const distributor = accounts[2]
@@ -49,21 +47,18 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
     let accessManager; let assetRouter; let
         factory
 
-    let stakingRewards; let
-        stakingToken
-    let snapshotId
+    let stakingToken
 
     let tokenA; let
         tokenB
+    let miniChef; let
+        rewarder
+    let pid
+    let rewardToken; let
+        rewarderToken
 
     const initReceipt = {}
-    let rewardsTokenA; let
-        rewardsTokenB
-
     before(async () => {
-        const snapshot = await timeMachine.takeSnapshot()
-        snapshotId = snapshot.result
-
         const implementation = await Farm.new({ from: account1 })
         accessManager = await AccessManager.new({ from: admin })// accounts[0] is admin
 
@@ -79,39 +74,52 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
             fromBlock: _receipt.block,
             toBlock: _receipt.block
         })
-
         // convert web3's receipt to truffle's format
         initReceipt.tx = _receipt.transactionHash
         initReceipt.receipt = _receipt
         initReceipt.logs = events
 
-        stakingRewards = await IStakingDualRewards.at(pool)
+        stakingToken = await IERC20.at(pool)
 
-        const stakingTokenAddress = await stakingRewards.stakingToken()
-        stakingToken = await IUniswapV2Pair.at(stakingTokenAddress)
+        const lpToken = await IUniswapV2Pair.at(pool)
 
-        const tokenAAddress = await stakingToken.token0()
-        const tokenBAddress = await stakingToken.token1()
+        const tokenAAddress = await lpToken.token0()
+        const tokenBAddress = await lpToken.token1()
 
-        tokenA = await IUniswapV2Pair.at(tokenAAddress)// should be ERC20 but IUniswapV2Pair has everything we need
-        tokenB = await IUniswapV2Pair.at(tokenBAddress)// should be ERC20 but IUniswapV2Pair has everything we need
+        tokenA = await IERC20.at(tokenAAddress)
+        tokenB = await IERC20.at(tokenBAddress)
 
-        const stakingRewardsFactoryAddress = await stakingRewards.dualRewardsDistribution()
-        const stakingRewardsFactory = await IStakingDualRewardsFactory.at(stakingRewardsFactoryAddress)
+        miniChef = await IMiniChefV2.at(miniChefAddress)
+        const poolLength = await miniChef.poolLength()
 
-        const rewardsTokenAAddress = await stakingRewards.rewardsTokenA()// dQuick
-        rewardsTokenA = await IUniswapV2Pair.at(rewardsTokenAAddress)
-        const rewardAmountA = await rewardsTokenA.balanceOf(DQuickHolder)
-        await rewardsTokenA.transfer(stakingRewardsFactory.address, rewardAmountA, { from: DQuickHolder })
+        for (let i = 0; i < poolLength.toNumber(); i++) {
+            const _lpToken = await miniChef.lpToken(i)
+            if (_lpToken.toString() === pool) {
+                pid = i
+                break
+            }
+        }
 
-        const rewardsTokenBAddress = await stakingRewards.rewardsTokenB()// WMatic
-        rewardsTokenB = await IUniswapV2Pair.at(rewardsTokenBAddress)
-        const rewardAmountB = await rewardsTokenB.balanceOf(WMaticHolder)
-        await rewardsTokenB.transfer(stakingRewardsFactory.address, rewardAmountB, { from: WMaticHolder })
+        rewardToken = await miniChef.SUSHI()
 
-        // add rewards to pool
-        await stakingRewardsFactory.update(stakingToken.address, rewardAmountA, rewardAmountB, 1000000, { from: stakingRewardsOwner })
-        await stakingRewardsFactory.notifyRewardAmount(stakingToken.address, { from: stakingRewardsOwner })
+        try {
+            const rewarderAddress = await miniChef.rewarder(pid)
+
+            rewarder = await IRewarder.at(rewarderAddress)
+            const data = await rewarder.pendingTokens(pid, constants.ZERO_ADDRESS, 0)
+            rewarderToken = data['0']['0'].toString()
+
+            const WMATICtoken = await IERC20.at(rewarderToken)
+            const WMATICbalance = await WMATICtoken.balanceOf(WMATICHolder)
+
+            await WMATICtoken.transfer(rewarderAddress, WMATICbalance, { from: WMATICHolder })
+        } catch (error) {
+            rewarderToken = constants.ZERO_ADDRESS
+        }
+
+        const SUSHItoken = await IERC20.at(rewardToken)
+        const SUSHIbalance = await SUSHItoken.balanceOf(SUSHIHolder)
+        await SUSHItoken.transfer(miniChefAddress, SUSHIbalance, { from: SUSHIHolder })
     })
 
     describe('Emits initialize event', () => {
@@ -266,8 +274,8 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
         })
     })
 
+    let farm
     describe('Deposits', () => {
-        let farm
         describe('reverts', () => {
             it('reverts if total amount provided is zero', async () => {
                 await expectRevert(
@@ -311,7 +319,7 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
             })
             it('stakes tokens in StakingRewards contract', async () => {
                 assert.equal(
-                    (await stakingRewards.balanceOf(farm.address)).toString(),
+                    (await miniChef.userInfo(pid, farm.address))['0'].toString(),
                     amounts[0].toString(),
                     "Total amount sent doesn't equal StakingRewards farm balance"
                 )
@@ -349,8 +357,8 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
             })
             it('stakes tokens in StakingRewards contract', async () => {
                 assert.equal(
-                    (await stakingRewards.balanceOf(farm.address)).toString(),
-                    amounts[0].add(amounts[1]).toString(),
+                    (await miniChef.userInfo(pid, farm.address))['0'].toString(),
+                    (amounts[0].add(amounts[1])).toString(),
                     "Total amount sent doesn't equal StakingRewards farm balance"
                 )
             })
@@ -395,8 +403,8 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
             })
             it('stakes tokens in StakingRewards contract', async () => {
                 assert.equal(
-                    await stakingRewards.balanceOf(farm.address),
-                    amounts[0].add(amounts[1]).add(amounts[2]).toString(),
+                    (await miniChef.userInfo(pid, farm.address))['0'].toString(),
+                    (amounts[0].add(amounts[1]).add(amounts[2])).toString(),
                     "Total amount sent doesn't equal StakingRewards farm balance"
                 )
             })
@@ -437,8 +445,8 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
             })
             it('stakes tokens in StakingRewards contract', async () => {
                 assert.equal(
-                    (await stakingRewards.balanceOf(farm.address)).toString(),
-                    amounts[0].add(amounts[1]).add(amounts[2]).add(amounts[3]).toString(),
+                    (await miniChef.userInfo(pid, farm.address))['0'].toString(),
+                    (amounts[0].add(amounts[1]).add(amounts[2]).add(amounts[3])).toString(),
                     "Total amount sent doesn't equal StakingRewards farm balance"
                 )
             })
@@ -446,12 +454,15 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
         describe('deposit normal tokens', () => {
             let balanceAbefore; let
                 balanceBbefore
+            let stakeABefore; let
+                stakeBBefore
 
             let amountA; let
                 amountB
+
             before(async () => {
-                const routerContract = await IUniswapV2Router01.at(quickswapRouter)
-                await stakingToken.approve(quickswapRouter, amounts[4], { from: account1 })
+                const routerContract = await IUniswapV2Router01.at(sushiswapRouter)
+                await stakingToken.approve(sushiswapRouter, amounts[4], { from: account1 })
                 const tx = await routerContract.removeLiquidity(
                     tokenA.address,
                     tokenB.address,
@@ -470,7 +481,8 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
                 amountB = web3.utils.hexToNumberString(`0x${event.data.substring(66, 130)}`)
 
                 balanceAbefore = await tokenA.balanceOf(account1)
-                balanceBbefore = await tokenB.balanceOf(account1)
+                balanceBbefore = await tokenB.balanceOf(account1);
+                ({ stakeLP, stakeA: stakeABefore, stakeB: stakeBBefore } = await assetRouter.userStake(account1, pool))
 
                 await tokenA.approve(assetRouter.address, amountA, { from: account1 })
                 await tokenB.approve(assetRouter.address, amountB, { from: account1 })
@@ -490,34 +502,37 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
                 expectEvent(receipt, 'Deposit', { lpPool: pool, sender: account1, recipient: account1 })
             })
             it('withdraws tokens from balance', async () => {
+                const { stakeA, stakeB } = await assetRouter.userStake(account1, pool)
                 const balanceAafter = await tokenA.balanceOf(account1)
                 const balanceBafter = await tokenB.balanceOf(account1)
 
-                assert.ok((balanceAbefore.sub(balanceAafter)).gt('0'), 'TokenA not withdrawn')
-                assert.ok((balanceBbefore.sub(balanceBafter)).gt('0'), 'TokenB not withdrawn')
+                approxeq(stakeA.sub(stakeABefore), balanceAbefore.sub(balanceAafter), new BN(1), 'StakeA is not correct')
+                approxeq(stakeB.sub(stakeBBefore), balanceBbefore.sub(balanceBafter), new BN(1), 'StakeB is not correct')
             })
-            let addedStake
             it('updates stakes', async () => {
                 const { stakeLP } = await assetRouter.userStake(account1, pool)
-                assert.ok(stakeLP.gt(amounts[0].add(amounts[1])), 'LP stake not increased')
-                addedStake = stakeLP.sub(amounts[0].add(amounts[1]))
+                approxeq(
+                    stakeLP,
+                    amounts[0].add(amounts[1]).add(amounts[4]),
+                    new BN(10),
+                    "LP Amount sent doesn't equal userStake"
+                )
             })
             it('updates totalDeposits', async () => {
                 const { totalDepositsLP } = await assetRouter.totalDeposits(pool)
-                assert.equal(
-                    totalDepositsLP.toString(),
-                    (amounts[0].add(amounts[1]).add(amounts[2]).add(amounts[3]).add(addedStake))
-                        .toString(),
+                approxeq(
+                    totalDepositsLP,
+                    amounts[0].add(amounts[1]).add(amounts[2]).add(amounts[3]).add(amounts[4]),
+                    new BN(10),
                     "Total amount sent doesn't equal totalDeposits"
                 )
             })
             it('stakes tokens in StakingRewards contract', async () => {
-                const stakingRewardBalance = await stakingRewards.balanceOf(farm.address)
-                assert.equal(
-                    stakingRewardBalance.toString(),
-                    (amounts[0].add(amounts[1]).add(amounts[2]).add(amounts[3]).add(addedStake))
-                        .toString(),
-                    "Total amount sent doesn't equal staking reward balance"
+                approxeq(
+                    (await miniChef.userInfo(pid, farm.address))['0'],
+                    amounts[0].add(amounts[1]).add(amounts[2]).add(amounts[3]).add(amounts[4]),
+                    new BN(10),
+                    "Total amount sent doesn't equal totalDeposits"
                 )
             })
         })
@@ -631,7 +646,6 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
             before(async () => {
                 balance1before = await stakingToken.balanceOf(account1)
                 balance2before = await stakingToken.balanceOf(account2);
-
                 ({ stakeLP: stake1before } = await assetRouter.userStake(account1, pool));
                 ({ stakeLP: stake2before } = await assetRouter.userStake(account2, pool))
 
@@ -767,9 +781,9 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
             before(async () => {
                 balanceAbefore = await tokenA.balanceOf(account1)
                 balanceBbefore = await tokenB.balanceOf(account1);
+
                 ({ stakeLP: stakeLP1, stakeA: stakeA1, stakeB: stakeB1 } = await assetRouter.userStake(account1, pool));
                 ({ stakeLP: stakeLP2, stakeA: stakeA2, stakeB: stakeB2 } = await assetRouter.userStake(account2, pool))
-
                 receipt = await assetRouter.withdraw(pool, stakeLP2, 0, 0, false, account1, { from: account2 })
             })
             it('fires events', async () => {
@@ -923,37 +937,41 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
                 const USDC = await IUniswapV2Pair.at('0x2791bca1f2de4661ed88a30c99a7a9449aa84174')
                 feeCollectorBalanceBefore = await USDC.balanceOf(feeCollector)
 
-                await time.increase(50000)
-
+                await time.increase(5000000)
                 receipt = await assetRouter.distribute(
                     pool,
                     [
                         {
                             route: [
-                                rewardsTokenA.address, // dQuick
-                                '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
-                                tokenA.address// WMATIC
+                                rewardToken,
+                                '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
+                                '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619',
+                                tokenA.address
                             ],
                             amountOutMin: 0
                         },
                         {
                             route: [
-                                rewardsTokenA.address, // dQuick
-                                '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
-                                tokenB.address// USDC
+                                rewardToken,
+                                '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
+                                '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619',
+                                tokenB.address
                             ],
                             amountOutMin: 0
                         },
                         {
                             route: [
-
+                                rewarderToken,
+                                '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619',
+                                tokenA.address
                             ],
                             amountOutMin: 0
                         },
                         {
                             route: [
-                                rewardsTokenB.address, // WMATIC
-                                tokenB.address// USDC
+                                rewarderToken,
+                                '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619',
+                                tokenB.address
                             ],
                             amountOutMin: 0
                         }
@@ -961,15 +979,15 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
                     [
                         {
                             route: [
-                                rewardsTokenA.address, // dQuick
-                                '0x831753DD7087CaC61aB5644b308642cc1c33Dc13',
+                                rewardToken,
+                                '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
                                 '0x2791bca1f2de4661ed88a30c99a7a9449aa84174'
                             ],
                             amountOutMin: 0
                         },
                         {
                             route: [
-                                rewardsTokenB.address, // WMATIC
+                                rewarderToken,
                                 '0x2791bca1f2de4661ed88a30c99a7a9449aa84174'
                             ],
                             amountOutMin: 0
@@ -987,7 +1005,7 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
                 assert.ok(stake1.gt(balance1), 'Stake1 not increased')
 
                 const { stakeLP: stake2 } = await assetRouter.userStake(account2, pool)
-                assert.ok(stake2.gt(balance2), 'Stake1 not increased')
+                assert.ok(stake2.gt(balance2), 'Stake2 not increased')
             })
             it('collects fees', async () => {
                 const USDC = await IUniswapV2Pair.at('0x2791bca1f2de4661ed88a30c99a7a9449aa84174')
@@ -997,9 +1015,9 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
         })
         describe('bad path reverts', () => {
             before(async () => {
-                await time.increase(50000)
+                await time.increase(5000000)
             })
-            it('reverts if passed wrong reward A token', async () => {
+            it('reverts if passed wrong reward token', async () => {
                 await expectRevert(
                     assetRouter.distribute(
                         pool,
@@ -1007,27 +1025,28 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
                             {
                                 route: [
                                     constants.ZERO_ADDRESS,
-                                    tokenA.address// WMATIC
+                                    tokenA.address
                                 ],
                                 amountOutMin: 0
                             },
                             {
                                 route: [
-                                    rewardsTokenA.address, // dQuick
-                                    tokenB.address// USDC
+                                    rewardToken,
+                                    tokenB.address
                                 ],
                                 amountOutMin: 0
                             },
                             {
                                 route: [
-
+                                    rewarderToken,
+                                    tokenA.address
                                 ],
                                 amountOutMin: 0
                             },
                             {
                                 route: [
-                                    rewardsTokenB.address, // WMATIC
-                                    tokenB.address// USDC
+                                    rewarderToken,
+                                    tokenB.address
                                 ],
                                 amountOutMin: 0
                             }
@@ -1045,7 +1064,7 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
                         feeCollector,
                         { from: distributor }
                     ),
-                    'BAD_REWARD_A_TOKEN_A_ROUTE'
+                    'BAD_REWARD_TOKEN_A_ROUTE'
                 )
                 await expectRevert(
                     assetRouter.distribute(
@@ -1053,28 +1072,29 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
                         [
                             {
                                 route: [
-                                    rewardsTokenA.address, // dQuick
-                                    tokenA.address// WMATIC
+                                    rewardToken,
+                                    tokenA.address
                                 ],
                                 amountOutMin: 0
                             },
                             {
                                 route: [
                                     constants.ZERO_ADDRESS,
-                                    tokenA.address// USDC
+                                    tokenB.address
                                 ],
                                 amountOutMin: 0
                             },
                             {
                                 route: [
-
+                                    rewarderToken,
+                                    tokenA.address
                                 ],
                                 amountOutMin: 0
                             },
                             {
                                 route: [
-                                    rewardsTokenB.address, // WMATIC
-                                    tokenB.address// USDC
+                                    rewarderToken,
+                                    tokenB.address
                                 ],
                                 amountOutMin: 0
                             }
@@ -1092,7 +1112,7 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
                         feeCollector,
                         { from: distributor }
                     ),
-                    'BAD_REWARD_A_TOKEN_B_ROUTE'
+                    'BAD_REWARD_TOKEN_B_ROUTE'
                 )
                 await expectRevert(
                     assetRouter.distribute(
@@ -1100,28 +1120,29 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
                         [
                             {
                                 route: [
-                                    rewardsTokenA.address, // dQuick
-                                    tokenA.address// WMATIC
+                                    rewardToken,
+                                    tokenA.address
                                 ],
                                 amountOutMin: 0
                             },
                             {
                                 route: [
-                                    rewardsTokenA.address,
-                                    tokenA.address// USDC
+                                    rewardToken,
+                                    tokenB.address
                                 ],
                                 amountOutMin: 0
                             },
                             {
                                 route: [
-
+                                    rewarderToken,
+                                    tokenA.address
                                 ],
                                 amountOutMin: 0
                             },
                             {
                                 route: [
-                                    rewardsTokenB.address, // WMATIC
-                                    tokenB.address// USDC
+                                    rewarderToken,
+                                    tokenB.address
                                 ],
                                 amountOutMin: 0
                             }
@@ -1136,255 +1157,7 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
                             },
                             {
                                 route: [
-                                    rewardsTokenB.address,
-                                    '0x2791bca1f2de4661ed88a30c99a7a9449aa84174'
-                                ],
-                                amountOutMin: 0
-                            }
-                        ],
-                        feeCollector,
-                        { from: distributor }
-                    ),
-                    'BAD_FEE_TOKEN_ROUTE'
-                )
-            })
-            it('reverts if passed wrong tokenA', async () => {
-                await expectRevert(
-                    assetRouter.distribute(
-                        pool,
-                        [
-                            {
-                                route: [
-                                    rewardsTokenA.address, // dQuick
-                                    constants.ZERO_ADDRESS
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [
-                                    rewardsTokenA.address, // dQuick
-                                    tokenB.address// USDC
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [
-
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [
-                                    rewardsTokenB.address, // WMATIC
-                                    tokenB.address// USDC
-                                ],
-                                amountOutMin: 0
-                            }
-                        ],
-                        [
-                            {
-                                route: [],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [],
-                                amountOutMin: 0
-                            }
-                        ],
-                        feeCollector,
-                        { from: distributor }
-                    ),
-                    'BAD_REWARD_A_TOKEN_A_ROUTE'
-                )
-            })
-            it('reverts if passed wrong tokenB', async () => {
-                await expectRevert(
-                    assetRouter.distribute(
-                        pool,
-                        [
-                            {
-                                route: [
-                                    rewardsTokenA.address, // dQuick
-                                    tokenA.address// WMATIC
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [
-                                    rewardsTokenA.address, // dQuick
-                                    constants.ZERO_ADDRESS
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [
-
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [
-                                    rewardsTokenB.address, // WMATIC
-                                    tokenB.address// USDC
-                                ],
-                                amountOutMin: 0
-                            }
-                        ],
-                        [
-                            {
-                                route: [],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [],
-                                amountOutMin: 0
-                            }
-                        ],
-                        feeCollector,
-                        { from: distributor }
-                    ),
-                    'BAD_REWARD_A_TOKEN_B_ROUTE'
-                )
-                await expectRevert(
-                    assetRouter.distribute(
-                        pool,
-                        [
-                            {
-                                route: [
-                                    rewardsTokenA.address, // dQuick
-                                    tokenA.address// WMATIC
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [
-                                    rewardsTokenA.address, // dQuick
-                                    tokenB.address// USDC
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [
-
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [
-                                    rewardsTokenB.address, // WMATIC
-                                    constants.ZERO_ADDRESS
-                                ],
-                                amountOutMin: 0
-                            }
-                        ],
-                        [
-                            {
-                                route: [],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [],
-                                amountOutMin: 0
-                            }
-                        ],
-                        feeCollector,
-                        { from: distributor }
-                    ),
-                    'BAD_REWARD_B_TOKEN_B_ROUTE'
-                )
-            })
-            it('reverts if passed wrong reward B token', async () => {
-                await expectRevert(
-                    assetRouter.distribute(
-                        pool,
-                        [
-
-                            {
-                                route: [
-                                    rewardsTokenA.address, // dQuick
-                                    tokenA.address// WMATIC
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [
-                                    rewardsTokenA.address, // dQuick
-                                    tokenB.address// USDC
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [
-
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [
-                                    constants.ZERO_ADDRESS,
-                                    tokenB.address// USDC
-                                ],
-                                amountOutMin: 0
-                            }
-                        ],
-                        [
-                            {
-                                route: [],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [],
-                                amountOutMin: 0
-                            }
-                        ],
-                        feeCollector,
-                        { from: distributor }
-                    ),
-                    'BAD_REWARD_B_TOKEN_B_ROUTE'
-                )
-                await expectRevert(
-                    assetRouter.distribute(
-                        pool,
-                        [
-                            {
-                                route: [
-                                    rewardsTokenA.address, // dQuick
-                                    tokenA.address// WMATIC
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [
-                                    rewardsTokenA.address,
-                                    tokenA.address// USDC
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [
-
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [
-                                    rewardsTokenB.address, // WMATIC
-                                    tokenB.address// USDC
-                                ],
-                                amountOutMin: 0
-                            }
-                        ],
-                        [
-                            {
-                                route: [
-                                    rewardsTokenA.address,
-                                    '0x2791bca1f2de4661ed88a30c99a7a9449aa84174'
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [
-                                    constants.ZERO_ADDRESS,
+                                    rewarderToken,
                                     '0x2791bca1f2de4661ed88a30c99a7a9449aa84174'
                                 ],
                                 amountOutMin: 0
@@ -1396,6 +1169,360 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
                     'BAD_FEE_TOKEN_ROUTE'
                 )
             })
+            it('reverts if passed wrong tokenA in reward route', async () => {
+                await expectRevert(
+                    assetRouter.distribute(
+                        pool,
+                        [
+                            {
+                                route: [
+                                    rewardToken,
+                                    constants.ZERO_ADDRESS
+                                ],
+                                amountOutMin: 0
+                            },
+                            {
+                                route: [
+                                    rewardToken,
+                                    tokenB.address
+                                ],
+                                amountOutMin: 0
+                            },
+                            {
+                                route: [
+                                    rewarderToken,
+                                    tokenA.address
+                                ],
+                                amountOutMin: 0
+                            },
+                            {
+                                route: [
+                                    rewarderToken,
+                                    tokenB.address
+                                ],
+                                amountOutMin: 0
+                            }
+                        ],
+                        [
+                            {
+                                route: [],
+                                amountOutMin: 0
+                            },
+                            {
+                                route: [],
+                                amountOutMin: 0
+                            }
+                        ],
+                        feeCollector,
+                        { from: distributor }
+                    ),
+                    'BAD_REWARD_TOKEN_A_ROUTE'
+                )
+            })
+            it('reverts if passed wrong tokenB in reward route', async () => {
+                await expectRevert(
+                    assetRouter.distribute(
+                        pool,
+                        [
+                            {
+                                route: [
+                                    rewardToken,
+                                    tokenA.address
+                                ],
+                                amountOutMin: 0
+                            },
+                            {
+                                route: [
+                                    rewardToken,
+                                    constants.ZERO_ADDRESS
+                                ],
+                                amountOutMin: 0
+                            },
+                            {
+                                route: [
+                                    rewarderToken,
+                                    tokenA.address
+                                ],
+                                amountOutMin: 0
+                            },
+                            {
+                                route: [
+                                    rewarderToken,
+                                    tokenB.address
+                                ],
+                                amountOutMin: 0
+                            }
+                        ],
+                        [
+                            {
+                                route: [],
+                                amountOutMin: 0
+                            },
+                            {
+                                route: [],
+                                amountOutMin: 0
+                            }
+                        ],
+                        feeCollector,
+                        { from: distributor }
+                    ),
+                    'BAD_REWARD_TOKEN_B_ROUTE'
+                )
+            })
+            if (rewarderToken !== constants.ZERO_ADDRESS) {
+                it('reverts if passed wrong rewardER token', async () => {
+                    await expectRevert(
+                        assetRouter.distribute(
+                            pool,
+                            [
+                                {
+                                    route: [
+                                        rewardToken,
+                                        tokenA.address
+                                    ],
+                                    amountOutMin: 0
+                                },
+                                {
+                                    route: [
+                                        rewardToken,
+                                        tokenB.address
+                                    ],
+                                    amountOutMin: 0
+                                },
+                                {
+                                    route: [
+                                        constants.ZERO_ADDRESS,
+                                        tokenA.address
+                                    ],
+                                    amountOutMin: 0
+                                },
+                                {
+                                    route: [
+                                        rewarderToken,
+                                        tokenB.address
+                                    ],
+                                    amountOutMin: 0
+                                }
+                            ],
+                            [
+                                {
+                                    route: [],
+                                    amountOutMin: 0
+                                },
+                                {
+                                    route: [],
+                                    amountOutMin: 0
+                                }
+                            ],
+                            feeCollector,
+                            { from: distributor }
+                        ),
+                        'BAD_REWARDER_TOKEN_A_ROUTE'
+                    )
+                    await expectRevert(
+                        assetRouter.distribute(
+                            pool,
+                            [
+                                {
+                                    route: [
+                                        rewardToken,
+                                        tokenA.address
+                                    ],
+                                    amountOutMin: 0
+                                },
+                                {
+                                    route: [
+                                        rewardToken,
+                                        tokenB.address
+                                    ],
+                                    amountOutMin: 0
+                                },
+                                {
+                                    route: [
+                                        rewarderToken,
+                                        tokenA.address
+                                    ],
+                                    amountOutMin: 0
+                                },
+                                {
+                                    route: [
+                                        constants.ZERO_ADDRESS,
+                                        tokenB.address
+                                    ],
+                                    amountOutMin: 0
+                                }
+                            ],
+                            [
+                                {
+                                    route: [],
+                                    amountOutMin: 0
+                                },
+                                {
+                                    route: [],
+                                    amountOutMin: 0
+                                }
+                            ],
+                            feeCollector,
+                            { from: distributor }
+                        ),
+                        'BAD_REWARDER_TOKEN_B_ROUTE'
+                    )
+                    await expectRevert(
+                        assetRouter.distribute(
+                            pool,
+                            [
+                                {
+                                    route: [
+                                        rewardToken,
+                                        tokenA.address
+                                    ],
+                                    amountOutMin: 0
+                                },
+                                {
+                                    route: [
+                                        rewardToken,
+                                        tokenB.address
+                                    ],
+                                    amountOutMin: 0
+                                },
+                                {
+                                    route: [
+                                        rewarderToken,
+                                        tokenA.address
+                                    ],
+                                    amountOutMin: 0
+                                },
+                                {
+                                    route: [
+                                        rewarderToken,
+                                        tokenB.address
+                                    ],
+                                    amountOutMin: 0
+                                }
+                            ],
+                            [
+                                {
+                                    route: [
+                                        rewardToken,
+                                        '0x2791bca1f2de4661ed88a30c99a7a9449aa84174'
+                                    ],
+                                    amountOutMin: 0
+                                },
+                                {
+                                    route: [
+                                        constants.ZERO_ADDRESS,
+                                        '0x2791bca1f2de4661ed88a30c99a7a9449aa84174'
+                                    ],
+                                    amountOutMin: 0
+                                }
+                            ],
+                            feeCollector,
+                            { from: distributor }
+                        ),
+                        'BAD_FEE_TOKEN_ROUTE'
+                    )
+                })
+                it('reverts if passed wrong tokenA in rewardER route', async () => {
+                    await expectRevert(
+                        assetRouter.distribute(
+                            pool,
+                            [
+                                {
+                                    route: [
+                                        rewardToken,
+                                        tokenA.address
+                                    ],
+                                    amountOutMin: 0
+                                },
+                                {
+                                    route: [
+                                        rewardToken,
+                                        tokenB.address
+                                    ],
+                                    amountOutMin: 0
+                                },
+                                {
+                                    route: [
+                                        rewarderToken,
+                                        constants.ZERO_ADDRESS
+                                    ],
+                                    amountOutMin: 0
+                                },
+                                {
+                                    route: [
+                                        rewarderToken,
+                                        tokenB.address
+                                    ],
+                                    amountOutMin: 0
+                                }
+                            ],
+                            [
+                                {
+                                    route: [],
+                                    amountOutMin: 0
+                                },
+                                {
+                                    route: [],
+                                    amountOutMin: 0
+                                }
+                            ],
+                            feeCollector,
+                            { from: distributor }
+                        ),
+                        'BAD_REWARDER_TOKEN_A_ROUTE'
+                    )
+                })
+                it('reverts if passed wrong tokenB in rewardER route', async () => {
+                    await expectRevert(
+                        assetRouter.distribute(
+                            pool,
+                            [
+                                {
+                                    route: [
+                                        rewardToken,
+                                        tokenA.address
+                                    ],
+                                    amountOutMin: 0
+                                },
+                                {
+                                    route: [
+                                        rewardToken,
+                                        tokenB.address
+                                    ],
+                                    amountOutMin: 0
+                                },
+                                {
+                                    route: [
+                                        rewarderToken,
+                                        tokenA.address
+                                    ],
+                                    amountOutMin: 0
+                                },
+                                {
+                                    route: [
+                                        rewarderToken,
+                                        constants.ZERO_ADDRESS
+                                    ],
+                                    amountOutMin: 0
+                                }
+                            ],
+                            [
+                                {
+                                    route: [],
+                                    amountOutMin: 0
+                                },
+                                {
+                                    route: [],
+                                    amountOutMin: 0
+                                }
+                            ],
+                            feeCollector,
+                            { from: distributor }
+                        ),
+                        'BAD_REWARDER_TOKEN_B_ROUTE'
+                    )
+                })
+            }
         })
         describe('withdraws', () => {
             it('withdraws all tokens for account1', async () => {
@@ -1438,6 +1565,7 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
             let stakingRewardsBalanceBefore
             let ethBalanceBefore
             let ETHSpentOnGas
+            let ETHPid
 
             before(async () => {
                 amountETH = new BN(40000000)
@@ -1447,13 +1575,22 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
                 ethPooltokenA = await IUniswapV2Pair.at(tokenAAddress)
                 ethPooltokenB = await IUniswapV2Pair.at(tokenBAddress)
 
+                const poolLength = await miniChef.poolLength()
+
+                for (let i = 0; i < poolLength.toNumber(); i++) {
+                    const lpToken = await miniChef.lpToken(i)
+                    if (lpToken.toString() === pool3) {
+                        ETHPid = i
+                        break
+                    }
+                }
+
                 const farmAddress = await factory.Farms(pool3)
                 if (farmAddress === constants.ZERO_ADDRESS) {
                     stakingRewardsBalanceBefore = new BN(0)
                 } else {
                     const farmETH = await Farm.at(farmAddress)
-                    const stakingRewardsETH = await IStakingDualRewards.at(pool3)
-                    stakingRewardsBalanceBefore = await stakingRewardsETH.balanceOf(farmETH.address)
+                    stakingRewardsBalanceBefore = (await miniChef.userInfo(ETHPid, farmETH.address))['0']
                 }
 
                 ({
@@ -1518,13 +1655,12 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
                 const { totalDepositsLP } = await assetRouter.totalDeposits(pool3)
                 assert.ok(totalDepositsLP.gt(totalDepositsLPBefore), 'Stake not increased')
             })
-            it('stakes tokens in StakingRewards contract', async () => {
+            it('stakes tokens in miniChef', async () => {
                 const farmAddress = await factory.Farms(pool3)
                 const farmETH = await Farm.at(farmAddress)
-                const stakingRewardsETH = await IStakingDualRewards.at(pool3)
 
-                const stakingRewardsBalance = await stakingRewardsETH.balanceOf(farmETH.address)
-                assert.ok(stakingRewardsBalance.gt(stakingRewardsBalanceBefore), 'StakingRewards balance not increased')
+                const stakingRewardsBalance = (await miniChef.userInfo(ETHPid, farmETH.address))['0']
+                assert.ok(stakingRewardsBalance.gt(stakingRewardsBalanceBefore), 'staking balance not increased')
             })
         })
         describe('withdraw ETH', () => {
@@ -1540,6 +1676,7 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
             let stakingRewardsBalanceBefore
             let ethBalanceBefore
             let ETHSpentOnGas
+            let ETHPid
 
             before(async () => {
                 amountETH = new BN(4000)
@@ -1550,13 +1687,22 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
                 ethPooltokenB = await IUniswapV2Pair.at(tokenBAddress);
                 ({ totalDepositsLP: totalDepositsLPBefore } = await assetRouter.totalDeposits(pool3))
 
+                const poolLength = await miniChef.poolLength()
+
+                for (let i = 0; i < poolLength.toNumber(); i++) {
+                    const lpToken = await miniChef.lpToken(i)
+                    if (lpToken.toString() === pool3) {
+                        ETHPid = i
+                        break
+                    }
+                }
+
                 const farmAddress = await factory.Farms(pool3)
                 if (farmAddress === constants.ZERO_ADDRESS) {
                     stakingRewardsBalanceBefore = new BN(0)
                 } else {
                     const farmETH = await Farm.at(farmAddress)
-                    const stakingRewardsETH = await IStakingDualRewards.at(pool3)
-                    stakingRewardsBalanceBefore = await stakingRewardsETH.balanceOf(farmETH.address)
+                    stakingRewardsBalanceBefore = (await miniChef.userInfo(ETHPid, farmETH.address))['0']
                 }
 
                 ({
@@ -1598,9 +1744,8 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
             it('unstakes tokens from StakingRewards contract', async () => {
                 const farmAddress = await factory.Farms(pool3)
                 const farmETH = await Farm.at(farmAddress)
-                const stakingRewardsETH = await IStakingDualRewards.at(pool3)
 
-                const stakingRewardsBalance = await stakingRewardsETH.balanceOf(farmETH.address)
+                const stakingRewardsBalance = (await miniChef.userInfo(ETHPid, farmETH.address))['0']
                 assert.ok(stakingRewardsBalanceBefore.gt(stakingRewardsBalance), 'StakingRewards balance not increased')
             })
             it('adds tokens and ETH to balance', async () => {
@@ -1666,8 +1811,5 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
                 )
             })
         })
-    })
-    after(async () => {
-        await timeMachine.revertToSnapshot(snapshotId)
     })
 })

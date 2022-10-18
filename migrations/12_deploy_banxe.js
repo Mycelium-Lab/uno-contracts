@@ -1,4 +1,5 @@
 const AccessManager = artifacts.require('UnoAccessManager')
+const { deployProxy } = require('@openzeppelin/truffle-upgrades')
 
 const AutoStrategy = artifacts.require('UnoAutoStrategyBanxe')
 
@@ -19,7 +20,7 @@ module.exports = async (deployer, network, accounts) => {
             AccessManager.address,
             banxe
         ],
-        { deployer, kind: 'uups', initializer: false }
+        { deployer, kind: 'uups' }
     )
 
     console.log('Deployed', autoStrategy.address)

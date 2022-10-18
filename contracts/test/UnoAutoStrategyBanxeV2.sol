@@ -7,7 +7,7 @@ import '@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeab
 import '@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 
-contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable, UUPSUpgradeable {
+contract UnoAutoStrategyBanxeV2 is Initializable, ERC20Upgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable, UUPSUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
     /**
      * @dev PoolInfo:
@@ -49,6 +49,8 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
     bytes32 private constant LIQUIDITY_MANAGER_ROLE = keccak256('LIQUIDITY_MANAGER_ROLE');
     bytes32 private constant PAUSER_ROLE = keccak256('PAUSER_ROLE');
     bytes32 private ADMIN_ROLE;
+
+    uint256 public constant version = 2;
 
     event Deposit(uint256 indexed poolID, address indexed from, address indexed recipient, uint256 amountA, uint256 amountB);
     event Withdraw(uint256 indexed poolID, address indexed from, address indexed recipient, uint256 amountA, uint256 amountB);
