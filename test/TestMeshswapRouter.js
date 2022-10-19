@@ -28,7 +28,7 @@ const IExchangeMeshwap = artifacts.require('IExchangeMeshwap')
 const JOEHolder = '0x799d4c5e577cf80221a076064a2054430d2af5cd' // has to be unlocked and hold 0x2915d57d076ca2233f73b2e724fea4f3db967f9b
 
 const account1 = '0x09CF915e195aF33FA7B932C253352Ae9FBdB0106' // has to be unlocked and hold 0x2915D57D076Ca2233F73B2E724Fea4F3DB967F9B
-const account2 = '0x3d05BC525aD296c246901f38b23542692AB54A8d' // has to be unlocked and hold 0x2915D57D076Ca2233F73B2E724Fea4F3DB967F9B
+const account2 = '0x0e893d9769c3210C73843230dd250eecBC8fA302' // has to be unlocked and hold 0x2915D57D076Ca2233F73B2E724Fea4F3DB967F9B
 const account3 = '0xBF14DB80D9275FB721383a77C00Ae180fc40ae98' // has to be unlocked and hold wMATIC-USDC
 
 const amounts = [
@@ -353,8 +353,10 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
             it('stakes tokens in StakingRewards contract', async () => {
                 assert.equal(
                     (
-                        await masterJoe.userInfo(pid, farm.address)
-                    ).amount.toString(),
+                        await (
+                            await IUniswapV2Pair.at(pool)
+                        ).balanceOf(farm.address)
+                    ).toString(),
                     amounts[0].toString(),
                     "Total amount sent doesn't equal StakingRewards farm balance"
                 )
@@ -406,8 +408,10 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
             it('stakes tokens in StakingRewards contract', async () => {
                 assert.equal(
                     (
-                        await masterJoe.userInfo(pid, farm.address)
-                    ).amount.toString(),
+                        await (
+                            await IUniswapV2Pair.at(pool)
+                        ).balanceOf(farm.address)
+                    ).toString(),
                     amounts[0].add(amounts[1]).toString(),
                     "Total amount sent doesn't equal StakingRewards farm balance"
                 )
@@ -416,9 +420,26 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
         describe('deposit lp tokens from different account', () => {
             let receipt
             before(async () => {
+                console.log(
+                    (
+                        await (
+                            await IUniswapV2Pair.at(pool)
+                        ).balanceOf(account2)
+                    ).toString()
+                )
+
+                console.log(
+                    (
+                        await (
+                            await IUniswapV2Pair.at(pool)
+                        ).balanceOf(account1)
+                    ).toString()
+                )
+                console.log(amounts[2].toString())
                 await stakingToken.approve(assetRouter.address, amounts[2], {
                     from: account2,
                 })
+
                 receipt = await assetRouter.deposit(
                     pool,
                     0,
@@ -467,9 +488,9 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
             })
             it('stakes tokens in StakingRewards contract', async () => {
                 assert.equal(
-                    (
-                        await masterJoe.userInfo(pid, farm.address)
-                    ).amount.toString(),
+                    await (
+                        await IUniswapV2Pair.at(pool)
+                    ).balanceOf(farm.address),
                     amounts[0].add(amounts[1]).add(amounts[2]).toString(),
                     "Total amount sent doesn't equal StakingRewards farm balance"
                 )
@@ -532,9 +553,9 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
             })
             it('stakes tokens in StakingRewards contract', async () => {
                 assert.equal(
-                    (
-                        await masterJoe.userInfo(pid, farm.address)
-                    ).amount.toString(),
+                    await (
+                        await IUniswapV2Pair.at(pool)
+                    ).balanceOf(farm.address),
                     amounts[0]
                         .add(amounts[1])
                         .add(amounts[2])
@@ -573,21 +594,24 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                     '16415710000',
                     { from: account1 }
                 )
+                console.log(tx.receipt.rawLogs)
                 const event = tx.receipt.rawLogs.find(
                     (l) =>
                         l.topics[0] ===
                         '0xdccd412f0b1252819cb1fd330b93224ca42612892bb3f4f789976e6d81936496'
                 )
 
-                amountA = web3.utils.hexToNumberString(
-                    event.data.substring(0, 66)
-                )
-                amountB = web3.utils.hexToNumberString(
-                    `0x${event.data.substring(66, 130)}`
-                )
+                // amountA = web3.utils.hexToNumberString(
+                //     event.data.substring(0, 66)
+                // )
+                // amountB = web3.utils.hexToNumberString(
+                //     `0x${event.data.substring(66, 130)}`
+                // )
 
                 balanceAbefore = await tokenA.balanceOf(account1)
                 balanceBbefore = await tokenB.balanceOf(account1)
+                amountA = balanceAbefore
+                amountB = balanceBbefore
                 ;({
                     stakeLP: stakeLPBefore,
                     stakeA: stakeABefore,
@@ -596,7 +620,9 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                 ;({ totalDepositsLP: totalDepositsLPBefore } =
                     await assetRouter.totalDeposits(pool))
                 stakingRewardsBalanceBefore = new BN(
-                    (await masterJoe.userInfo(pid, farm.address))['0']
+                    await (
+                        await IUniswapV2Pair.at(pool)
+                    ).balanceOf(farm.address)
                 )
 
                 await tokenA.approve(assetRouter.address, amountA, {
@@ -607,13 +633,15 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                 })
             })
             it('reverts if minAmountA > amountA || minAmountB > amountB', async () => {
+                console.log(15996479893 + amountA)
+                console.log(amountA)
                 await expectRevert(
                     assetRouter.deposit(
                         pool,
                         amountA,
                         new BN(1),
-                        amountA,
-                        0,
+                        amountA.add(new BN('6025913637524859708')),
+                        amountA.add(new BN('6025913637524859708')),
                         0,
                         account1,
                         { from: account1 }
@@ -694,7 +722,9 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
             it('stakes tokens in StakingRewards contract', async () => {
                 assert.ok(
                     new BN(
-                        (await masterJoe.userInfo(pid, farm.address))['0']
+                        await (
+                            await IUniswapV2Pair.at(pool)
+                        ).balanceOf(farm.address)
                     ).gt(stakingRewardsBalanceBefore),
                     'StakingRewards balance was not increased'
                 )
