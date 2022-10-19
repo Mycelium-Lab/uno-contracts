@@ -3,8 +3,6 @@ const {
 } = require('@openzeppelin/test-helpers')
 const { deployProxy, upgradeProxy } = require('@openzeppelin/truffle-upgrades')
 
-const timeMachine = require('ganache-time-traveler')
-
 const IStakingDualRewards = artifacts.require('IStakingDualRewards')
 const IStakingDualRewardsFactory = artifacts.require('IStakingDualRewardsFactory')
 const IUniswapV2Pair = artifacts.require('IUniswapV2Pair')
@@ -51,7 +49,6 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
 
     let stakingRewards; let
         stakingToken
-    let snapshotId
 
     let tokenA; let
         tokenB
@@ -61,9 +58,6 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
         rewardsTokenB
 
     before(async () => {
-        const snapshot = await timeMachine.takeSnapshot()
-        snapshotId = snapshot.result
-
         const implementation = await Farm.new({ from: account1 })
         accessManager = await AccessManager.new({ from: admin })// accounts[0] is admin
 
@@ -1666,8 +1660,5 @@ contract('UnoAssetRouterQuickswapDual', (accounts) => {
                 )
             })
         })
-    })
-    after(async () => {
-        await timeMachine.revertToSnapshot(snapshotId)
     })
 })
