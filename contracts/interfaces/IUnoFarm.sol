@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.17;
+pragma solidity 0.8.10;
 
 interface IUnoFarm {
 	function rewardToken() external view returns (address);

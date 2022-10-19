@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.17;
+pragma solidity 0.8.10;
 
 import { IUnoFarmTraderjoe as Farm } from "./interfaces/IUnoFarmTraderjoe.sol";
 import "../../interfaces/IUnoFarmFactory.sol";
@@ -217,7 +217,10 @@ contract UnoAssetRouterTraderjoe is
 				address(this),
 				recipient
 			);
-			IERC20Upgradeable(tokenB).safeTransfer(msg.sender, amountToken - sentToken);
+			IERC20Upgradeable(tokenB).safeTransfer(
+				msg.sender,
+				amountToken - sentToken
+			);
 		} else if (tokenB == WAVAX) {
 			if (amountToken > 0) {
 				IERC20Upgradeable(tokenA).safeTransferFrom(
@@ -235,7 +238,10 @@ contract UnoAssetRouterTraderjoe is
 				address(this),
 				recipient
 			);
-			IERC20Upgradeable(tokenA).safeTransfer(msg.sender, amountToken - sentToken);
+			IERC20Upgradeable(tokenA).safeTransfer(
+				msg.sender,
+				amountToken - sentToken
+			);
 		} else {
 			revert("NOT_WAVAX_POOL");
 		}
@@ -445,11 +451,15 @@ contract UnoAssetRouterTraderjoe is
 		uint256 totalSupply = IERC20Upgradeable(lpPair).totalSupply();
 		amountA =
 			(amountLP *
-				IERC20Upgradeable(IUniswapV2Pair(lpPair).token0()).balanceOf(lpPair)) /
+				IERC20Upgradeable(IUniswapV2Pair(lpPair).token0()).balanceOf(
+					lpPair
+				)) /
 			totalSupply;
 		amountB =
 			(amountLP *
-				IERC20Upgradeable(IUniswapV2Pair(lpPair).token1()).balanceOf(lpPair)) /
+				IERC20Upgradeable(IUniswapV2Pair(lpPair).token1()).balanceOf(
+					lpPair
+				)) /
 			totalSupply;
 	}
 

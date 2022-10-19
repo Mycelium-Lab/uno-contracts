@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.17;
+pragma solidity 0.8.10;
 
 import { IUnoFarmTraderjoe as Farm } from "../apps/traderjoe/interfaces/IUnoFarmTraderjoe.sol";
 import "../interfaces/IUnoFarmFactory.sol";
@@ -30,7 +30,7 @@ contract UnoAssetRouterTraderjoeV2 is
 	bytes32 private constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
 	bytes32 private constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
-    uint256 public constant version = 2;
+	uint256 public constant version = 2;
 
 	uint256 public fee;
 
@@ -219,7 +219,10 @@ contract UnoAssetRouterTraderjoeV2 is
 				address(this),
 				recipient
 			);
-			IERC20Upgradeable(tokenB).safeTransfer(msg.sender, amountToken - sentToken);
+			IERC20Upgradeable(tokenB).safeTransfer(
+				msg.sender,
+				amountToken - sentToken
+			);
 		} else if (tokenB == WAVAX) {
 			if (amountToken > 0) {
 				IERC20Upgradeable(tokenA).safeTransferFrom(
@@ -237,7 +240,10 @@ contract UnoAssetRouterTraderjoeV2 is
 				address(this),
 				recipient
 			);
-			IERC20Upgradeable(tokenA).safeTransfer(msg.sender, amountToken - sentToken);
+			IERC20Upgradeable(tokenA).safeTransfer(
+				msg.sender,
+				amountToken - sentToken
+			);
 		} else {
 			revert("NOT_WAVAX_POOL");
 		}
@@ -447,11 +453,15 @@ contract UnoAssetRouterTraderjoeV2 is
 		uint256 totalSupply = IERC20Upgradeable(lpPair).totalSupply();
 		amountA =
 			(amountLP *
-				IERC20Upgradeable(IUniswapV2Pair(lpPair).token0()).balanceOf(lpPair)) /
+				IERC20Upgradeable(IUniswapV2Pair(lpPair).token0()).balanceOf(
+					lpPair
+				)) /
 			totalSupply;
 		amountB =
 			(amountLP *
-				IERC20Upgradeable(IUniswapV2Pair(lpPair).token1()).balanceOf(lpPair)) /
+				IERC20Upgradeable(IUniswapV2Pair(lpPair).token1()).balanceOf(
+					lpPair
+				)) /
 			totalSupply;
 	}
 
