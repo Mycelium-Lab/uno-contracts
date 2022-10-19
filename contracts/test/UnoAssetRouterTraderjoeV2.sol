@@ -348,8 +348,8 @@ contract UnoAssetRouterTraderjoeV2 is
 	 */
 	function distribute(
 		address lpPair,
-		Farm.SwapInfo[2] calldata swapInfos,
-		Farm.SwapInfo calldata feeSwapInfo,
+		Farm.SwapInfo[4] calldata swapInfos,
+		Farm.SwapInfo[2] calldata feeSwapInfo,
 		address feeTo
 	) external whenNotPaused onlyRole(DISTRIBUTOR_ROLE) {
 		Farm farm = Farm(farmFactory.Farms(lpPair));

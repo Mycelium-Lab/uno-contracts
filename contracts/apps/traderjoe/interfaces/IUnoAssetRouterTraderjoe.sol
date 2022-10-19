@@ -58,8 +58,8 @@ interface IUnoAssetRouterTraderjoe {
 
 	function distribute(
 		address lpStakingPool,
-		Farm.SwapInfo[2] calldata swapInfos,
-		Farm.SwapInfo calldata feeSwapInfo,
+		Farm.SwapInfo[4] calldata swapInfos,
+		Farm.SwapInfo[2] calldata feeSwapInfo,
 		address feeTo
 	) external;
 

@@ -245,8 +245,13 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                         [
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 },
                         ],
-                        { route: [], amountOutMin: 0 },
+                        [
+                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 },
+                        ],
                         feeCollector,
                         { from: account1 }
                     ),
@@ -286,8 +291,13 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                         [
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 },
                         ],
-                        { route: [], amountOutMin: 0 },
+                        [
+                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 },
+                        ],
                         feeCollector,
                         { from: account1 }
                     ),
@@ -1128,8 +1138,13 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                         [
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 },
                         ],
-                        { route: [], amountOutMin: 0 },
+                        [
+                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 },
+                        ],
                         feeCollector,
                         { from: pauser }
                     ),
@@ -1143,8 +1158,13 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                         [
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 },
                         ],
-                        { route: [], amountOutMin: 0 },
+                        [
+                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 },
+                        ],
                         feeCollector,
                         { from: distributor }
                     ),
@@ -1158,8 +1178,13 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                         [
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 },
                         ],
-                        { route: [], amountOutMin: 0 },
+                        [
+                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 },
+                        ],
                         feeCollector,
                         { from: distributor }
                     ),
@@ -1228,15 +1253,20 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                             ],
                             amountOutMin: 0,
                         },
+                        { route: [], amountOutMin: 0 },
+                        { route: [], amountOutMin: 0 },
                     ],
-                    {
-                        route: [
-                            rewardToken,
-                            '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                            WETH.address,
-                        ],
-                        amountOutMin: 0,
-                    },
+                    [
+                        {
+                            route: [
+                                rewardToken,
+                                '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
+                                WETH.address,
+                            ],
+                            amountOutMin: 0,
+                        },
+                        { route: [], amountOutMin: 0 },
+                    ],
                     feeCollector,
                     { from: distributor }
                 )
@@ -1292,15 +1322,20 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                                 ],
                                 amountOutMin: 0,
                             },
+                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 },
                         ],
-                        {
-                            route: [
-                                rewardToken,
-                                '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                WETH.address,
-                            ],
-                            amountOutMin: 0,
-                        },
+                        [
+                            {
+                                route: [
+                                    rewardToken,
+                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
+                                    WETH.address,
+                                ],
+                                amountOutMin: 0,
+                            },
+                            { route: [], amountOutMin: 0 },
+                        ],
                         feeCollector,
                         { from: distributor }
                     ),
@@ -1326,15 +1361,20 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                                 ],
                                 amountOutMin: 0,
                             },
+                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 },
                         ],
-                        {
-                            route: [
-                                rewardToken,
-                                '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                WETH.address,
-                            ],
-                            amountOutMin: 0,
-                        },
+                        [
+                            {
+                                route: [
+                                    rewardToken,
+                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
+                                    WETH.address,
+                                ],
+                                amountOutMin: 0,
+                            },
+                            { route: [], amountOutMin: 0 },
+                        ],
                         feeCollector,
                         { from: distributor }
                     ),
@@ -1360,15 +1400,20 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                                 ],
                                 amountOutMin: 0,
                             },
+                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 },
                         ],
-                        {
-                            route: [
-                                constants.ZERO_ADDRESS,
-                                '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                WETH.address,
-                            ],
-                            amountOutMin: 0,
-                        },
+                        [
+                            {
+                                route: [
+                                    constants.ZERO_ADDRESS,
+                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
+                                    WETH.address,
+                                ],
+                                amountOutMin: 0,
+                            },
+                            { route: [], amountOutMin: 0 },
+                        ],
                         feeCollector,
                         { from: distributor }
                     ),
@@ -1396,15 +1441,20 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                                 ],
                                 amountOutMin: 0,
                             },
+                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 },
                         ],
-                        {
-                            route: [
-                                rewardToken,
-                                '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                WETH.address,
-                            ],
-                            amountOutMin: 0,
-                        },
+                        [
+                            {
+                                route: [
+                                    rewardToken,
+                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
+                                    WETH.address,
+                                ],
+                                amountOutMin: 0,
+                            },
+                            { route: [], amountOutMin: 0 },
+                        ],
                         feeCollector,
                         { from: distributor }
                     ),
@@ -1432,15 +1482,20 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                                 ],
                                 amountOutMin: 0,
                             },
+                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 },
                         ],
-                        {
-                            route: [
-                                rewardToken,
-                                '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                WETH.address,
-                            ],
-                            amountOutMin: 0,
-                        },
+                        [
+                            {
+                                route: [
+                                    rewardToken,
+                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
+                                    WETH.address,
+                                ],
+                                amountOutMin: 0,
+                            },
+                            { route: [], amountOutMin: 0 },
+                        ],
                         feeCollector,
                         { from: distributor }
                     ),

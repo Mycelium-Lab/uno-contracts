@@ -49,8 +49,8 @@ interface IUnoFarmTraderjoe {
 	) external returns (uint256 amountA, uint256 amountB);
 
 	function distribute(
-		SwapInfo[2] calldata swapInfos,
-		SwapInfo calldata feeSwapInfo,
+		SwapInfo[4] calldata swapInfos,
+		SwapInfo[2] calldata feeSwapInfo,
 		FeeInfo calldata feeInfo
 	) external returns (uint256 reward);
 
