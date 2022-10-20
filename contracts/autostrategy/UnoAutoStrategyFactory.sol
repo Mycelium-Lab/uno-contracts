@@ -39,10 +39,7 @@ contract UnoAutoStrategyFactory is Pausable {
 	event AssetRouterRevoked(address indexed assetRouter);
 
 	modifier onlyRole(bytes32 role) {
-		require(
-			accessManager.hasRole(role, msg.sender),
-			"CALLER_NOT_AUTHORIZED"
-		);
+		require(accessManager.hasRole(role, msg.sender), "CALLER_NOT_AUTHORIZED");
 		_;
 	}
 
@@ -62,16 +59,9 @@ contract UnoAutoStrategyFactory is Pausable {
 	 * @param poolInfos - An array of (assetRouter - pool) pairs. AssetRouter needs to be approved for PoolInfo to be valid. poolInfos.length must be >= 2.
 	 * @return autoStrategy - Deployed Auto Strategy contract address.
 	 */
-	function createStrategy(PoolInfo[] calldata poolInfos)
-		external
-		whenNotPaused
-		returns (address)
-	{
+	function createStrategy(PoolInfo[] calldata poolInfos) external whenNotPaused returns (address) {
 		for (uint256 i = 0; i < poolInfos.length; i++) {
-			require(
-				assetRouterApproved[poolInfos[i].assetRouter] == true,
-				"ASSET_ROUTER_NOT_APPROVED"
-			);
+			require(assetRouterApproved[poolInfos[i].assetRouter] == true, "ASSET_ROUTER_NOT_APPROVED");
 		}
 		address autoStrategy = _createStrategy(poolInfos);
 		autoStrategies.push(autoStrategy);
@@ -84,14 +74,8 @@ contract UnoAutoStrategyFactory is Pausable {
 
      * Note: This function can only be called by ADMIN_ROLE.
      */
-	function approveAssetRouter(address _assetRouter)
-		external
-		onlyRole(ADMIN_ROLE)
-	{
-		require(
-			assetRouterApproved[_assetRouter] == false,
-			"ASSET_ROUTER_ALREADY_APPROVED"
-		);
+	function approveAssetRouter(address _assetRouter) external onlyRole(ADMIN_ROLE) {
+		require(assetRouterApproved[_assetRouter] == false, "ASSET_ROUTER_ALREADY_APPROVED");
 		assetRouterApproved[_assetRouter] = true;
 		emit AssetRouterApproved(_assetRouter);
 	}
@@ -102,14 +86,8 @@ contract UnoAutoStrategyFactory is Pausable {
 
      * Note: This function can only be called by ADMIN_ROLE.
      */
-	function revokeAssetRouter(address _assetRouter)
-		external
-		onlyRole(ADMIN_ROLE)
-	{
-		require(
-			assetRouterApproved[_assetRouter] == true,
-			"ASSET_ROUTER_NOT_APPROVED"
-		);
+	function revokeAssetRouter(address _assetRouter) external onlyRole(ADMIN_ROLE) {
+		require(assetRouterApproved[_assetRouter] == true, "ASSET_ROUTER_NOT_APPROVED");
 		assetRouterApproved[_assetRouter] = false;
 		emit AssetRouterRevoked(_assetRouter);
 	}
@@ -120,28 +98,15 @@ contract UnoAutoStrategyFactory is Pausable {
 
      * Note: This function can only be called by ADMIN_ROLE.
      */
-	function upgradeStrategies(address newImplementation)
-		external
-		onlyRole(ADMIN_ROLE)
-	{
+	function upgradeStrategies(address newImplementation) external onlyRole(ADMIN_ROLE) {
 		UpgradeableBeacon(autoStrategyBeacon).upgradeTo(newImplementation);
 	}
 
 	/**
 	 * @dev Deploys new AutoStrategy contract and calls initialize() on it. Emits {AutoStrategyDeployed} event.
 	 */
-	function _createStrategy(PoolInfo[] calldata poolInfos)
-		internal
-		returns (address)
-	{
-		BeaconProxy proxy = new BeaconProxy(
-			autoStrategyBeacon,
-			abi.encodeWithSelector(
-				bytes4(keccak256("initialize((address,address)[],address)")),
-				poolInfos,
-				accessManager
-			)
-		);
+	function _createStrategy(PoolInfo[] calldata poolInfos) internal returns (address) {
+		BeaconProxy proxy = new BeaconProxy(autoStrategyBeacon, abi.encodeWithSelector(bytes4(keccak256("initialize((address,address)[],address)")), poolInfos, accessManager));
 		emit AutoStrategyDeployed(address(proxy));
 		return address(proxy);
 	}

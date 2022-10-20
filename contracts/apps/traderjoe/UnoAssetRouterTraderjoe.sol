@@ -12,11 +12,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract UnoAssetRouterTraderjoe is
-	Initializable,
-	PausableUpgradeable,
-	UUPSUpgradeable
-{
+contract UnoAssetRouterTraderjoe is Initializable, PausableUpgradeable, UUPSUpgradeable {
 	using SafeERC20Upgradeable for IERC20Upgradeable;
 
 	/**
@@ -34,27 +30,14 @@ contract UnoAssetRouterTraderjoe is
 
 	address public constant WAVAX = 0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7;
 
-	event Deposit(
-		address indexed lpPool,
-		address indexed sender,
-		address indexed recipient,
-		uint256 amount
-	);
-	event Withdraw(
-		address indexed lpPool,
-		address indexed sender,
-		address indexed recipient,
-		uint256 amount
-	);
+	event Deposit(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
+	event Withdraw(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
 	event Distribute(address indexed lpPool, uint256 reward);
 
 	event FeeChanged(uint256 previousFee, uint256 newFee);
 
 	modifier onlyRole(bytes32 role) {
-		require(
-			accessManager.hasRole(role, msg.sender),
-			"CALLER_NOT_AUTHORIZED"
-		);
+		require(accessManager.hasRole(role, msg.sender), "CALLER_NOT_AUTHORIZED");
 		_;
 	}
 
@@ -65,10 +48,7 @@ contract UnoAssetRouterTraderjoe is
 		_disableInitializers();
 	}
 
-	function initialize(address _accessManager, address _farmFactory)
-		external
-		initializer
-	{
+	function initialize(address _accessManager, address _farmFactory) external initializer {
 		require(_accessManager != address(0), "BAD_ACCESS_MANAGER");
 		require(_farmFactory != address(0), "BAD_FARM_FACTORY");
 
@@ -118,36 +98,16 @@ contract UnoAssetRouterTraderjoe is
 		}
 
 		if (amountLP > 0) {
-			IERC20Upgradeable(lpPair).safeTransferFrom(
-				msg.sender,
-				address(farm),
-				amountLP
-			);
+			IERC20Upgradeable(lpPair).safeTransferFrom(msg.sender, address(farm), amountLP);
 		}
 		if (amountA > 0) {
-			IERC20Upgradeable(farm.tokenA()).safeTransferFrom(
-				msg.sender,
-				address(farm),
-				amountA
-			);
+			IERC20Upgradeable(farm.tokenA()).safeTransferFrom(msg.sender, address(farm), amountA);
 		}
 		if (amountB > 0) {
-			IERC20Upgradeable(farm.tokenB()).safeTransferFrom(
-				msg.sender,
-				address(farm),
-				amountB
-			);
+			IERC20Upgradeable(farm.tokenB()).safeTransferFrom(msg.sender, address(farm), amountB);
 		}
 
-		(sentA, sentB, liquidity) = farm.deposit(
-			amountA,
-			amountB,
-			amountAMin,
-			amountBMin,
-			amountLP,
-			msg.sender,
-			recipient
-		);
+		(sentA, sentB, liquidity) = farm.deposit(amountA, amountB, amountAMin, amountBMin, amountLP, msg.sender, recipient);
 		emit Deposit(lpPair, msg.sender, recipient, liquidity);
 	}
 
@@ -188,11 +148,7 @@ contract UnoAssetRouterTraderjoe is
 		}
 
 		if (amountLP > 0) {
-			IERC20Upgradeable(lpPair).safeTransferFrom(
-				msg.sender,
-				address(farm),
-				amountLP
-			);
+			IERC20Upgradeable(lpPair).safeTransferFrom(msg.sender, address(farm), amountLP);
 		}
 
 		address tokenA = farm.tokenA();
@@ -202,46 +158,16 @@ contract UnoAssetRouterTraderjoe is
 		IERC20Upgradeable(WAVAX).safeTransfer(address(farm), msg.value);
 		if (tokenA == WAVAX) {
 			if (amountToken > 0) {
-				IERC20Upgradeable(tokenB).safeTransferFrom(
-					msg.sender,
-					address(farm),
-					amountToken
-				);
+				IERC20Upgradeable(tokenB).safeTransferFrom(msg.sender, address(farm), amountToken);
 			}
-			(sentETH, sentToken, liquidity) = farm.deposit(
-				msg.value,
-				amountToken,
-				amountETHMin,
-				amountTokenMin,
-				amountLP,
-				address(this),
-				recipient
-			);
-			IERC20Upgradeable(tokenB).safeTransfer(
-				msg.sender,
-				amountToken - sentToken
-			);
+			(sentETH, sentToken, liquidity) = farm.deposit(msg.value, amountToken, amountETHMin, amountTokenMin, amountLP, address(this), recipient);
+			IERC20Upgradeable(tokenB).safeTransfer(msg.sender, amountToken - sentToken);
 		} else if (tokenB == WAVAX) {
 			if (amountToken > 0) {
-				IERC20Upgradeable(tokenA).safeTransferFrom(
-					msg.sender,
-					address(farm),
-					amountToken
-				);
+				IERC20Upgradeable(tokenA).safeTransferFrom(msg.sender, address(farm), amountToken);
 			}
-			(sentToken, sentETH, liquidity) = farm.deposit(
-				amountToken,
-				msg.value,
-				amountTokenMin,
-				amountETHMin,
-				amountLP,
-				address(this),
-				recipient
-			);
-			IERC20Upgradeable(tokenA).safeTransfer(
-				msg.sender,
-				amountToken - sentToken
-			);
+			(sentToken, sentETH, liquidity) = farm.deposit(amountToken, msg.value, amountTokenMin, amountETHMin, amountLP, address(this), recipient);
+			IERC20Upgradeable(tokenA).safeTransfer(msg.sender, amountToken - sentToken);
 		} else {
 			revert("NOT_WAVAX_POOL");
 		}
@@ -277,14 +203,7 @@ contract UnoAssetRouterTraderjoe is
 		Farm farm = Farm(farmFactory.Farms(lpPair));
 		require(farm != Farm(address(0)), "FARM_NOT_EXISTS");
 
-		(amountA, amountB) = farm.withdraw(
-			amount,
-			amountAMin,
-			amountBMin,
-			withdrawLP,
-			msg.sender,
-			recipient
-		);
+		(amountA, amountB) = farm.withdraw(amount, amountAMin, amountBMin, withdrawLP, msg.sender, recipient);
 		emit Withdraw(lpPair, msg.sender, recipient, amount);
 	}
 
@@ -313,24 +232,10 @@ contract UnoAssetRouterTraderjoe is
 		address tokenB = farm.tokenB();
 
 		if (tokenA == WAVAX) {
-			(amountETH, amountToken) = farm.withdraw(
-				amount,
-				amountETHMin,
-				amountTokenMin,
-				false,
-				msg.sender,
-				address(this)
-			);
+			(amountETH, amountToken) = farm.withdraw(amount, amountETHMin, amountTokenMin, false, msg.sender, address(this));
 			IERC20Upgradeable(tokenB).safeTransfer(recipient, amountToken);
 		} else if (tokenB == WAVAX) {
-			(amountToken, amountETH) = farm.withdraw(
-				amount,
-				amountTokenMin,
-				amountETHMin,
-				false,
-				msg.sender,
-				address(this)
-			);
+			(amountToken, amountETH) = farm.withdraw(amount, amountTokenMin, amountETHMin, false, msg.sender, address(this));
 			IERC20Upgradeable(tokenA).safeTransfer(recipient, amountToken);
 		} else {
 			revert("NOT_WMATIC_POOL");
@@ -359,11 +264,7 @@ contract UnoAssetRouterTraderjoe is
 		Farm farm = Farm(farmFactory.Farms(lpPair));
 		require(farm != Farm(address(0)), "FARM_NOT_EXISTS");
 
-		uint256 reward = farm.distribute(
-			swapInfos,
-			feeSwapInfo,
-			Farm.FeeInfo(feeTo, fee)
-		);
+		uint256 reward = farm.distribute(swapInfos, feeSwapInfo, Farm.FeeInfo(feeTo, fee));
 		emit Distribute(lpPair, reward);
 	}
 
@@ -412,10 +313,7 @@ contract UnoAssetRouterTraderjoe is
 		Farm farm = Farm(farmFactory.Farms(lpPair));
 		if (farm != Farm(address(0))) {
 			totalDepositsLP = farm.getTotalDeposits();
-			(totalDepositsA, totalDepositsB) = getTokenStake(
-				lpPair,
-				totalDepositsLP
-			);
+			(totalDepositsA, totalDepositsB) = getTokenStake(lpPair, totalDepositsLP);
 		}
 	}
 
@@ -425,11 +323,7 @@ contract UnoAssetRouterTraderjoe is
 
      * @return tokens - Tokens addresses.
      */
-	function getTokens(address lpPair)
-		external
-		view
-		returns (IERC20Upgradeable[] memory tokens)
-	{
+	function getTokens(address lpPair) external view returns (IERC20Upgradeable[] memory tokens) {
 		tokens = new IERC20Upgradeable[](2);
 		tokens[0] = IERC20Upgradeable(IUniswapV2Pair(lpPair).token0());
 		tokens[1] = IERC20Upgradeable(IUniswapV2Pair(lpPair).token1());
@@ -443,24 +337,10 @@ contract UnoAssetRouterTraderjoe is
      * @return amountA - Token A amount.
      * @return amountB - Token B amount.
      */
-	function getTokenStake(address lpPair, uint256 amountLP)
-		internal
-		view
-		returns (uint256 amountA, uint256 amountB)
-	{
+	function getTokenStake(address lpPair, uint256 amountLP) internal view returns (uint256 amountA, uint256 amountB) {
 		uint256 totalSupply = IERC20Upgradeable(lpPair).totalSupply();
-		amountA =
-			(amountLP *
-				IERC20Upgradeable(IUniswapV2Pair(lpPair).token0()).balanceOf(
-					lpPair
-				)) /
-			totalSupply;
-		amountB =
-			(amountLP *
-				IERC20Upgradeable(IUniswapV2Pair(lpPair).token1()).balanceOf(
-					lpPair
-				)) /
-			totalSupply;
+		amountA = (amountLP * IERC20Upgradeable(IUniswapV2Pair(lpPair).token0()).balanceOf(lpPair)) / totalSupply;
+		amountB = (amountLP * IERC20Upgradeable(IUniswapV2Pair(lpPair).token1()).balanceOf(lpPair)) / totalSupply;
 	}
 
 	/**
@@ -469,10 +349,7 @@ contract UnoAssetRouterTraderjoe is
 	 *
 	 * Note: This function can only be called by ADMIN_ROLE.
 	 */
-	function setFee(uint256 _fee)
-		external
-		onlyRole(accessManager.ADMIN_ROLE())
-	{
+	function setFee(uint256 _fee) external onlyRole(accessManager.ADMIN_ROLE()) {
 		require(_fee <= 1 ether, "BAD_FEE");
 		if (fee != _fee) {
 			emit FeeChanged(fee, _fee);
@@ -488,9 +365,5 @@ contract UnoAssetRouterTraderjoe is
 		_unpause();
 	}
 
-	function _authorizeUpgrade(address)
-		internal
-		override
-		onlyRole(accessManager.ADMIN_ROLE())
-	{}
+	function _authorizeUpgrade(address) internal override onlyRole(accessManager.ADMIN_ROLE()) {}
 }

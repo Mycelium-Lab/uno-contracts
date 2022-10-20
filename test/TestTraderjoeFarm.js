@@ -23,7 +23,7 @@ contract('UnoFarmTraderjoe', (accounts) => {
         implementation = await Farm.new({ from: accounts[0] })
 
         receipt = await implementation.initialize(pool, assetRouter, {
-            from: accounts[0],
+            from: accounts[0]
         })
 
         masterTraderjoe = await IMasterTraderjoe.at(masterTraderjoeAddress)
@@ -51,7 +51,7 @@ contract('UnoFarmTraderjoe', (accounts) => {
         it('Reverts', async () => {
             await expectRevert(
                 implementation.initialize(pool, assetRouter, {
-                    from: accounts[0],
+                    from: accounts[0]
                 }),
                 'Initializable: contract is already initialized'
             )
@@ -131,11 +131,11 @@ contract('UnoFarmTraderjoe', (accounts) => {
                         { route: [], amountOutMin: 0 },
                         { route: [], amountOutMin: 0 },
                         { route: [], amountOutMin: 0 },
-                        { route: [], amountOutMin: 0 },
+                        { route: [], amountOutMin: 0 }
                     ],
                     [
                         { route: [], amountOutMin: 0 },
-                        { route: [], amountOutMin: 0 },
+                        { route: [], amountOutMin: 0 }
                     ],
                     { feeTo: accounts[1], fee: 0 },
                     { from: accounts[1] }
@@ -177,11 +177,11 @@ contract('UnoFarmTraderjoe', (accounts) => {
                         { route: [], amountOutMin: 0 },
                         { route: [], amountOutMin: 0 },
                         { route: [], amountOutMin: 0 },
-                        { route: [], amountOutMin: 0 },
+                        { route: [], amountOutMin: 0 }
                     ],
                     [
                         { route: [], amountOutMin: 0 },
-                        { route: [], amountOutMin: 0 },
+                        { route: [], amountOutMin: 0 }
                     ],
                     { feeTo: accounts[1], fee: 0 },
                     { from: assetRouter }

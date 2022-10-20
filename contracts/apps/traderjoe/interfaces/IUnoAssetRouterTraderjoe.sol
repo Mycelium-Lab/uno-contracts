@@ -7,18 +7,8 @@ import "../../../interfaces/IUnoAccessManager.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
 interface IUnoAssetRouterTraderjoe {
-	event Deposit(
-		address indexed lpPool,
-		address indexed sender,
-		address indexed recipient,
-		uint256 amount
-	);
-	event Withdraw(
-		address indexed lpPool,
-		address indexed sender,
-		address indexed recipient,
-		uint256 amount
-	);
+	event Deposit(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
+	event Withdraw(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
 	event Distribute(address indexed lpPool, uint256 reward);
 
 	event FeeChanged(uint256 previousFee, uint256 newFee);
@@ -81,10 +71,7 @@ interface IUnoAssetRouterTraderjoe {
 			uint256 totalDepositsB
 		);
 
-	function getTokens(address lpStakingPool)
-		external
-		view
-		returns (IERC20Upgradeable[] memory tokens);
+	function getTokens(address lpStakingPool) external view returns (IERC20Upgradeable[] memory tokens);
 
 	function setFee(uint256 _fee) external;
 

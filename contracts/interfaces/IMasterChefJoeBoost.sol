@@ -29,10 +29,7 @@ interface IMasterChefJoeBoost {
 		uint256 totalLpSupply;
 	}
 
-	function poolInfo(uint256 pid)
-		external
-		view
-		returns (IMasterChefJoeBoost.PoolInfo memory);
+	function poolInfo(uint256 pid) external view returns (IMasterChefJoeBoost.PoolInfo memory);
 
 	function poolLength() external view returns (uint256);
 }

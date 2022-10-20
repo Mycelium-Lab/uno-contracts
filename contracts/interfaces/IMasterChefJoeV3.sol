@@ -11,10 +11,7 @@ interface IMasterChefJoeV3 {
 		address rewarder;
 	}
 
-	function poolInfo(uint256 pid)
-		external
-		view
-		returns (IMasterChefJoeV3.PoolInfo memory);
+	function poolInfo(uint256 pid) external view returns (IMasterChefJoeV3.PoolInfo memory);
 
 	function poolLength() external view returns (uint256);
 }

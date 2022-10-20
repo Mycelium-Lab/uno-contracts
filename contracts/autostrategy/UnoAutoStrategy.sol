@@ -7,11 +7,7 @@ import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
-contract UnoAutoStrategy is
-	Initializable,
-	ERC20Upgradeable,
-	ReentrancyGuardUpgradeable
-{
+contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgradeable {
 	using SafeERC20Upgradeable for IERC20Upgradeable;
 	/**
 	 * @dev PoolInfo:
@@ -64,8 +60,7 @@ contract UnoAutoStrategy is
      * {MINIMUM_LIQUIDITY} - Ameliorates rounding errors.
      */
 
-	IOdosRouter private constant OdosRouter =
-		IOdosRouter(0xa32EE1C40594249eb3183c10792BcF573D4Da47C);
+	IOdosRouter private constant OdosRouter = IOdosRouter(0xa32EE1C40594249eb3183c10792BcF573D4Da47C);
 
 	uint256 public poolID;
 	PoolInfo[] public pools;
@@ -79,27 +74,11 @@ contract UnoAutoStrategy is
 	IUnoAutoStrategyFactory public factory;
 
 	uint256 private constant MINIMUM_LIQUIDITY = 10**3;
-	bytes32 private constant LIQUIDITY_MANAGER_ROLE =
-		keccak256("LIQUIDITY_MANAGER_ROLE");
+	bytes32 private constant LIQUIDITY_MANAGER_ROLE = keccak256("LIQUIDITY_MANAGER_ROLE");
 
-	event Deposit(
-		uint256 indexed poolID,
-		address indexed from,
-		address indexed recipient,
-		uint256 amountA,
-		uint256 amountB
-	);
-	event Withdraw(
-		uint256 indexed poolID,
-		address indexed from,
-		address indexed recipient,
-		uint256 amountA,
-		uint256 amountB
-	);
-	event MoveLiquidity(
-		uint256 indexed previousPoolID,
-		uint256 indexed nextPoolID
-	);
+	event Deposit(uint256 indexed poolID, address indexed from, address indexed recipient, uint256 amountA, uint256 amountB);
+	event Withdraw(uint256 indexed poolID, address indexed from, address indexed recipient, uint256 amountA, uint256 amountB);
+	event MoveLiquidity(uint256 indexed previousPoolID, uint256 indexed nextPoolID);
 
 	modifier whenNotPaused() {
 		require(factory.paused() == false, "PAUSABLE: PAUSED");
@@ -108,52 +87,24 @@ contract UnoAutoStrategy is
 
 	// ============ Methods ============
 
-	function initialize(
-		_PoolInfo[] calldata poolInfos,
-		IUnoAccessManager _accessManager
-	) external initializer {
-		require(
-			(poolInfos.length >= 2) && (poolInfos.length <= 50),
-			"BAD_POOL_COUNT"
-		);
+	function initialize(_PoolInfo[] calldata poolInfos, IUnoAccessManager _accessManager) external initializer {
+		require((poolInfos.length >= 2) && (poolInfos.length <= 50), "BAD_POOL_COUNT");
 
 		__ERC20_init("UNO-AutoStrategy", "UNO-LP");
 		__ReentrancyGuard_init();
 
 		for (uint256 i = 0; i < poolInfos.length; i++) {
-			address[] memory _tokens = IUnoAssetRouter(poolInfos[i].assetRouter)
-				.getTokens(poolInfos[i].pool);
-			PoolInfo memory pool = PoolInfo({
-				pool: poolInfos[i].pool,
-				assetRouter: poolInfos[i].assetRouter,
-				tokenA: IERC20Upgradeable(_tokens[0]),
-				tokenB: IERC20Upgradeable(_tokens[1])
-			});
+			address[] memory _tokens = IUnoAssetRouter(poolInfos[i].assetRouter).getTokens(poolInfos[i].pool);
+			PoolInfo memory pool = PoolInfo({ pool: poolInfos[i].pool, assetRouter: poolInfos[i].assetRouter, tokenA: IERC20Upgradeable(_tokens[0]), tokenB: IERC20Upgradeable(_tokens[1]) });
 			pools.push(pool);
 
-			if (
-				pool.tokenA.allowance(
-					address(this),
-					address(pool.assetRouter)
-				) == 0
-			) {
+			if (pool.tokenA.allowance(address(this), address(pool.assetRouter)) == 0) {
 				pool.tokenA.approve(address(OdosRouter), type(uint256).max);
-				pool.tokenA.approve(
-					address(pool.assetRouter),
-					type(uint256).max
-				);
+				pool.tokenA.approve(address(pool.assetRouter), type(uint256).max);
 			}
-			if (
-				pool.tokenB.allowance(
-					address(this),
-					address(pool.assetRouter)
-				) == 0
-			) {
+			if (pool.tokenB.allowance(address(this), address(pool.assetRouter)) == 0) {
 				pool.tokenB.approve(address(OdosRouter), type(uint256).max);
-				pool.tokenB.approve(
-					address(pool.assetRouter),
-					type(uint256).max
-				);
+				pool.tokenB.approve(address(pool.assetRouter), type(uint256).max);
 			}
 		}
 
@@ -198,15 +149,7 @@ contract UnoAutoStrategy is
 		pool.tokenA.safeTransferFrom(msg.sender, address(this), amountA);
 		pool.tokenB.safeTransferFrom(msg.sender, address(this), amountB);
 
-		(sentA, sentB, ) = pool.assetRouter.deposit(
-			pool.pool,
-			amountA,
-			amountB,
-			amountAMin,
-			amountBMin,
-			0,
-			address(this)
-		);
+		(sentA, sentB, ) = pool.assetRouter.deposit(pool.pool, amountA, amountB, amountAMin, amountBMin, 0, address(this));
 		liquidity = mint(recipient);
 
 		pool.tokenA.safeTransfer(msg.sender, amountA - sentA);
@@ -232,26 +175,14 @@ contract UnoAutoStrategy is
 		uint256 amountAMin,
 		uint256 amountBMin,
 		address recipient
-	)
-		external
-		whenNotPaused
-		nonReentrant
-		returns (uint256 amountA, uint256 amountB)
-	{
+	) external whenNotPaused nonReentrant returns (uint256 amountA, uint256 amountB) {
 		require(pid == poolID, "BAD_POOL_ID");
 		PoolInfo memory pool = pools[poolID];
 
 		(uint256 leftoverA, uint256 leftoverB) = collectLeftovers(recipient);
 
 		uint256 amountLP = burn(liquidity);
-		(amountA, amountB) = pool.assetRouter.withdraw(
-			pool.pool,
-			amountLP,
-			amountAMin,
-			amountBMin,
-			false,
-			recipient
-		);
+		(amountA, amountB) = pool.assetRouter.withdraw(pool.pool, amountLP, amountAMin, amountBMin, false, recipient);
 
 		amountA += leftoverA;
 		amountB += leftoverB;
@@ -266,23 +197,12 @@ contract UnoAutoStrategy is
      * @return leftoverA - Token A amount sent to the {recipient}.
      * @return leftoverB - Token B amount sent to the {recipient}.
      */
-	function collectLeftovers(address recipient)
-		internal
-		returns (uint256 leftoverA, uint256 leftoverB)
-	{
+	function collectLeftovers(address recipient) internal returns (uint256 leftoverA, uint256 leftoverB) {
 		if (!leftoversCollected[msg.sender][lastMoveInfo.block]) {
 			if (lastMoveInfo.totalSupply != 0) {
 				PoolInfo memory pool = pools[poolID];
-				leftoverA =
-					((balanceOf(msg.sender) -
-						blockedLiquidty[msg.sender][lastMoveInfo.block]) *
-						lastMoveInfo.leftoverA) /
-					lastMoveInfo.totalSupply;
-				leftoverB =
-					((balanceOf(msg.sender) -
-						blockedLiquidty[msg.sender][lastMoveInfo.block]) *
-						lastMoveInfo.leftoverB) /
-					lastMoveInfo.totalSupply;
+				leftoverA = ((balanceOf(msg.sender) - blockedLiquidty[msg.sender][lastMoveInfo.block]) * lastMoveInfo.leftoverA) / lastMoveInfo.totalSupply;
+				leftoverB = ((balanceOf(msg.sender) - blockedLiquidty[msg.sender][lastMoveInfo.block]) * lastMoveInfo.leftoverB) / lastMoveInfo.totalSupply;
 
 				if (leftoverA > 0) {
 					pool.tokenA.safeTransfer(recipient, leftoverA);
@@ -313,140 +233,45 @@ contract UnoAutoStrategy is
 		uint256 amountAMin,
 		uint256 amountBMin
 	) external whenNotPaused nonReentrant {
-		require(
-			accessManager.hasRole(LIQUIDITY_MANAGER_ROLE, msg.sender),
-			"CALLER_NOT_LIQUIDITY_MANAGER"
-		);
+		require(accessManager.hasRole(LIQUIDITY_MANAGER_ROLE, msg.sender), "CALLER_NOT_LIQUIDITY_MANAGER");
 		require(totalSupply() != 0, "NO_LIQUIDITY");
-		require(
-			lastMoveInfo.block != block.number,
-			"CANT_CALL_ON_THE_SAME_BLOCK"
-		);
+		require(lastMoveInfo.block != block.number, "CANT_CALL_ON_THE_SAME_BLOCK");
 		require((_poolID < pools.length) && (_poolID != poolID), "BAD_POOL_ID");
 
 		PoolInfo memory currentPool = pools[poolID];
 		PoolInfo memory newPool = pools[_poolID];
 
-		(uint256 _totalDeposits, , ) = currentPool.assetRouter.userStake(
-			address(this),
-			currentPool.pool
-		);
-		currentPool.assetRouter.withdraw(
-			currentPool.pool,
-			_totalDeposits,
-			0,
-			0,
-			false,
-			address(this)
-		);
+		(uint256 _totalDeposits, , ) = currentPool.assetRouter.userStake(address(this), currentPool.pool);
+		currentPool.assetRouter.withdraw(currentPool.pool, _totalDeposits, 0, 0, false, address(this));
 
 		uint256 tokenABalance = currentPool.tokenA.balanceOf(address(this));
 		uint256 tokenBBalance = currentPool.tokenB.balanceOf(address(this));
 
 		if (currentPool.tokenA != newPool.tokenA) {
-			(
-				IOdosRouter.inputToken[] memory inputs,
-				IOdosRouter.outputToken[] memory outputs,
-				,
-				uint256 valueOutMin,
-				address executor,
-				bytes memory pathDefinition
-			) = abi.decode(
-					swapAData[4:],
-					(
-						IOdosRouter.inputToken[],
-						IOdosRouter.outputToken[],
-						uint256,
-						uint256,
-						address,
-						bytes
-					)
-				);
+			(IOdosRouter.inputToken[] memory inputs, IOdosRouter.outputToken[] memory outputs, , uint256 valueOutMin, address executor, bytes memory pathDefinition) = abi.decode(swapAData[4:], (IOdosRouter.inputToken[], IOdosRouter.outputToken[], uint256, uint256, address, bytes));
 
-			require(
-				(inputs.length == 1) && (outputs.length == 1),
-				"BAD_SWAP_A_TOKENS_LENGTH"
-			);
-			require(
-				inputs[0].tokenAddress == address(currentPool.tokenA),
-				"BAD_SWAP_A_INPUT_TOKEN"
-			);
-			require(
-				outputs[0].tokenAddress == address(newPool.tokenA),
-				"BAD_SWAP_A_OUTPUT_TOKEN"
-			);
+			require((inputs.length == 1) && (outputs.length == 1), "BAD_SWAP_A_TOKENS_LENGTH");
+			require(inputs[0].tokenAddress == address(currentPool.tokenA), "BAD_SWAP_A_INPUT_TOKEN");
+			require(outputs[0].tokenAddress == address(newPool.tokenA), "BAD_SWAP_A_OUTPUT_TOKEN");
 
 			inputs[0].amountIn = tokenABalance;
-			OdosRouter.swap(
-				inputs,
-				outputs,
-				type(uint256).max,
-				valueOutMin,
-				executor,
-				pathDefinition
-			);
+			OdosRouter.swap(inputs, outputs, type(uint256).max, valueOutMin, executor, pathDefinition);
 		}
 
 		if (currentPool.tokenB != newPool.tokenB) {
-			(
-				IOdosRouter.inputToken[] memory inputs,
-				IOdosRouter.outputToken[] memory outputs,
-				,
-				uint256 valueOutMin,
-				address executor,
-				bytes memory pathDefinition
-			) = abi.decode(
-					swapBData[4:],
-					(
-						IOdosRouter.inputToken[],
-						IOdosRouter.outputToken[],
-						uint256,
-						uint256,
-						address,
-						bytes
-					)
-				);
+			(IOdosRouter.inputToken[] memory inputs, IOdosRouter.outputToken[] memory outputs, , uint256 valueOutMin, address executor, bytes memory pathDefinition) = abi.decode(swapBData[4:], (IOdosRouter.inputToken[], IOdosRouter.outputToken[], uint256, uint256, address, bytes));
 
-			require(
-				(inputs.length == 1) && (outputs.length == 1),
-				"BAD_SWAP_B_TOKENS_LENGTH"
-			);
-			require(
-				inputs[0].tokenAddress == address(currentPool.tokenB),
-				"BAD_SWAP_B_INPUT_TOKEN"
-			);
-			require(
-				outputs[0].tokenAddress == address(newPool.tokenB),
-				"BAD_SWAP_B_OUTPUT_TOKEN"
-			);
+			require((inputs.length == 1) && (outputs.length == 1), "BAD_SWAP_B_TOKENS_LENGTH");
+			require(inputs[0].tokenAddress == address(currentPool.tokenB), "BAD_SWAP_B_INPUT_TOKEN");
+			require(outputs[0].tokenAddress == address(newPool.tokenB), "BAD_SWAP_B_OUTPUT_TOKEN");
 
 			inputs[0].amountIn = tokenBBalance;
-			OdosRouter.swap(
-				inputs,
-				outputs,
-				type(uint256).max,
-				valueOutMin,
-				executor,
-				pathDefinition
-			);
+			OdosRouter.swap(inputs, outputs, type(uint256).max, valueOutMin, executor, pathDefinition);
 		}
 
-		(, , reserveLP) = newPool.assetRouter.deposit(
-			newPool.pool,
-			newPool.tokenA.balanceOf(address(this)),
-			newPool.tokenB.balanceOf(address(this)),
-			amountAMin,
-			amountBMin,
-			0,
-			address(this)
-		);
+		(, , reserveLP) = newPool.assetRouter.deposit(newPool.pool, newPool.tokenA.balanceOf(address(this)), newPool.tokenB.balanceOf(address(this)), amountAMin, amountBMin, 0, address(this));
 
-		lastMoveInfo = MoveLiquidityInfo({
-			leftoverA: newPool.tokenA.balanceOf(address(this)),
-			leftoverB: newPool.tokenB.balanceOf(address(this)),
-			totalSupply: totalSupply(),
-			block: block.number
-		});
+		lastMoveInfo = MoveLiquidityInfo({ leftoverA: newPool.tokenA.balanceOf(address(this)), leftoverB: newPool.tokenB.balanceOf(address(this)), totalSupply: totalSupply(), block: block.number });
 
 		emit MoveLiquidity(poolID, _poolID);
 		poolID = _poolID;
@@ -472,30 +297,16 @@ contract UnoAutoStrategy is
 		)
 	{
 		PoolInfo memory pool = pools[poolID];
-		(, uint256 balanceA, uint256 balanceB) = pool.assetRouter.userStake(
-			address(this),
-			pool.pool
-		);
+		(, uint256 balanceA, uint256 balanceB) = pool.assetRouter.userStake(address(this), pool.pool);
 
 		uint256 _balance = balanceOf(_address);
 		if (_balance != 0) {
 			uint256 _totalSupply = totalSupply();
 			stakeA = (_balance * balanceA) / _totalSupply;
 			stakeB = (_balance * balanceB) / _totalSupply;
-			if (
-				(!leftoversCollected[msg.sender][lastMoveInfo.block]) &&
-				(lastMoveInfo.totalSupply != 0)
-			) {
-				leftoverA =
-					((_balance -
-						blockedLiquidty[_address][lastMoveInfo.block]) *
-						lastMoveInfo.leftoverA) /
-					lastMoveInfo.totalSupply;
-				leftoverB =
-					((_balance -
-						blockedLiquidty[_address][lastMoveInfo.block]) *
-						lastMoveInfo.leftoverB) /
-					lastMoveInfo.totalSupply;
+			if ((!leftoversCollected[msg.sender][lastMoveInfo.block]) && (lastMoveInfo.totalSupply != 0)) {
+				leftoverA = ((_balance - blockedLiquidty[_address][lastMoveInfo.block]) * lastMoveInfo.leftoverA) / lastMoveInfo.totalSupply;
+				leftoverB = ((_balance - blockedLiquidty[_address][lastMoveInfo.block]) * lastMoveInfo.leftoverB) / lastMoveInfo.totalSupply;
 			}
 		}
 	}
@@ -505,16 +316,9 @@ contract UnoAutoStrategy is
 	 * @return totalDepositsA - Token A deposits.
 	 * @return totalDepositsB - Token B deposits.
 	 */
-	function totalDeposits()
-		external
-		view
-		returns (uint256 totalDepositsA, uint256 totalDepositsB)
-	{
+	function totalDeposits() external view returns (uint256 totalDepositsA, uint256 totalDepositsB) {
 		PoolInfo memory pool = pools[poolID];
-		(, totalDepositsA, totalDepositsB) = pool.assetRouter.userStake(
-			address(this),
-			pool.pool
-		);
+		(, totalDepositsA, totalDepositsB) = pool.assetRouter.userStake(address(this), pool.pool);
 
 		// Add leftover tokens.
 		totalDepositsA += pool.tokenA.balanceOf(address(this));
@@ -538,10 +342,7 @@ contract UnoAutoStrategy is
 
 	function mint(address to) internal returns (uint256 liquidity) {
 		PoolInfo memory pool = pools[poolID];
-		(uint256 balanceLP, , ) = pool.assetRouter.userStake(
-			address(this),
-			pool.pool
-		);
+		(uint256 balanceLP, , ) = pool.assetRouter.userStake(address(this), pool.pool);
 		uint256 amountLP = balanceLP - reserveLP;
 
 		uint256 _totalSupply = totalSupply();
@@ -560,10 +361,7 @@ contract UnoAutoStrategy is
 
 	function burn(uint256 liquidity) internal returns (uint256 amountLP) {
 		PoolInfo memory pool = pools[poolID];
-		(uint256 balanceLP, , ) = pool.assetRouter.userStake(
-			address(this),
-			pool.pool
-		);
+		(uint256 balanceLP, , ) = pool.assetRouter.userStake(address(this), pool.pool);
 
 		amountLP = (liquidity * balanceLP) / totalSupply();
 		require(amountLP > 0, "INSUFFICIENT_LIQUIDITY_BURNED");

@@ -77,12 +77,9 @@ contract UnoFarmTraderjoe is Initializable, ReentrancyGuardUpgradeable {
 	 * {traderjoeRouter} - The contract that executes swaps.
 	 * {MasterChef} -The contract that distibutes {rewardToken}.
 	 */
-	IUniswapV2Router01 private constant traderjoeRouter =
-		IUniswapV2Router01(0x60aE616a2155Ee3d9A68541Ba4544862310933d4);
-	IMasterChefJoeBoost private constant MasterChefBoost =
-		IMasterChefJoeBoost(0x4483f0b6e2F5486D06958C20f8C39A7aBe87bf8F);
-	IMasterChefJoeV3 private constant MasterChefV3 =
-		IMasterChefJoeV3(0x4483f0b6e2F5486D06958C20f8C39A7aBe87bf8F);
+	IUniswapV2Router01 private constant traderjoeRouter = IUniswapV2Router01(0x60aE616a2155Ee3d9A68541Ba4544862310933d4);
+	IMasterChefJoeBoost private constant MasterChefBoost = IMasterChefJoeBoost(0x4483f0b6e2F5486D06958C20f8C39A7aBe87bf8F);
+	IMasterChefJoeV3 private constant MasterChefV3 = IMasterChefJoeV3(0x188bED1968b795d5c9022F6a0bb5931Ac4c18F00);
 
 	/**
      * @dev Contract Variables:
@@ -124,10 +121,7 @@ contract UnoFarmTraderjoe is Initializable, ReentrancyGuardUpgradeable {
 
 	// ============ Methods ============
 
-	function initialize(address _lpPair, address _assetRouter)
-		external
-		initializer
-	{
+	function initialize(address _lpPair, address _assetRouter) external initializer {
 		require(_lpPair != address(0), "BAD_LP_POOL");
 		require(_assetRouter != address(0), "BAD_ASSET_ROUTER");
 
@@ -141,56 +135,29 @@ contract UnoFarmTraderjoe is Initializable, ReentrancyGuardUpgradeable {
 		if (address(MasterChef) == address(MasterChefBoost)) {
 			address simpleRewarder = MasterChefBoost.poolInfo(pid).rewarder;
 			if (simpleRewarder != address(0)) {
-				address(ISimpleRewarder(simpleRewarder).rewardToken());
-				IERC20(rewarderToken).approve(
-					address(traderjoeRouter),
-					type(uint256).max
-				);
+				rewarderToken = address(ISimpleRewarder(simpleRewarder).rewardToken());
+				IERC20(rewarderToken).approve(address(traderjoeRouter), type(uint256).max);
 			}
 		} else {
 			address simpleRewarder = MasterChefV3.poolInfo(pid).rewarder;
 			if (simpleRewarder != address(0)) {
-				rewarderToken = address(
-					ISimpleRewarder(simpleRewarder).rewardToken()
-				);
-				IERC20(rewarderToken).approve(
-					address(traderjoeRouter),
-					type(uint256).max
-				);
+				rewarderToken = address(ISimpleRewarder(simpleRewarder).rewardToken());
+				IERC20(rewarderToken).approve(address(traderjoeRouter), type(uint256).max);
 			}
 		}
 
 		tokenA = IUniswapV2Pair(lpPair).token0();
 		tokenB = IUniswapV2Pair(lpPair).token1();
 
-		distributionInfo[0] = DistributionInfo({
-			block: block.number,
-			rewardPerDepositAge: 0,
-			cumulativeRewardAgePerDepositAge: 0
-		});
+		distributionInfo[0] = DistributionInfo({ block: block.number, rewardPerDepositAge: 0, cumulativeRewardAgePerDepositAge: 0 });
 		distributionID = 1;
 		totalDepositLastUpdate = block.number;
 
-		IERC20Upgradeable(lpPair).approve(
-			address(MasterChef),
-			type(uint256).max
-		);
-		IERC20Upgradeable(lpPair).approve(
-			address(traderjoeRouter),
-			type(uint256).max
-		);
-		IERC20Upgradeable(rewardToken).approve(
-			address(traderjoeRouter),
-			type(uint256).max
-		);
-		IERC20Upgradeable(tokenA).approve(
-			address(traderjoeRouter),
-			type(uint256).max
-		);
-		IERC20Upgradeable(tokenB).approve(
-			address(traderjoeRouter),
-			type(uint256).max
-		);
+		IERC20Upgradeable(lpPair).approve(address(MasterChef), type(uint256).max);
+		IERC20Upgradeable(lpPair).approve(address(traderjoeRouter), type(uint256).max);
+		IERC20Upgradeable(rewardToken).approve(address(traderjoeRouter), type(uint256).max);
+		IERC20Upgradeable(tokenA).approve(address(traderjoeRouter), type(uint256).max);
+		IERC20Upgradeable(tokenB).approve(address(traderjoeRouter), type(uint256).max);
 	}
 
 	/**
@@ -217,16 +184,7 @@ contract UnoFarmTraderjoe is Initializable, ReentrancyGuardUpgradeable {
 	{
 		uint256 addedLiquidity;
 		if (amountA > 0 && amountB > 0) {
-			(sentA, sentB, addedLiquidity) = traderjoeRouter.addLiquidity(
-				tokenA,
-				tokenB,
-				amountA,
-				amountB,
-				amountAMin,
-				amountBMin,
-				address(this),
-				block.timestamp
-			);
+			(sentA, sentB, addedLiquidity) = traderjoeRouter.addLiquidity(tokenA, tokenB, amountA, amountB, amountAMin, amountBMin, address(this), block.timestamp);
 		}
 		liquidity = addedLiquidity + amountLP;
 		require(liquidity > 0, "NO_LIQUIDITY_PROVIDED");
@@ -250,12 +208,7 @@ contract UnoFarmTraderjoe is Initializable, ReentrancyGuardUpgradeable {
 		bool withdrawLP,
 		address origin,
 		address recipient
-	)
-		external
-		nonReentrant
-		onlyAssetRouter
-		returns (uint256 amountA, uint256 amountB)
-	{
+	) external nonReentrant onlyAssetRouter returns (uint256 amountA, uint256 amountB) {
 		require(amount > 0, "INSUFFICIENT_AMOUNT");
 
 		_updateDeposit(origin);
@@ -276,15 +229,7 @@ contract UnoFarmTraderjoe is Initializable, ReentrancyGuardUpgradeable {
 			IERC20Upgradeable(lpPair).safeTransfer(recipient, amount);
 			return (0, 0);
 		}
-		(amountA, amountB) = traderjoeRouter.removeLiquidity(
-			tokenA,
-			tokenB,
-			amount,
-			amountAMin,
-			amountBMin,
-			recipient,
-			block.timestamp
-		);
+		(amountA, amountB) = traderjoeRouter.removeLiquidity(tokenA, tokenB, amount, amountAMin, amountBMin, recipient, block.timestamp);
 	}
 
 	/**
@@ -299,10 +244,7 @@ contract UnoFarmTraderjoe is Initializable, ReentrancyGuardUpgradeable {
 		FeeInfo calldata feeInfo
 	) external onlyAssetRouter nonReentrant returns (uint256 reward) {
 		require(totalDeposits > 0, "NO_LIQUIDITY");
-		require(
-			distributionInfo[distributionID - 1].block != block.number,
-			"CANT_CALL_ON_THE_SAME_BLOCK"
-		);
+		require(distributionInfo[distributionID - 1].block != block.number, "CANT_CALL_ON_THE_SAME_BLOCK");
 
 		MasterChef.withdraw(pid, 0);
 
@@ -310,110 +252,46 @@ contract UnoFarmTraderjoe is Initializable, ReentrancyGuardUpgradeable {
 		collectFees(feeSwapInfo[1], feeInfo, IERC20Upgradeable(rewarderToken));
 		{
 			// scope to avoid stack too deep errors
-			uint256 rewardTokenHalf = IERC20(rewardToken).balanceOf(
-				address(this)
-			) / 2;
+			uint256 rewardTokenHalf = IERC20(rewardToken).balanceOf(address(this)) / 2;
 			uint256 rewarderTokenHalf;
 			if (rewarderToken != address(0)) {
-				rewarderTokenHalf =
-					IERC20(rewarderToken).balanceOf(address(this)) /
-					2;
+				rewarderTokenHalf = IERC20(rewarderToken).balanceOf(address(this)) / 2;
 			}
 			if (rewardTokenHalf > 0) {
 				if (tokenA != rewardToken) {
 					address[] calldata route = swapInfos[0].route;
-					require(
-						route[0] == rewardToken &&
-							route[route.length - 1] == tokenA,
-						"BAD_REWARD_TOKEN_A_ROUTE"
-					);
-					traderjoeRouter.swapExactTokensForTokens(
-						rewardTokenHalf,
-						swapInfos[0].amountOutMin,
-						route,
-						address(this),
-						block.timestamp
-					);
+					require(route[0] == rewardToken && route[route.length - 1] == tokenA, "BAD_REWARD_TOKEN_A_ROUTE");
+					traderjoeRouter.swapExactTokensForTokens(rewardTokenHalf, swapInfos[0].amountOutMin, route, address(this), block.timestamp);
 				}
 
 				if (tokenB != rewardToken) {
 					address[] calldata route = swapInfos[1].route;
-					require(
-						route[0] == rewardToken &&
-							route[route.length - 1] == tokenB,
-						"BAD_REWARD_TOKEN_B_ROUTE"
-					);
-					traderjoeRouter.swapExactTokensForTokens(
-						rewardTokenHalf,
-						swapInfos[1].amountOutMin,
-						route,
-						address(this),
-						block.timestamp
-					);
+					require(route[0] == rewardToken && route[route.length - 1] == tokenB, "BAD_REWARD_TOKEN_B_ROUTE");
+					traderjoeRouter.swapExactTokensForTokens(rewardTokenHalf, swapInfos[1].amountOutMin, route, address(this), block.timestamp);
 				}
 			}
 
 			if (rewarderTokenHalf > 0) {
 				if (tokenA != rewarderToken) {
 					address[] calldata route = swapInfos[2].route;
-					require(
-						route[0] == rewarderToken &&
-							route[route.length - 1] == tokenA,
-						"BAD_REWARDER_TOKEN_A_ROUTE"
-					);
-					traderjoeRouter.swapExactTokensForTokens(
-						rewarderTokenHalf,
-						swapInfos[2].amountOutMin,
-						route,
-						address(this),
-						block.timestamp
-					);
+					require(route[0] == rewarderToken && route[route.length - 1] == tokenA, "BAD_REWARDER_TOKEN_A_ROUTE");
+					traderjoeRouter.swapExactTokensForTokens(rewarderTokenHalf, swapInfos[2].amountOutMin, route, address(this), block.timestamp);
 				}
 
 				if (tokenB != rewarderToken) {
 					address[] calldata route = swapInfos[3].route;
-					require(
-						route[0] == rewarderToken &&
-							route[route.length - 1] == tokenB,
-						"BAD_REWARDER_TOKEN_B_ROUTE"
-					);
-					traderjoeRouter.swapExactTokensForTokens(
-						rewarderTokenHalf,
-						swapInfos[3].amountOutMin,
-						route,
-						address(this),
-						block.timestamp
-					);
+					require(route[0] == rewarderToken && route[route.length - 1] == tokenB, "BAD_REWARDER_TOKEN_B_ROUTE");
+					traderjoeRouter.swapExactTokensForTokens(rewarderTokenHalf, swapInfos[3].amountOutMin, route, address(this), block.timestamp);
 				}
 			}
 		}
 
-		(, , reward) = traderjoeRouter.addLiquidity(
-			tokenA,
-			tokenB,
-			IERC20Upgradeable(tokenA).balanceOf(address(this)),
-			IERC20Upgradeable(tokenB).balanceOf(address(this)),
-			swapInfos[0].amountOutMin,
-			swapInfos[1].amountOutMin,
-			address(this),
-			block.timestamp
-		);
+		(, , reward) = traderjoeRouter.addLiquidity(tokenA, tokenB, IERC20Upgradeable(tokenA).balanceOf(address(this)), IERC20Upgradeable(tokenB).balanceOf(address(this)), swapInfos[0].amountOutMin, swapInfos[1].amountOutMin, address(this), block.timestamp);
 
-		uint256 rewardPerDepositAge = (reward * fractionMultiplier) /
-			(totalDepositAge +
-				totalDeposits *
-				(block.number - totalDepositLastUpdate));
-		uint256 cumulativeRewardAgePerDepositAge = distributionInfo[
-			distributionID - 1
-		].cumulativeRewardAgePerDepositAge +
-			rewardPerDepositAge *
-			(block.number - distributionInfo[distributionID - 1].block);
+		uint256 rewardPerDepositAge = (reward * fractionMultiplier) / (totalDepositAge + totalDeposits * (block.number - totalDepositLastUpdate));
+		uint256 cumulativeRewardAgePerDepositAge = distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge + rewardPerDepositAge * (block.number - distributionInfo[distributionID - 1].block);
 
-		distributionInfo[distributionID] = DistributionInfo({
-			block: block.number,
-			rewardPerDepositAge: rewardPerDepositAge,
-			cumulativeRewardAgePerDepositAge: cumulativeRewardAgePerDepositAge
-		});
+		distributionInfo[distributionID] = DistributionInfo({ block: block.number, rewardPerDepositAge: rewardPerDepositAge, cumulativeRewardAgePerDepositAge: cumulativeRewardAgePerDepositAge });
 
 		distributionID += 1;
 		totalDepositLastUpdate = block.number;
@@ -431,19 +309,12 @@ contract UnoFarmTraderjoe is Initializable, ReentrancyGuardUpgradeable {
 		IERC20Upgradeable token
 	) internal {
 		if (address(token) != address(0) && feeInfo.feeTo != address(0)) {
-			uint256 feeAmount = (token.balanceOf(address(this)) * feeInfo.fee) /
-				fractionMultiplier;
+			uint256 feeAmount = (token.balanceOf(address(this)) * feeInfo.fee) / fractionMultiplier;
 			if (feeAmount > 0) {
 				address[] calldata route = feeSwapInfo.route;
 				if (route.length > 0 && route[0] != route[route.length - 1]) {
 					require(route[0] == address(token), "BAD_FEE_TOKEN_ROUTE");
-					traderjoeRouter.swapExactTokensForTokens(
-						feeAmount,
-						feeSwapInfo.amountOutMin,
-						route,
-						feeInfo.feeTo,
-						block.timestamp
-					);
+					traderjoeRouter.swapExactTokensForTokens(feeAmount, feeSwapInfo.amountOutMin, route, feeInfo.feeTo, block.timestamp);
 					return;
 				}
 				token.safeTransfer(feeInfo.feeTo, feeAmount);
@@ -477,18 +348,14 @@ contract UnoFarmTraderjoe is Initializable, ReentrancyGuardUpgradeable {
 			// A reward has been distributed, update user.reward.
 			user.reward = userReward(_address);
 			// Count fresh deposit age from previous reward distribution to now.
-			user.depositAge =
-				user.stake *
-				(block.number - distributionInfo[distributionID - 1].block);
+			user.depositAge = user.stake * (block.number - distributionInfo[distributionID - 1].block);
 		}
 
 		user.lastDistribution = distributionID;
 		user.lastUpdate = block.number;
 
 		// Same with total deposit age.
-		totalDepositAge +=
-			(block.number - totalDepositLastUpdate) *
-			totalDeposits;
+		totalDepositAge += (block.number - totalDepositLastUpdate) * totalDeposits;
 		totalDepositLastUpdate = block.number;
 	}
 
@@ -498,32 +365,19 @@ contract UnoFarmTraderjoe is Initializable, ReentrancyGuardUpgradeable {
 			// Return user.reward if the distribution after the last user deposit did not happen yet.
 			return user.reward;
 		}
-		DistributionInfo memory lastUserDistributionInfo = distributionInfo[
-			user.lastDistribution
-		];
-		uint256 userDepositAge = user.depositAge +
-			user.stake *
-			(lastUserDistributionInfo.block - user.lastUpdate);
+		DistributionInfo memory lastUserDistributionInfo = distributionInfo[user.lastDistribution];
+		uint256 userDepositAge = user.depositAge + user.stake * (lastUserDistributionInfo.block - user.lastUpdate);
 		// Calculate reward between the last user deposit and the distribution after that.
-		uint256 rewardBeforeDistibution = (userDepositAge *
-			lastUserDistributionInfo.rewardPerDepositAge) / fractionMultiplier;
+		uint256 rewardBeforeDistibution = (userDepositAge * lastUserDistributionInfo.rewardPerDepositAge) / fractionMultiplier;
 		// Calculate reward from the distributions that have happened after the last user deposit.
-		uint256 rewardAfterDistribution = (user.stake *
-			(distributionInfo[distributionID - 1]
-				.cumulativeRewardAgePerDepositAge -
-				lastUserDistributionInfo.cumulativeRewardAgePerDepositAge)) /
-			fractionMultiplier;
+		uint256 rewardAfterDistribution = (user.stake * (distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge - lastUserDistributionInfo.cumulativeRewardAgePerDepositAge)) / fractionMultiplier;
 		return user.reward + rewardBeforeDistibution + rewardAfterDistribution;
 	}
 
 	/**
 	 * @dev Get pid and MasterChef version by iterating over all pools and MasterChefs and comparing pids.
 	 */
-	function getPoolInfo(address _lpPair)
-		internal
-		view
-		returns (uint256 _pid, IMasterChefJoe _masterChefAddress)
-	{
+	function getPoolInfo(address _lpPair) internal view returns (uint256 _pid, IMasterChefJoe _masterChefAddress) {
 		bool poolExists = false;
 
 		// there are more pools assigned to V2, so it makes sense to start with it

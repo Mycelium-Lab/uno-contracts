@@ -15,15 +15,9 @@ interface IMasterChefJoe {
 		address rewarder;
 	}
 
-	function poolInfo(uint256 pid)
-		external
-		view
-		returns (IMasterChefJoe.PoolInfo memory);
+	function poolInfo(uint256 pid) external view returns (IMasterChefJoe.PoolInfo memory);
 
-	function userInfo(uint256 _pid, address _user)
-		external
-		view
-		returns (IMasterChefJoe.UserInfo memory);
+	function userInfo(uint256 _pid, address _user) external view returns (IMasterChefJoe.UserInfo memory);
 
 	function JOE() external view returns (address);
 

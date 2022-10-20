@@ -3,7 +3,7 @@ const {
     expectEvent,
     BN,
     constants,
-    time,
+    time
 } = require('@openzeppelin/test-helpers')
 const { deployProxy, upgradeProxy } = require('@openzeppelin/truffle-upgrades')
 
@@ -37,7 +37,7 @@ const amounts = [
     new BN(300000),
     new BN(500000),
     new BN(400000000),
-    new BN(4400000000),
+    new BN(4400000000)
 ]
 
 const feeCollector = '0xFFFf795B802CB03FD664092Ab169f5f5c236335c'
@@ -92,7 +92,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
 
         assetRouter = await deployProxy(AssetRouter, {
             kind: 'uups',
-            initializer: false,
+            initializer: false
         })
 
         factory = await FarmFactory.new(
@@ -107,7 +107,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
         )
         const events = await assetRouter.getPastEvents('AllEvents', {
             fromBlock: _receipt.block,
-            toBlock: _receipt.block,
+            toBlock: _receipt.block
         })
         // convert web3's receipt to truffle's format
         initReceipt.tx = _receipt.transactionHash
@@ -140,7 +140,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
         const JOEtoken = await IERC20.at(rewardToken)
         const JOEbalance = await JOEtoken.balanceOf(JOEHolder)
         await JOEtoken.transfer(masterJoeAddress, JOEbalance, {
-            from: JOEHolder,
+            from: JOEHolder
         })
     })
 
@@ -154,7 +154,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
         it('Reverts', async () => {
             await expectRevert(
                 assetRouter.initialize(accessManager.address, factory.address, {
-                    from: account1,
+                    from: account1
                 }),
                 'Initializable: contract is already initialized'
             )
@@ -235,7 +235,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
             it('prevents function calls', async () => {
                 await expectRevert(
                     assetRouter.deposit(pool, 0, 0, 0, 0, 0, account1, {
-                        from: account1,
+                        from: account1
                     }),
                     'Pausable: paused'
                 )
@@ -246,11 +246,11 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 }
                         ],
                         [
                             { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 }
                         ],
                         feeCollector,
                         { from: account1 }
@@ -281,7 +281,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                 // Pausable: paused check passes. revert for a different reason
                 await expectRevert(
                     assetRouter.deposit(pool, 0, 0, 0, 0, 0, account1, {
-                        from: account1,
+                        from: account1
                     }),
                     'NO_LIQUIDITY_PROVIDED'
                 )
@@ -292,11 +292,11 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 }
                         ],
                         [
                             { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 }
                         ],
                         feeCollector,
                         { from: account1 }
@@ -319,7 +319,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
             it('reverts if total amount provided is zero', async () => {
                 await expectRevert(
                     assetRouter.deposit(pool, 0, 0, 0, 0, 0, account1, {
-                        from: account1,
+                        from: account1
                     }),
                     'NO_LIQUIDITY_PROVIDED'
                 )
@@ -329,7 +329,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
             let receipt
             before(async () => {
                 await stakingToken.approve(assetRouter.address, amounts[0], {
-                    from: account1,
+                    from: account1
                 })
                 receipt = await assetRouter.deposit(
                     pool,
@@ -350,7 +350,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                     lpPool: pool,
                     sender: account1,
                     recipient: account1,
-                    amount: amounts[0],
+                    amount: amounts[0]
                 })
             })
             it('updates stakes', async () => {
@@ -385,7 +385,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
             let receipt
             before(async () => {
                 await stakingToken.approve(assetRouter.address, amounts[1], {
-                    from: account1,
+                    from: account1
                 })
                 receipt = await assetRouter.deposit(
                     pool,
@@ -403,7 +403,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                     lpPool: pool,
                     sender: account1,
                     recipient: account1,
-                    amount: amounts[1],
+                    amount: amounts[1]
                 })
             })
             it('updates stakes', async () => {
@@ -438,7 +438,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
             let receipt
             before(async () => {
                 await stakingToken.approve(assetRouter.address, amounts[2], {
-                    from: account2,
+                    from: account2
                 })
                 receipt = await assetRouter.deposit(
                     pool,
@@ -457,7 +457,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                     lpPool: pool,
                     sender: account2,
                     recipient: account2,
-                    amount: amounts[2],
+                    amount: amounts[2]
                 })
             })
             it("doesn't change stakes for account[0]", async () => {
@@ -500,7 +500,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
             let receipt
             before(async () => {
                 await stakingToken.approve(assetRouter.address, amounts[3], {
-                    from: account1,
+                    from: account1
                 })
                 receipt = await assetRouter.deposit(
                     pool,
@@ -518,7 +518,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                     lpPool: pool,
                     sender: account1,
                     recipient: account2,
-                    amount: amounts[3],
+                    amount: amounts[3]
                 })
             })
             it('doesnt change stakes for account1', async () => {
@@ -582,7 +582,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                     traderjoeRouter
                 )
                 await stakingToken.approve(traderjoeRouter, amounts[4], {
-                    from: account1,
+                    from: account1
                 })
                 const tx = await routerContract.removeLiquidity(
                     tokenA.address,
@@ -595,9 +595,8 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                     { from: account1 }
                 )
                 const event = tx.receipt.rawLogs.find(
-                    (l) =>
-                        l.topics[0] ===
-                        '0xdccd412f0b1252819cb1fd330b93224ca42612892bb3f4f789976e6d81936496'
+                    (l) => l.topics[0]
+                        === '0xdccd412f0b1252819cb1fd330b93224ca42612892bb3f4f789976e6d81936496'
                 )
 
                 amountA = web3.utils.hexToNumberString(
@@ -608,23 +607,22 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                 )
 
                 balanceAbefore = await tokenA.balanceOf(account1)
-                balanceBbefore = await tokenB.balanceOf(account1)
-                ;({
+                balanceBbefore = await tokenB.balanceOf(account1);
+                ({
                     stakeLP: stakeLPBefore,
                     stakeA: stakeABefore,
-                    stakeB: stakeBBefore,
-                } = await assetRouter.userStake(account1, pool))
-                ;({ totalDepositsLP: totalDepositsLPBefore } =
-                    await assetRouter.totalDeposits(pool))
+                    stakeB: stakeBBefore
+                } = await assetRouter.userStake(account1, pool));
+                ({ totalDepositsLP: totalDepositsLPBefore } = await assetRouter.totalDeposits(pool))
                 stakingRewardsBalanceBefore = new BN(
                     (await masterJoe.userInfo(pid, farm.address))['0']
                 )
 
                 await tokenA.approve(assetRouter.address, amountA, {
-                    from: account1,
+                    from: account1
                 })
                 await tokenB.approve(assetRouter.address, amountB, {
-                    from: account1,
+                    from: account1
                 })
             })
             it('reverts if minAmountA > amountA || minAmountB > amountB', async () => {
@@ -669,7 +667,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                 expectEvent(receipt, 'Deposit', {
                     lpPool: pool,
                     sender: account1,
-                    recipient: account1,
+                    recipient: account1
                 })
             })
             it('withdraws tokens from balance', async () => {
@@ -741,7 +739,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
             it('reverts if the stake is zero', async () => {
                 await expectRevert(
                     assetRouter.withdraw(pool, new BN(1), 0, 0, true, admin, {
-                        from: admin,
+                        from: admin
                     }),
                     'INSUFFICIENT_BALANCE'
                 )
@@ -763,7 +761,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
             it('reverts if amount provided is 0', async () => {
                 await expectRevert(
                     assetRouter.withdraw(pool, 0, 0, 0, true, account1, {
-                        from: account1,
+                        from: account1
                     }),
                     'INSUFFICIENT_AMOUNT'
                 )
@@ -780,12 +778,12 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
 
             before(async () => {
                 balance1before = await stakingToken.balanceOf(account1)
-                balance2before = await stakingToken.balanceOf(account2)
-                ;({ stakeLP: stake1before } = await assetRouter.userStake(
+                balance2before = await stakingToken.balanceOf(account2);
+                ({ stakeLP: stake1before } = await assetRouter.userStake(
                     account1,
                     pool
-                ))
-                ;({ stakeLP: stake2before } = await assetRouter.userStake(
+                ));
+                ({ stakeLP: stake2before } = await assetRouter.userStake(
                     account2,
                     pool
                 ))
@@ -814,13 +812,13 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                     lpPool: pool,
                     sender: account1,
                     recipient: account1,
-                    amount: amounts[0],
+                    amount: amounts[0]
                 })
                 expectEvent(receipt2, 'Withdraw', {
                     lpPool: pool,
                     sender: account2,
                     recipient: account2,
-                    amount: amounts[2],
+                    amount: amounts[2]
                 })
             })
 
@@ -877,12 +875,12 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
             let receipt
             before(async () => {
                 balance1before = await stakingToken.balanceOf(account1)
-                balance2before = await stakingToken.balanceOf(account2)
-                ;({ stakeLP: stake1before } = await assetRouter.userStake(
+                balance2before = await stakingToken.balanceOf(account2);
+                ({ stakeLP: stake1before } = await assetRouter.userStake(
                     account1,
                     pool
-                ))
-                ;({ stakeLP: stake2before } = await assetRouter.userStake(
+                ));
+                ({ stakeLP: stake2before } = await assetRouter.userStake(
                     account2,
                     pool
                 ))
@@ -902,7 +900,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                     lpPool: pool,
                     sender: account1,
                     recipient: account2,
-                    amount: amounts[1],
+                    amount: amounts[1]
                 })
             })
             it('correctly changes userStake for account1', async () => {
@@ -950,16 +948,16 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
             let receipt
             before(async () => {
                 balanceAbefore = await tokenA.balanceOf(account1)
-                balanceBbefore = await tokenB.balanceOf(account1)
-                ;({
+                balanceBbefore = await tokenB.balanceOf(account1);
+                ({
                     stakeLP: stakeLP1,
                     stakeA: stakeA1,
-                    stakeB: stakeB1,
-                } = await assetRouter.userStake(account1, pool))
-                ;({
+                    stakeB: stakeB1
+                } = await assetRouter.userStake(account1, pool));
+                ({
                     stakeLP: stakeLP2,
                     stakeA: stakeA2,
-                    stakeB: stakeB2,
+                    stakeB: stakeB2
                 } = await assetRouter.userStake(account2, pool))
                 receipt = await assetRouter.withdraw(
                     pool,
@@ -976,7 +974,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                     lpPool: pool,
                     sender: account1,
                     recipient: account1,
-                    amount: stakeLP1,
+                    amount: stakeLP1
                 })
             })
             it('correctly updates account1 stake', async () => {
@@ -1027,16 +1025,16 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
             let receipt
             before(async () => {
                 balanceAbefore = await tokenA.balanceOf(account1)
-                balanceBbefore = await tokenB.balanceOf(account1)
-                ;({
+                balanceBbefore = await tokenB.balanceOf(account1);
+                ({
                     stakeLP: stakeLP1,
                     stakeA: stakeA1,
-                    stakeB: stakeB1,
-                } = await assetRouter.userStake(account1, pool))
-                ;({
+                    stakeB: stakeB1
+                } = await assetRouter.userStake(account1, pool));
+                ({
                     stakeLP: stakeLP2,
                     stakeA: stakeA2,
-                    stakeB: stakeB2,
+                    stakeB: stakeB2
                 } = await assetRouter.userStake(account2, pool))
                 receipt = await assetRouter.withdraw(
                     pool,
@@ -1053,7 +1051,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                     lpPool: pool,
                     sender: account2,
                     recipient: account1,
-                    amount: stakeLP2,
+                    amount: stakeLP2
                 })
             })
             it('correctly updates account2 stake', async () => {
@@ -1115,7 +1113,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
             it('fires events', async () => {
                 expectEvent(receipt, 'FeeChanged', {
                     previousFee: new BN(0),
-                    newFee: fee,
+                    newFee: fee
                 })
             })
             it('sets new fee', async () => {
@@ -1139,11 +1137,11 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 }
                         ],
                         [
                             { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 }
                         ],
                         feeCollector,
                         { from: pauser }
@@ -1159,11 +1157,11 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 }
                         ],
                         [
                             { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 }
                         ],
                         feeCollector,
                         { from: distributor }
@@ -1179,11 +1177,11 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 }
                         ],
                         [
                             { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 }
                         ],
                         feeCollector,
                         { from: distributor }
@@ -1200,7 +1198,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
             before(async () => {
                 balance1 = await stakingToken.balanceOf(account1)
                 await stakingToken.approve(assetRouter.address, balance1, {
-                    from: account1,
+                    from: account1
                 })
                 await assetRouter.deposit(
                     pool,
@@ -1215,7 +1213,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
 
                 balance2 = await stakingToken.balanceOf(account2)
                 await stakingToken.approve(assetRouter.address, balance2, {
-                    from: account2,
+                    from: account2
                 })
                 await assetRouter.deposit(
                     pool,
@@ -1241,31 +1239,31 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                             route: [
                                 rewardToken,
                                 '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                tokenA.address,
+                                tokenA.address
                             ],
-                            amountOutMin: 0,
+                            amountOutMin: 0
                         },
                         {
                             route: [
                                 rewardToken,
                                 '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                tokenB.address,
+                                tokenB.address
                             ],
-                            amountOutMin: 0,
+                            amountOutMin: 0
                         },
                         { route: [], amountOutMin: 0 },
-                        { route: [], amountOutMin: 0 },
+                        { route: [], amountOutMin: 0 }
                     ],
                     [
                         {
                             route: [
                                 rewardToken,
                                 '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                WETH.address,
+                                WETH.address
                             ],
-                            amountOutMin: 0,
+                            amountOutMin: 0
                         },
-                        { route: [], amountOutMin: 0 },
+                        { route: [], amountOutMin: 0 }
                     ],
                     feeCollector,
                     { from: distributor }
@@ -1310,31 +1308,31 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                                 route: [
                                     constants.ZERO_ADDRESS,
                                     '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    tokenA.address,
+                                    tokenA.address
                                 ],
-                                amountOutMin: 0,
+                                amountOutMin: 0
                             },
                             {
                                 route: [
                                     rewardToken,
                                     '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    tokenB.address,
+                                    tokenB.address
                                 ],
-                                amountOutMin: 0,
+                                amountOutMin: 0
                             },
                             { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 }
                         ],
                         [
                             {
                                 route: [
                                     rewardToken,
                                     '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    WETH.address,
+                                    WETH.address
                                 ],
-                                amountOutMin: 0,
+                                amountOutMin: 0
                             },
-                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 }
                         ],
                         feeCollector,
                         { from: distributor }
@@ -1349,31 +1347,31 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                                 route: [
                                     rewardToken,
                                     '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    tokenA.address,
+                                    tokenA.address
                                 ],
-                                amountOutMin: 0,
+                                amountOutMin: 0
                             },
                             {
                                 route: [
                                     constants.ZERO_ADDRESS,
                                     '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    tokenB.address,
+                                    tokenB.address
                                 ],
-                                amountOutMin: 0,
+                                amountOutMin: 0
                             },
                             { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 }
                         ],
                         [
                             {
                                 route: [
                                     rewardToken,
                                     '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    WETH.address,
+                                    WETH.address
                                 ],
-                                amountOutMin: 0,
+                                amountOutMin: 0
                             },
-                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 }
                         ],
                         feeCollector,
                         { from: distributor }
@@ -1388,31 +1386,31 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                                 route: [
                                     rewardToken,
                                     '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    tokenA.address,
+                                    tokenA.address
                                 ],
-                                amountOutMin: 0,
+                                amountOutMin: 0
                             },
                             {
                                 route: [
                                     rewardToken,
                                     '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    tokenB.address,
+                                    tokenB.address
                                 ],
-                                amountOutMin: 0,
+                                amountOutMin: 0
                             },
                             { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 }
                         ],
                         [
                             {
                                 route: [
                                     constants.ZERO_ADDRESS,
                                     '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    WETH.address,
+                                    WETH.address
                                 ],
-                                amountOutMin: 0,
+                                amountOutMin: 0
                             },
-                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 }
                         ],
                         feeCollector,
                         { from: distributor }
@@ -1429,31 +1427,31 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                                 route: [
                                     rewardToken,
                                     '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    constants.ZERO_ADDRESS,
+                                    constants.ZERO_ADDRESS
                                 ],
-                                amountOutMin: 0,
+                                amountOutMin: 0
                             },
                             {
                                 route: [
                                     rewardToken,
                                     '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    tokenB.address,
+                                    tokenB.address
                                 ],
-                                amountOutMin: 0,
+                                amountOutMin: 0
                             },
                             { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 }
                         ],
                         [
                             {
                                 route: [
                                     rewardToken,
                                     '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    WETH.address,
+                                    WETH.address
                                 ],
-                                amountOutMin: 0,
+                                amountOutMin: 0
                             },
-                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 }
                         ],
                         feeCollector,
                         { from: distributor }
@@ -1470,31 +1468,31 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                                 route: [
                                     rewardToken,
                                     '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    tokenA.address,
+                                    tokenA.address
                                 ],
-                                amountOutMin: 0,
+                                amountOutMin: 0
                             },
                             {
                                 route: [
                                     rewardToken,
                                     '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    constants.ZERO_ADDRESS,
+                                    constants.ZERO_ADDRESS
                                 ],
-                                amountOutMin: 0,
+                                amountOutMin: 0
                             },
                             { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 }
                         ],
                         [
                             {
                                 route: [
                                     rewardToken,
                                     '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    WETH.address,
+                                    WETH.address
                                 ],
-                                amountOutMin: 0,
+                                amountOutMin: 0
                             },
-                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 }
                         ],
                         feeCollector,
                         { from: distributor }
@@ -1514,8 +1512,8 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                     true,
                     account1,
                     { from: account1 }
-                )
-                ;({ stakeLP } = await assetRouter.userStake(account1, pool))
+                );
+                ({ stakeLP } = await assetRouter.userStake(account1, pool))
                 assert.equal(stakeLP.toString(), '0', 'acount1 stake not 0')
             })
             it('withdraws tokens for account2', async () => {
@@ -1528,8 +1526,8 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                     true,
                     account2,
                     { from: account2 }
-                )
-                ;({ stakeLP } = await assetRouter.userStake(account2, pool))
+                );
+                ({ stakeLP } = await assetRouter.userStake(account2, pool))
                 assert.equal(stakeLP.toString(), '0', 'acount2 stake not 0')
             })
             it('not leaves any tokens', async () => {
@@ -1561,8 +1559,8 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
 
             before(async () => {
                 amountETH = new BN(40000000000000)
-                amountToken = new BN(40000000000)
-                ;[tokenAAddress, tokenBAddress] = await assetRouter.getTokens(
+                amountToken = new BN(40000000000);
+                [tokenAAddress, tokenBAddress] = await assetRouter.getTokens(
                     pool
                 )
 
@@ -1589,17 +1587,16 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                     )
                 }
 
-                ;({
+                ({
                     stakeLP: stakeLPBefore,
                     stakeA: stakeABefore,
-                    stakeB: stakeBBefore,
-                } = await assetRouter.userStake(account3, pool))
-                ;({ totalDepositsLP: totalDepositsLPBefore } =
-                    await assetRouter.totalDeposits(pool))
+                    stakeB: stakeBBefore
+                } = await assetRouter.userStake(account3, pool));
+                ({ totalDepositsLP: totalDepositsLPBefore } = await assetRouter.totalDeposits(pool))
 
                 if (
-                    tokenAAddress.toLowerCase() ===
-                    '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7'.toLowerCase()
+                    tokenAAddress.toLowerCase()
+                    === '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7'.toLowerCase()
                 ) {
                     await ethPooltokenB.approve(
                         assetRouter.address,
@@ -1629,7 +1626,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                     account3,
                     {
                         from: account3,
-                        value: amountETH,
+                        value: amountETH
                     }
                 )
 
@@ -1643,19 +1640,18 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                 expectEvent(receipt, 'Deposit', {
                     lpPool: pool,
                     sender: account3,
-                    recipient: account3,
+                    recipient: account3
                 })
             })
             it('withdraws tokens and ETH from balance', async () => {
-                const { stakeA: stakeAAfter, stakeB: stakeBAfter } =
-                    await assetRouter.userStake(account3, pool)
+                const { stakeA: stakeAAfter, stakeB: stakeBAfter } = await assetRouter.userStake(account3, pool)
 
                 let tokenStakeDiff
                 let ETHStakeDiff
 
                 if (
-                    tokenAAddress.toLowerCase() ===
-                    '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7'.toLowerCase()
+                    tokenAAddress.toLowerCase()
+                    === '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7'.toLowerCase()
                 ) {
                     tokenStakeDiff = stakeBAfter.sub(stakeBBefore)
                     ETHStakeDiff = stakeAAfter.sub(stakeABefore)
@@ -1710,15 +1706,14 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
 
             before(async () => {
                 amountETH = new BN(4000)
-                amountToken = new BN(4000)
-                ;[tokenAAddress, tokenBAddress] = await assetRouter.getTokens(
+                amountToken = new BN(4000);
+                [tokenAAddress, tokenBAddress] = await assetRouter.getTokens(
                     pool
                 )
 
                 ethPooltokenA = await IUniswapV2Pair.at(tokenAAddress)
-                ethPooltokenB = await IUniswapV2Pair.at(tokenBAddress)
-                ;({ totalDepositsLP: totalDepositsLPBefore } =
-                    await assetRouter.totalDeposits(pool))
+                ethPooltokenB = await IUniswapV2Pair.at(tokenBAddress);
+                ({ totalDepositsLP: totalDepositsLPBefore } = await assetRouter.totalDeposits(pool))
 
                 const poolLength = await masterJoe.poolLength()
 
@@ -1740,15 +1735,15 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                     )
                 }
 
-                ;({
+                ({
                     stakeLP: stakeLPBefore,
                     stakeA: stakeABefore,
-                    stakeB: stakeBBefore,
+                    stakeB: stakeBBefore
                 } = await assetRouter.userStake(account3, pool))
 
                 if (
-                    tokenAAddress.toLowerCase() ===
-                    '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7'.toLowerCase()
+                    tokenAAddress.toLowerCase()
+                    === '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7'.toLowerCase()
                 ) {
                     token = ethPooltokenB
                     tokenBalanceBefore = await token.balanceOf(account3)
@@ -1767,7 +1762,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                     0,
                     account3,
                     {
-                        from: account3,
+                        from: account3
                     }
                 )
 
@@ -1781,7 +1776,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                 expectEvent(receipt, 'Withdraw', {
                     lpPool: pool,
                     sender: account3,
-                    recipient: account3,
+                    recipient: account3
                 })
             })
             it('updates stakes', async () => {
@@ -1810,8 +1805,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                 )
             })
             it('adds tokens and ETH to balance', async () => {
-                const { stakeA: stakeAAfter, stakeB: stakeBAfter } =
-                    await assetRouter.userStake(account3, pool)
+                const { stakeA: stakeAAfter, stakeB: stakeBAfter } = await assetRouter.userStake(account3, pool)
                 const tokenBalanceAfter = await token.balanceOf(account3)
                 const ethBalanceAfter = new BN(
                     await web3.eth.getBalance(account3)
@@ -1826,8 +1820,8 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                 let ETHStakeDiff
 
                 if (
-                    tokenAAddress.toLowerCase() ===
-                    '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7'.toLowerCase()
+                    tokenAAddress.toLowerCase()
+                    === '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7'.toLowerCase()
                 ) {
                     tokenStakeDiff = stakeBAfter.sub(stakeBBefore)
                     ETHStakeDiff = stakeAAfter.sub(stakeABefore)
@@ -1862,7 +1856,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                 // we get last transaction's hash by finding the last event because upgradeProxy returns contract instance instead of transaction receipt object
                 const events = await instance.getPastEvents('AllEvents', {
                     fromBlock: 'latest',
-                    toBlock: 'latest',
+                    toBlock: 'latest'
                 })
                 const _receipt = await web3.eth.getTransactionReceipt(
                     events[0].transactionHash
