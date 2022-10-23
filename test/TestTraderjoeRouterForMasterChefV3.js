@@ -372,7 +372,6 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
                 )
             })
             it('stakes tokens in StakingRewards contract', async () => {
-                console.log(await masterJoe.userInfo(pid, farm.address))
                 assert.equal(
                     (
                         await masterJoe.userInfo(pid, farm.address)
