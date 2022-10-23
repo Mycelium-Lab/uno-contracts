@@ -53,7 +53,7 @@ approxeq = (bn1, bn2, epsilon, message) => {
     )
 }
 
-contract('UnoAssetRouterTraderjoe', (accounts) => {
+contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
     const admin = accounts[0]
     const pauser = accounts[1]
     const distributor = accounts[2]

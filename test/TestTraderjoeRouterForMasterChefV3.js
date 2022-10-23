@@ -24,12 +24,12 @@ const AssetRouterV2 = artifacts.require('UnoAssetRouterTraderjoeV2')
 const traderjoeRouter = '0x60aE616a2155Ee3d9A68541Ba4544862310933d4'
 const pool = '0x0512Ab7CcF96AF5512dBc2d4C93048f3f6A16608' // wAVAX-USDC
 
-const masterJoeAddress = '0x4483f0b6e2F5486D06958C20f8C39A7aBe87bf8F'
+const masterJoeAddress = '0x188bED1968b795d5c9022F6a0bb5931Ac4c18F00'
 
 const JOEHolder = '0x799d4c5e577cf80221a076064a2054430d2af5cd' // has to be unlocked and hold 0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a
 
 const account1 = '0x406f7956a8962792F458615194E4Adb7A06248ed' // has to be unlocked and hold 0xf4003F4efBE8691B60249E6afbD307aBE7758adb
-const account2 = '0x406f7956a8962792F458615194E4Adb7A06248ed' // has to be unlocked and hold 0xf4003F4efBE8691B60249E6afbD307aBE7758adb
+const account2 = '0x05810778827F97e742AB4657660901F4d6FA9dCf' // has to be unlocked and hold 0xf4003F4efBE8691B60249E6afbD307aBE7758adb
 
 const amounts = [
     new BN(100000),
@@ -52,7 +52,7 @@ approxeq = (bn1, bn2, epsilon, message) => {
     )
 }
 
-contract('UnoAssetRouterTraderjoe', (accounts) => {
+contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
     const admin = accounts[0]
     const pauser = accounts[1]
     const distributor = accounts[2]
@@ -108,7 +108,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
             fromBlock: _receipt.block,
             toBlock: _receipt.block
         })
-        // convert web3's receipt to truffle's format
+        // convert web3's receipt to truffle's formatIMasterJoe
         initReceipt.tx = _receipt.transactionHash
         initReceipt.receipt = _receipt
         initReceipt.logs = events
@@ -116,6 +116,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
         stakingToken = await IERC20.at(pool)
 
         const lpToken = await IUniswapV2Pair.at(pool)
+        await lpToken.transfer(account2, amounts[4], { from: account1 })
 
         const tokenAAddress = await lpToken.token0()
         const tokenBAddress = await lpToken.token1()
@@ -371,6 +372,7 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                 )
             })
             it('stakes tokens in StakingRewards contract', async () => {
+                console.log(await masterJoe.userInfo(pid, farm.address))
                 assert.equal(
                     (
                         await masterJoe.userInfo(pid, farm.address)
@@ -721,20 +723,6 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
     })
     describe('withdraw', () => {
         describe('reverts', () => {
-            it('reverts if the pool doesnt exist', async () => {
-                await expectRevert(
-                    assetRouter.withdraw(
-                        pool2,
-                        amounts[0],
-                        0,
-                        0,
-                        true,
-                        account1,
-                        { from: account1 }
-                    ),
-                    'FARM_NOT_EXISTS'
-                )
-            })
             it('reverts if the stake is zero', async () => {
                 await expectRevert(
                     assetRouter.withdraw(pool, new BN(1), 0, 0, true, admin, {
@@ -1148,26 +1136,6 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                     'CALLER_NOT_AUTHORIZED'
                 )
             })
-            it('reverts if pool doesnt exist', async () => {
-                await expectRevert(
-                    assetRouter.distribute(
-                        pool2,
-                        [
-                            { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 }
-                        ],
-                        [
-                            { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 }
-                        ],
-                        feeCollector,
-                        { from: distributor }
-                    ),
-                    'FARM_NOT_EXISTS'
-                )
-            })
             it('reverts if there is no liquidity in the pool', async () => {
                 await expectRevert(
                     assetRouter.distribute(
@@ -1237,7 +1205,6 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                         {
                             route: [
                                 rewardToken,
-                                '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
                                 tokenA.address
                             ],
                             amountOutMin: 0
@@ -1245,24 +1212,42 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                         {
                             route: [
                                 rewardToken,
-                                '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
+                                '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7',
                                 tokenB.address
                             ],
                             amountOutMin: 0
                         },
-                        { route: [], amountOutMin: 0 },
-                        { route: [], amountOutMin: 0 }
+                        {
+                            route: [
+                                tokenB.address,
+                                tokenA.address
+                            ],
+                            amountOutMin: 0
+                        },
+                        {
+                            route: [
+                                tokenB.address,
+                                tokenA.address
+                            ],
+                            amountOutMin: 0
+                        }
                     ],
                     [
                         {
                             route: [
                                 rewardToken,
-                                '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
+                                '0xA7D7079b0FEaD91F3e65f86E8915Cb59c1a4C664',
                                 WETH.address
                             ],
                             amountOutMin: 0
                         },
-                        { route: [], amountOutMin: 0 }
+                        {
+                            route: [tokenB.address,
+                                '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E',
+                                '0xA7D7079b0FEaD91F3e65f86E8915Cb59c1a4C664',
+                                WETH.address],
+                            amountOutMin: 0
+                        }
                     ],
                     feeCollector,
                     { from: distributor }
@@ -1537,309 +1522,6 @@ contract('UnoAssetRouterTraderjoe', (accounts) => {
                     totalDepositsLP.toString(),
                     '0',
                     'totalDeposits not 0'
-                )
-            })
-        })
-    })
-    describe('ETH deposit and withdraw', () => {
-        describe('deposit ETH', () => {
-            let stakeABefore
-            let stakeBBefore
-            let stakeLPBefore
-            let totalDepositsLPBefore
-
-            let amountETH
-            let amountToken
-            let tokenAAddress
-            let tokenBAddress
-            let token
-            let stakingRewardsBalanceBefore
-            let ETHPid
-
-            before(async () => {
-                amountETH = new BN(40000000000000)
-                amountToken = new BN(40000000000);
-                [tokenAAddress, tokenBAddress] = await assetRouter.getTokens(
-                    pool
-                )
-
-                ethPooltokenA = await IUniswapV2Pair.at(tokenAAddress)
-                ethPooltokenB = await IUniswapV2Pair.at(tokenBAddress)
-
-                const poolLength = await masterJoe.poolLength()
-
-                for (let i = 0; i < poolLength.toNumber(); i++) {
-                    const lpToken = (await masterJoe.poolInfo(i)).lpToken
-                    if (lpToken.toString() === pool) {
-                        ETHPid = i
-                        break
-                    }
-                }
-
-                const farmAddress = await factory.Farms(pool)
-                if (farmAddress === constants.ZERO_ADDRESS) {
-                    stakingRewardsBalanceBefore = new BN(0)
-                } else {
-                    const farmETH = await Farm.at(farmAddress)
-                    stakingRewardsBalanceBefore = new BN(
-                        (await masterJoe.userInfo(ETHPid, farmETH.address))['0']
-                    )
-                }
-
-                ({
-                    stakeLP: stakeLPBefore,
-                    stakeA: stakeABefore,
-                    stakeB: stakeBBefore
-                } = await assetRouter.userStake(account3, pool));
-                ({ totalDepositsLP: totalDepositsLPBefore } = await assetRouter.totalDeposits(pool))
-
-                if (
-                    tokenAAddress.toLowerCase()
-                    === '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7'.toLowerCase()
-                ) {
-                    await ethPooltokenB.approve(
-                        assetRouter.address,
-                        amountToken,
-                        { from: account3 }
-                    )
-                    token = ethPooltokenB
-                    tokenBalanceBefore = await token.balanceOf(account3)
-                } else {
-                    await ethPooltokenA.approve(
-                        assetRouter.address,
-                        amountToken,
-                        { from: account3 }
-                    )
-                    token = ethPooltokenA
-                    tokenBalanceBefore = await token.balanceOf(account3)
-                }
-            })
-            it('fires events', async () => {
-                ethBalanceBefore = new BN(await web3.eth.getBalance(account3))
-                const receipt = await assetRouter.depositETH(
-                    pool,
-                    amountToken,
-                    0,
-                    0,
-                    0,
-                    account3,
-                    {
-                        from: account3,
-                        value: amountETH
-                    }
-                )
-
-                const gasUsed = new BN(receipt.receipt.gasUsed)
-                const effectiveGasPrice = new BN(
-                    receipt.receipt.effectiveGasPrice
-                )
-
-                ETHSpentOnGas = gasUsed.mul(effectiveGasPrice)
-
-                expectEvent(receipt, 'Deposit', {
-                    lpPool: pool,
-                    sender: account3,
-                    recipient: account3
-                })
-            })
-            it('withdraws tokens and ETH from balance', async () => {
-                const { stakeA: stakeAAfter, stakeB: stakeBAfter } = await assetRouter.userStake(account3, pool)
-
-                let tokenStakeDiff
-                let ETHStakeDiff
-
-                if (
-                    tokenAAddress.toLowerCase()
-                    === '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7'.toLowerCase()
-                ) {
-                    tokenStakeDiff = stakeBAfter.sub(stakeBBefore)
-                    ETHStakeDiff = stakeAAfter.sub(stakeABefore)
-                } else {
-                    tokenStakeDiff = stakeAAfter.sub(stakeABefore)
-                    ETHStakeDiff = stakeBAfter.sub(stakeBBefore)
-                }
-
-                assert.ok(!tokenStakeDiff.isNeg(), 'Token Stake not increased')
-                assert.ok(!ETHStakeDiff.isNeg(), 'ETH Stake not increased')
-            })
-            it('updates stakes', async () => {
-                const { stakeLP } = await assetRouter.userStake(account3, pool)
-                assert.ok(stakeLP.gt(stakeLPBefore), 'Stake not increased')
-            })
-            it('updates totalDeposits', async () => {
-                const { totalDepositsLP } = await assetRouter.totalDeposits(
-                    pool
-                )
-                assert.ok(
-                    totalDepositsLP.gt(totalDepositsLPBefore),
-                    'Stake not increased'
-                )
-            })
-            it('stakes tokens in masterJoe', async () => {
-                const farmAddress = await factory.Farms(pool)
-                const farmETH = await Farm.at(farmAddress)
-
-                const stakingRewardsBalance = new BN(
-                    (await masterJoe.userInfo(ETHPid, farmETH.address))['0']
-                )
-                assert.ok(
-                    stakingRewardsBalance.gt(stakingRewardsBalanceBefore),
-                    'staking balance not increased'
-                )
-            })
-        })
-        describe('withdraw ETH', () => {
-            let stakeABefore
-            let stakeBBefore
-            let stakeLPBefore
-
-            let tokenAAddress
-            let tokenBAddress
-            let token
-            let tokenBalanceBefore
-            let totalDepositsLPBefore
-            let stakingRewardsBalanceBefore
-            let ethBalanceBefore
-            let ETHSpentOnGas
-            let ETHPid
-
-            before(async () => {
-                amountETH = new BN(4000)
-                amountToken = new BN(4000);
-                [tokenAAddress, tokenBAddress] = await assetRouter.getTokens(
-                    pool
-                )
-
-                ethPooltokenA = await IUniswapV2Pair.at(tokenAAddress)
-                ethPooltokenB = await IUniswapV2Pair.at(tokenBAddress);
-                ({ totalDepositsLP: totalDepositsLPBefore } = await assetRouter.totalDeposits(pool))
-
-                const poolLength = await masterJoe.poolLength()
-
-                for (let i = 0; i < poolLength.toNumber(); i++) {
-                    const lpToken = (await masterJoe.poolInfo(i)).lpToken
-                    if (lpToken.toString() === pool) {
-                        ETHPid = i
-                        break
-                    }
-                }
-
-                const farmAddress = await factory.Farms(pool)
-                if (farmAddress === constants.ZERO_ADDRESS) {
-                    stakingRewardsBalanceBefore = new BN(0)
-                } else {
-                    const farmETH = await Farm.at(farmAddress)
-                    stakingRewardsBalanceBefore = new BN(
-                        (await masterJoe.userInfo(ETHPid, farmETH.address))['0']
-                    )
-                }
-
-                ({
-                    stakeLP: stakeLPBefore,
-                    stakeA: stakeABefore,
-                    stakeB: stakeBBefore
-                } = await assetRouter.userStake(account3, pool))
-
-                if (
-                    tokenAAddress.toLowerCase()
-                    === '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7'.toLowerCase()
-                ) {
-                    token = ethPooltokenB
-                    tokenBalanceBefore = await token.balanceOf(account3)
-                } else {
-                    token = ethPooltokenA
-                    tokenBalanceBefore = await token.balanceOf(account3)
-                }
-            })
-            it('fires events', async () => {
-                ethBalanceBefore = new BN(await web3.eth.getBalance(account3))
-
-                const receipt = await assetRouter.withdrawETH(
-                    pool,
-                    stakeLPBefore,
-                    0,
-                    0,
-                    account3,
-                    {
-                        from: account3
-                    }
-                )
-
-                const gasUsed = new BN(receipt.receipt.gasUsed)
-                const effectiveGasPrice = new BN(
-                    receipt.receipt.effectiveGasPrice
-                )
-
-                ETHSpentOnGas = gasUsed.mul(effectiveGasPrice)
-
-                expectEvent(receipt, 'Withdraw', {
-                    lpPool: pool,
-                    sender: account3,
-                    recipient: account3
-                })
-            })
-            it('updates stakes', async () => {
-                const { stakeLP } = await assetRouter.userStake(account3, pool)
-                assert.ok(stakeLPBefore.gt(stakeLP), 'Stake not reduced')
-            })
-            it('updates totalDeposits', async () => {
-                const { totalDepositsLP } = await assetRouter.totalDeposits(
-                    pool
-                )
-                assert.ok(
-                    totalDepositsLPBefore.gt(totalDepositsLP),
-                    'totalDeposits not reduced'
-                )
-            })
-            it('unstakes tokens from StakingRewards contract', async () => {
-                const farmAddress = await factory.Farms(pool)
-                const farmETH = await Farm.at(farmAddress)
-
-                const stakingRewardsBalance = new BN(
-                    (await masterJoe.userInfo(ETHPid, farmETH.address))['0']
-                )
-                assert.ok(
-                    stakingRewardsBalanceBefore.gt(stakingRewardsBalance),
-                    'StakingRewards balance not increased'
-                )
-            })
-            it('adds tokens and ETH to balance', async () => {
-                const { stakeA: stakeAAfter, stakeB: stakeBAfter } = await assetRouter.userStake(account3, pool)
-                const tokenBalanceAfter = await token.balanceOf(account3)
-                const ethBalanceAfter = new BN(
-                    await web3.eth.getBalance(account3)
-                )
-
-                const ETHDiff = ethBalanceBefore
-                    .sub(ethBalanceAfter)
-                    .sub(ETHSpentOnGas)
-                const tokenDiff = tokenBalanceBefore.sub(tokenBalanceAfter)
-
-                let tokenStakeDiff
-                let ETHStakeDiff
-
-                if (
-                    tokenAAddress.toLowerCase()
-                    === '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7'.toLowerCase()
-                ) {
-                    tokenStakeDiff = stakeBAfter.sub(stakeBBefore)
-                    ETHStakeDiff = stakeAAfter.sub(stakeABefore)
-                } else {
-                    tokenStakeDiff = stakeAAfter.sub(stakeABefore)
-                    ETHStakeDiff = stakeBAfter.sub(stakeBBefore)
-                }
-
-                approxeq(
-                    tokenDiff,
-                    tokenStakeDiff,
-                    new BN(10),
-                    'Token Stake is not correct'
-                )
-                approxeq(
-                    ETHDiff,
-                    ETHStakeDiff,
-                    new BN(10),
-                    'ETH Stake is not correct'
                 )
             })
         })
