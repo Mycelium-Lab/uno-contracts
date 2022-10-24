@@ -96,7 +96,19 @@ contract UnoAssetRouterQuickswapDual is Initializable, PausableUpgradeable, UUPS
         (sentA, sentB, liquidity) = farm.deposit(amountA, amountB, amountAMin, amountBMin, amountLP, msg.sender, recipient);
         emit Deposit(lpStakingPool, msg.sender, recipient, liquidity); 
     }
+    function depositSingleAsset(address lpStakingPool, uint256 amount, address token, address recipient) external whenNotPaused returns(uint256 sentA, uint256 sentB, uint256 addedLiquidity){
+        Farm farm = Farm(farmFactory.Farms(lpStakingPool));
+        if(farm == Farm(address(0))){
+            farm = Farm(farmFactory.createFarm(lpStakingPool));
+        }
+        require(token == farm.tokenA() || token == farm.tokenB(), "INVALID_TOKEN.");
+        if(amount > 0){
+            IERC20Upgradeable(token).safeTransferFrom(msg.sender, address(farm), amount);
+        }
 
+        (sentA, sentB, addedLiquidity) = farm.depositSingleAsset(amount, token, msg.sender, recipient);
+        emit Deposit(lpStakingPool, msg.sender, recipient, addedLiquidity);
+    }
     /**
      * @dev Autoconverts MATIC into WMATIC and deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool} and deposits tokens in it. Emits a {Deposit} event.
      * @param lpStakingPool - Address of the pool to deposit tokens in.

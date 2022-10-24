@@ -25,8 +25,8 @@ const stakingRewardsOwner = '0x476307dac3fd170166e007fcaa14f0a129721463'// has t
 const account1 = '0xdDdd9E9D429ebe7235514B9Addc25bd772a8eEe2'// has to be unlocked and hold 0x2cF7252e74036d1Da831d11089D326296e64a728
 const account2 = '0x8eB6eAD701b7d378cF62C898a0A7b72639a89201'// has to be unlocked and hold 0x2cF7252e74036d1Da831d11089D326296e64a728
 const account3 = '0xB3Eb833853b3d7B4bdAD7defB1e869372A2c6767' // has to be unlocked and hold 0x80c0CBDB8d0B190238795d376f0bD57fd40525F2 (WONE)
-
-const amounts = [new BN(1000), new BN(3000), new BN(500), new BN(4000), new BN(700000000000)]
+const account4 = '0x11eDedebF63bef0ea2d2D071bdF88F71543ec6fB' // has to be unlocked and hold 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174 (USDC)
+const amounts = [new BN(1000), new BN(3000), new BN(500), new BN(4000), new BN(700000000000), new BN(500000000000)]
 
 const feeCollector = '0xFFFf795B802CB03FD664092Ab169f5f5c236335c'
 const fee = new BN('40000000000000000')// 4%
@@ -483,7 +483,6 @@ contract('UnoAssetRouterQuickswap', (accounts) => {
                 const { stakeA, stakeB } = await assetRouter.userStake(account1, pool)
                 const balanceAafter = await tokenA.balanceOf(account1)
                 const balanceBafter = await tokenB.balanceOf(account1)
-
                 approxeq(stakeA.sub(stakeABefore), balanceAbefore.sub(balanceAafter), new BN(10), 'StakeA is not correct')
                 approxeq(stakeB.sub(stakeBBefore), balanceBbefore.sub(balanceBafter), new BN(10), 'StakeB is not correct')
             })
@@ -514,6 +513,46 @@ contract('UnoAssetRouterQuickswap', (accounts) => {
                 )
             })
         })
+        describe('deposit single asset', () => {
+            let stakeABefore; let
+                stakeBBefore; let stakeLPBefore
+            let stakeA; let stakeB; let stakeLP
+            before(async () => {
+                balanceABefore = await tokenA.balanceOf(account4)
+                balanceBBefore = await tokenB.balanceOf(account4);
+                ({ stakeLP: stakeLPBefore, stakeA: stakeABefore, stakeB: stakeBBefore } = await assetRouter.userStake(account4, pool))
+                await tokenA.approve(assetRouter.address, amounts[5], { from: account4 })
+            })
+            it('fires events', async () => {
+                const receipt = await assetRouter.depositSingleAsset(pool, amounts[5], tokenA.address, account4, { from: account4 })
+                expectEvent(receipt, 'Deposit', { lpPool: pool, sender: account4, recipient: account4 })
+            })
+            it('checks stake', async () => {
+                ({ stakeLP, stakeA, stakeB } = await assetRouter.userStake(account4, pool))
+                const balanceAAfter = await tokenA.balanceOf(account4)
+                approxeq(stakeA.sub(stakeABefore), (amounts[5]).div(new BN(2)).sub(balanceAAfter), new BN(10), 'Stake is not correct')
+                assert.equal(stakeB.gt(stakeBBefore), true)
+            })
+            it('updates totalDeposits', async () => {
+                const { totalDepositsLP } = await assetRouter.totalDeposits(pool)
+                approxeq(
+                    totalDepositsLP,
+                    amounts[0].add(amounts[1]).add(amounts[2]).add(amounts[3]).add(amounts[4])
+                        .add(stakeLP),
+                    new BN(10),
+                    "Total amount sent doesn't equal totalDeposits"
+                )
+            })
+            it('stakes tokens in StakingRewards contract', async () => {
+                approxeq(
+                    await stakingRewards.balanceOf(farm.address),
+                    amounts[0].add(amounts[1]).add(amounts[2]).add(amounts[3]).add(amounts[4])
+                        .add(stakeLP),
+                    new BN(10),
+                    "Total amount sent doesn't equal totalDeposits"
+                )
+            })
+        })
     })
     describe('withdraw', () => {
         describe('reverts', () => {
@@ -539,6 +578,63 @@ contract('UnoAssetRouterQuickswap', (accounts) => {
                 await expectRevert(
                     assetRouter.withdraw(pool, 0, 0, 0, true, account1, { from: account1 }),
                     'INSUFFICIENT_AMOUNT'
+                )
+            })
+        })
+        describe('withdraws single asset', () => {
+            let balanceAbefore; let
+                balanceBbefore
+
+            let stakeLP; let stakeA; let
+                stakeB
+
+            let receipt
+            before(async () => {
+                balanceAbefore = await tokenA.balanceOf(account4)
+                balanceBbefore = await tokenB.balanceOf(account4);
+
+                ({ stakeLP, stakeA, stakeB } = await assetRouter.userStake(account4, pool))
+                receipt = await assetRouter.withdraw(pool, stakeLP, 0, 0, false, account4, { from: account4 })
+            })
+            it('fires events', async () => {
+                expectEvent(receipt, 'Withdraw', {
+                    lpPool: pool,
+                    sender: account4,
+                    recipient: account4,
+                    amount: stakeLP
+                })
+            })
+            it('correctly updates account4 stake', async () => {
+                const { stakeLP: stakeLP1, stakeA: stakeA1, stakeB: stakeB1 } = await assetRouter.userStake(account4, pool)
+                assert.equal(
+                    stakeLP1.toString(),
+                    '0',
+                    'stakeLP is wrong'
+                )
+                assert.equal(
+                    stakeA1.toString(),
+                    '0',
+                    'stakeA is wrong'
+                )
+                assert.equal(
+                    stakeB1.toString(),
+                    '0',
+                    'stakeB is wrong'
+                )
+            })
+            it('transfers tokens to user', async () => {
+                const balanceAafter = await tokenA.balanceOf(account4)
+                assert.equal(
+                    balanceAafter.sub(balanceAbefore).toString(),
+                    stakeA.toString(),
+                    'TokensA withdrawn do not equal deposited'
+                )
+
+                const balanceBafter = await tokenB.balanceOf(account4)
+                assert.equal(
+                    balanceBafter.sub(balanceBbefore).toString(),
+                    stakeB.toString(),
+                    'TokensB withdrawn do not equal deposited'
                 )
             })
         })

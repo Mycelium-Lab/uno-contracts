@@ -138,7 +138,61 @@ contract UnoFarmQuickswap is Initializable, ReentrancyGuardUpgradeable {
         IERC20(tokenA).approve(address(quickswapRouter), type(uint256).max);
         IERC20(tokenB).approve(address(quickswapRouter), type(uint256).max);
     }
+    /**
+     * @dev Function that makes the deposits with single asset.
+     * Deposits provided tokens in the Liquidity Pool, then stakes generated LP tokens in the {lpStakingPool}.
+     */
+    function depositSingleAsset(uint256 amount, address token, address origin, address recipient) external nonReentrant onlyAssetRouter returns(uint256 sentA, uint256 sentB, uint256 addedLiquidity){
+        uint256[] memory amountSwapped;
+        {
+            address[] memory path = new address[](2);
+            if (token == tokenA) {
+                path[0] = tokenA;
+                path[1] = tokenB;
+            } else {
+                path[0] = tokenB;
+                path[1] = tokenA;
+            }
+            uint256[] memory amountsOut = quickswapRouter.getAmountsOut(amount/2, path);
+            amountSwapped = quickswapRouter.swapExactTokensForTokens(
+                amount/2,
+                amountsOut[1],
+                path,
+                address(this),
+                block.timestamp);
+        }
+        if(amount > 0 && amountSwapped[1] > 0){
+            uint256 tokenAAmount;
+            uint256 tokenBAmount;
+            if (token == tokenA) {
+                tokenAAmount = amount - amount / 2;
+                tokenBAmount = amountSwapped[1];
+            } else {
+                tokenAAmount = amountSwapped[1];
+                tokenBAmount = amount - amount / 2;
+            }
+            (sentA, sentB, addedLiquidity) = quickswapRouter.addLiquidity(tokenA, tokenB, tokenAAmount, tokenBAmount, 0, 0, address(this), block.timestamp);
+        }
+        require(addedLiquidity > 0, 'NO_LIQUIDITY_PROVIDED');
 
+        _updateDeposit(recipient);
+        userInfo[recipient].stake += addedLiquidity;
+        totalDeposits += addedLiquidity;
+            
+        lpStakingPool.stake(addedLiquidity);
+        uint256 tokenAAmountSurplus;
+        uint256 tokenBAmountSurplus;
+         if (token == tokenA) {
+            tokenAAmountSurplus = amount - amount/2 - sentA;
+            tokenBAmountSurplus = amountSwapped[1] - sentB;
+         } else {
+           tokenAAmountSurplus = amountSwapped[1] - sentA;
+           tokenBAmountSurplus = amount - amount/2 - sentB;
+         }
+        IERC20Upgradeable(tokenA).safeTransfer(origin, tokenAAmountSurplus);
+        IERC20Upgradeable(tokenB).safeTransfer(origin, tokenBAmountSurplus);
+    }
+    
     /**
      * @dev Function that makes the deposits.
      * Deposits provided tokens in the Liquidity Pool, then stakes generated LP tokens in the {lpStakingPool}.
