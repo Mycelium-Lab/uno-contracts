@@ -25,8 +25,6 @@ const pool = '0x2915D57D076Ca2233F73B2E724Fea4F3DB967F9B' // weth-USDC
 const pool2 = '0x54e911F419e78d3E286c70D28a52933705069A31' // wMATIC-WETH.e
 const IExchangeMeshwap = artifacts.require('IExchangeMeshwap')
 
-const JOEHolder = '0x799d4c5e577cf80221a076064a2054430d2af5cd' // has to be unlocked and hold 0x2915d57d076ca2233f73b2e724fea4f3db967f9b
-
 const account1 = '0x09CF915e195aF33FA7B932C253352Ae9FBdB0106' // has to be unlocked and hold 0x2915D57D076Ca2233F73B2E724Fea4F3DB967F9B
 const account2 = '0x0e893d9769c3210C73843230dd250eecBC8fA302' // has to be unlocked and hold 0x2915D57D076Ca2233F73B2E724Fea4F3DB967F9B
 const account3 = '0x5b1cC8d112A98Ee0F731310373aEE0223290ab03' // has to be unlocked and hold wMATIC-USDC
@@ -1083,7 +1081,6 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
     })
 
     describe('Distributions', () => {
-        let WETH
         describe('reverts', () => {
             it('reverts if called not by distributor', async () => {
                 await expectRevert(
