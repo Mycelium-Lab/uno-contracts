@@ -3,7 +3,7 @@ const {
     expectEvent,
     BN,
     constants,
-    time,
+    time
 } = require('@openzeppelin/test-helpers')
 const { deployProxy, upgradeProxy } = require('@openzeppelin/truffle-upgrades')
 
@@ -22,21 +22,21 @@ const AssetRouterV2 = artifacts.require('UnoAssetRouterMeshswapV2')
 
 const meshswapRouter = '0x10f4A785F458Bc144e3706575924889954946639'
 const pool = '0x2915D57D076Ca2233F73B2E724Fea4F3DB967F9B' // weth-USDC
-const pool2 = '0xFE15c2695F1F920da45C30AAE47d11dE51007AF9' // wMATIC-WETH.e
+const pool2 = '0x54e911F419e78d3E286c70D28a52933705069A31' // wMATIC-WETH.e
 const IExchangeMeshwap = artifacts.require('IExchangeMeshwap')
 
 const JOEHolder = '0x799d4c5e577cf80221a076064a2054430d2af5cd' // has to be unlocked and hold 0x2915d57d076ca2233f73b2e724fea4f3db967f9b
 
 const account1 = '0x09CF915e195aF33FA7B932C253352Ae9FBdB0106' // has to be unlocked and hold 0x2915D57D076Ca2233F73B2E724Fea4F3DB967F9B
 const account2 = '0x0e893d9769c3210C73843230dd250eecBC8fA302' // has to be unlocked and hold 0x2915D57D076Ca2233F73B2E724Fea4F3DB967F9B
-const account3 = '0xBF14DB80D9275FB721383a77C00Ae180fc40ae98' // has to be unlocked and hold wMATIC-USDC
+const account3 = '0x5b1cC8d112A98Ee0F731310373aEE0223290ab03' // has to be unlocked and hold wMATIC-USDC
 
 const amounts = [
     new BN(100000),
     new BN(300000),
     new BN(500000),
     new BN(400000000),
-    new BN(4400000000),
+    new BN(4400000000)
 ]
 
 const feeCollector = '0xFFFf795B802CB03FD664092Ab169f5f5c236335c'
@@ -66,9 +66,9 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
 
     let tokenA
     let tokenB
-    let masterJoe
-    let pid
     let rewardToken
+
+    let USDC
 
     const initReceipt = {}
     before(async () => {
@@ -91,7 +91,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
 
         assetRouter = await deployProxy(AssetRouter, {
             kind: 'uups',
-            initializer: false,
+            initializer: false
         })
 
         factory = await FarmFactory.new(
@@ -106,7 +106,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
         )
         const events = await assetRouter.getPastEvents('AllEvents', {
             fromBlock: _receipt.block,
-            toBlock: _receipt.block,
+            toBlock: _receipt.block
         })
         // convert web3's receipt to truffle's format
         initReceipt.tx = _receipt.transactionHash
@@ -126,11 +126,6 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
         exchaneMeshswap = await IExchangeMeshwap.at(pool)
 
         rewardToken = await exchaneMeshswap.mesh()
-        // const JOEtoken = await IERC20.at(rewardToken)
-        // const JOEbalance = await JOEtoken.balanceOf(JOEHolder)
-        // await JOEtoken.transfer(masterJoeAddress, JOEbalance, {
-        //     from: JOEHolder,
-        // })
     })
 
     describe('Emits initialize event', () => {
@@ -143,7 +138,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
         it('Reverts', async () => {
             await expectRevert(
                 assetRouter.initialize(accessManager.address, factory.address, {
-                    from: account1,
+                    from: account1
                 }),
                 'Initializable: contract is already initialized'
             )
@@ -224,7 +219,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
             it('prevents function calls', async () => {
                 await expectRevert(
                     assetRouter.deposit(pool, 0, 0, 0, 0, 0, account1, {
-                        from: account1,
+                        from: account1
                     }),
                     'Pausable: paused'
                 )
@@ -233,7 +228,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                         pool,
                         [
                             { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 }
                         ],
                         { route: [], amountOutMin: 0 },
                         feeCollector,
@@ -265,7 +260,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                 // Pausable: paused check passes. revert for a different reason
                 await expectRevert(
                     assetRouter.deposit(pool, 0, 0, 0, 0, 0, account1, {
-                        from: account1,
+                        from: account1
                     }),
                     'NO_LIQUIDITY_PROVIDED'
                 )
@@ -274,7 +269,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                         pool,
                         [
                             { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 }
                         ],
                         { route: [], amountOutMin: 0 },
                         feeCollector,
@@ -298,7 +293,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
             it('reverts if total amount provided is zero', async () => {
                 await expectRevert(
                     assetRouter.deposit(pool, 0, 0, 0, 0, 0, account1, {
-                        from: account1,
+                        from: account1
                     }),
                     'NO_LIQUIDITY_PROVIDED'
                 )
@@ -308,7 +303,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
             let receipt
             before(async () => {
                 await stakingToken.approve(assetRouter.address, amounts[0], {
-                    from: account1,
+                    from: account1
                 })
                 receipt = await assetRouter.deposit(
                     pool,
@@ -329,7 +324,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                     lpPool: pool,
                     sender: account1,
                     recipient: account1,
-                    amount: amounts[0],
+                    amount: amounts[0]
                 })
             })
             it('updates stakes', async () => {
@@ -366,7 +361,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
             let receipt
             before(async () => {
                 await stakingToken.approve(assetRouter.address, amounts[1], {
-                    from: account1,
+                    from: account1
                 })
                 receipt = await assetRouter.deposit(
                     pool,
@@ -384,7 +379,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                     lpPool: pool,
                     sender: account1,
                     recipient: account1,
-                    amount: amounts[1],
+                    amount: amounts[1]
                 })
             })
             it('updates stakes', async () => {
@@ -420,24 +415,8 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
         describe('deposit lp tokens from different account', () => {
             let receipt
             before(async () => {
-                console.log(
-                    (
-                        await (
-                            await IUniswapV2Pair.at(pool)
-                        ).balanceOf(account2)
-                    ).toString()
-                )
-
-                console.log(
-                    (
-                        await (
-                            await IUniswapV2Pair.at(pool)
-                        ).balanceOf(account1)
-                    ).toString()
-                )
-                console.log(amounts[2].toString())
                 await stakingToken.approve(assetRouter.address, amounts[2], {
-                    from: account2,
+                    from: account2
                 })
 
                 receipt = await assetRouter.deposit(
@@ -457,7 +436,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                     lpPool: pool,
                     sender: account2,
                     recipient: account2,
-                    amount: amounts[2],
+                    amount: amounts[2]
                 })
             })
             it("doesn't change stakes for account[0]", async () => {
@@ -500,7 +479,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
             let receipt
             before(async () => {
                 await stakingToken.approve(assetRouter.address, amounts[3], {
-                    from: account1,
+                    from: account1
                 })
                 receipt = await assetRouter.deposit(
                     pool,
@@ -518,7 +497,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                     lpPool: pool,
                     sender: account1,
                     recipient: account2,
-                    amount: amounts[3],
+                    amount: amounts[3]
                 })
             })
             it('doesnt change stakes for account1', async () => {
@@ -582,9 +561,9 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                     meshswapRouter
                 )
                 await stakingToken.approve(meshswapRouter, amounts[4], {
-                    from: account1,
+                    from: account1
                 })
-                const tx = await routerContract.removeLiquidity(
+                await routerContract.removeLiquidity(
                     tokenA.address,
                     tokenB.address,
                     amounts[4],
@@ -594,31 +573,17 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                     '16415710000',
                     { from: account1 }
                 )
-                console.log(tx.receipt.rawLogs)
-                const event = tx.receipt.rawLogs.find(
-                    (l) =>
-                        l.topics[0] ===
-                        '0xdccd412f0b1252819cb1fd330b93224ca42612892bb3f4f789976e6d81936496'
-                )
-
-                // amountA = web3.utils.hexToNumberString(
-                //     event.data.substring(0, 66)
-                // )
-                // amountB = web3.utils.hexToNumberString(
-                //     `0x${event.data.substring(66, 130)}`
-                // )
 
                 balanceAbefore = await tokenA.balanceOf(account1)
                 balanceBbefore = await tokenB.balanceOf(account1)
                 amountA = balanceAbefore
-                amountB = balanceBbefore
-                ;({
+                amountB = balanceBbefore;
+                ({
                     stakeLP: stakeLPBefore,
                     stakeA: stakeABefore,
-                    stakeB: stakeBBefore,
-                } = await assetRouter.userStake(account1, pool))
-                ;({ totalDepositsLP: totalDepositsLPBefore } =
-                    await assetRouter.totalDeposits(pool))
+                    stakeB: stakeBBefore
+                } = await assetRouter.userStake(account1, pool));
+                ({ totalDepositsLP: totalDepositsLPBefore } = await assetRouter.totalDeposits(pool))
                 stakingRewardsBalanceBefore = new BN(
                     await (
                         await IUniswapV2Pair.at(pool)
@@ -626,40 +591,20 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                 )
 
                 await tokenA.approve(assetRouter.address, amountA, {
-                    from: account1,
+                    from: account1
                 })
                 await tokenB.approve(assetRouter.address, amountB, {
-                    from: account1,
+                    from: account1
                 })
             })
             it('reverts if minAmountA > amountA || minAmountB > amountB', async () => {
-                console.log(15996479893 + amountA)
-                console.log(amountA)
                 await expectRevert(
-                    assetRouter.deposit(
-                        pool,
-                        amountA,
-                        new BN(1),
-                        amountA.add(new BN('6025913637524859708')),
-                        amountA.add(new BN('6025913637524859708')),
-                        0,
-                        account1,
-                        { from: account1 }
-                    ),
-                    'INSUFFICIENT_A_AMOUNT'
+                    assetRouter.deposit(pool, amountA, new BN(1), amountA + 1, 0, 0, account1, { from: account1 }),
+                    'minAmount0 is not satisfied'
                 )
                 await expectRevert(
-                    assetRouter.deposit(
-                        pool,
-                        new BN(1),
-                        amountB,
-                        0,
-                        amountB,
-                        0,
-                        account1,
-                        { from: account1 }
-                    ),
-                    'INSUFFICIENT_B_AMOUNT'
+                    assetRouter.deposit(pool, new BN(1000), amountB, 3, amountB + 1000000, 0, account1, { from: account1 }),
+                    'minAmount1 is not satisfied'
                 )
             })
             it('fires events', async () => {
@@ -676,7 +621,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                 expectEvent(receipt, 'Deposit', {
                     lpPool: pool,
                     sender: account1,
-                    recipient: account1,
+                    recipient: account1
                 })
             })
             it('withdraws tokens from balance', async () => {
@@ -750,7 +695,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
             it('reverts if the stake is zero', async () => {
                 await expectRevert(
                     assetRouter.withdraw(pool, new BN(1), 0, 0, true, admin, {
-                        from: admin,
+                        from: admin
                     }),
                     'INSUFFICIENT_BALANCE'
                 )
@@ -772,7 +717,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
             it('reverts if amount provided is 0', async () => {
                 await expectRevert(
                     assetRouter.withdraw(pool, 0, 0, 0, true, account1, {
-                        from: account1,
+                        from: account1
                     }),
                     'INSUFFICIENT_AMOUNT'
                 )
@@ -789,12 +734,12 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
 
             before(async () => {
                 balance1before = await stakingToken.balanceOf(account1)
-                balance2before = await stakingToken.balanceOf(account2)
-                ;({ stakeLP: stake1before } = await assetRouter.userStake(
+                balance2before = await stakingToken.balanceOf(account2);
+                ({ stakeLP: stake1before } = await assetRouter.userStake(
                     account1,
                     pool
-                ))
-                ;({ stakeLP: stake2before } = await assetRouter.userStake(
+                ));
+                ({ stakeLP: stake2before } = await assetRouter.userStake(
                     account2,
                     pool
                 ))
@@ -823,13 +768,13 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                     lpPool: pool,
                     sender: account1,
                     recipient: account1,
-                    amount: amounts[0],
+                    amount: amounts[0]
                 })
                 expectEvent(receipt2, 'Withdraw', {
                     lpPool: pool,
                     sender: account2,
                     recipient: account2,
-                    amount: amounts[2],
+                    amount: amounts[2]
                 })
             })
 
@@ -886,12 +831,12 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
             let receipt
             before(async () => {
                 balance1before = await stakingToken.balanceOf(account1)
-                balance2before = await stakingToken.balanceOf(account2)
-                ;({ stakeLP: stake1before } = await assetRouter.userStake(
+                balance2before = await stakingToken.balanceOf(account2);
+                ({ stakeLP: stake1before } = await assetRouter.userStake(
                     account1,
                     pool
-                ))
-                ;({ stakeLP: stake2before } = await assetRouter.userStake(
+                ));
+                ({ stakeLP: stake2before } = await assetRouter.userStake(
                     account2,
                     pool
                 ))
@@ -911,7 +856,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                     lpPool: pool,
                     sender: account1,
                     recipient: account2,
-                    amount: amounts[1],
+                    amount: amounts[1]
                 })
             })
             it('correctly changes userStake for account1', async () => {
@@ -959,16 +904,16 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
             let receipt
             before(async () => {
                 balanceAbefore = await tokenA.balanceOf(account1)
-                balanceBbefore = await tokenB.balanceOf(account1)
-                ;({
+                balanceBbefore = await tokenB.balanceOf(account1);
+                ({
                     stakeLP: stakeLP1,
                     stakeA: stakeA1,
-                    stakeB: stakeB1,
-                } = await assetRouter.userStake(account1, pool))
-                ;({
+                    stakeB: stakeB1
+                } = await assetRouter.userStake(account1, pool));
+                ({
                     stakeLP: stakeLP2,
                     stakeA: stakeA2,
-                    stakeB: stakeB2,
+                    stakeB: stakeB2
                 } = await assetRouter.userStake(account2, pool))
                 receipt = await assetRouter.withdraw(
                     pool,
@@ -985,7 +930,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                     lpPool: pool,
                     sender: account1,
                     recipient: account1,
-                    amount: stakeLP1,
+                    amount: stakeLP1
                 })
             })
             it('correctly updates account1 stake', async () => {
@@ -1036,16 +981,16 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
             let receipt
             before(async () => {
                 balanceAbefore = await tokenA.balanceOf(account1)
-                balanceBbefore = await tokenB.balanceOf(account1)
-                ;({
+                balanceBbefore = await tokenB.balanceOf(account1);
+                ({
                     stakeLP: stakeLP1,
                     stakeA: stakeA1,
-                    stakeB: stakeB1,
-                } = await assetRouter.userStake(account1, pool))
-                ;({
+                    stakeB: stakeB1
+                } = await assetRouter.userStake(account1, pool));
+                ({
                     stakeLP: stakeLP2,
                     stakeA: stakeA2,
-                    stakeB: stakeB2,
+                    stakeB: stakeB2
                 } = await assetRouter.userStake(account2, pool))
                 receipt = await assetRouter.withdraw(
                     pool,
@@ -1062,7 +1007,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                     lpPool: pool,
                     sender: account2,
                     recipient: account1,
-                    amount: stakeLP2,
+                    amount: stakeLP2
                 })
             })
             it('correctly updates account2 stake', async () => {
@@ -1124,7 +1069,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
             it('fires events', async () => {
                 expectEvent(receipt, 'FeeChanged', {
                     previousFee: new BN(0),
-                    newFee: fee,
+                    newFee: fee
                 })
             })
             it('sets new fee', async () => {
@@ -1146,7 +1091,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                         pool,
                         [
                             { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 }
                         ],
                         { route: [], amountOutMin: 0 },
                         feeCollector,
@@ -1161,7 +1106,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                         pool2,
                         [
                             { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 }
                         ],
                         { route: [], amountOutMin: 0 },
                         feeCollector,
@@ -1176,7 +1121,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                         pool,
                         [
                             { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 },
+                            { route: [], amountOutMin: 0 }
                         ],
                         { route: [], amountOutMin: 0 },
                         feeCollector,
@@ -1191,10 +1136,11 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
             let balance1
             let balance2
             let feeCollectorBalanceBefore
+
             before(async () => {
                 balance1 = await stakingToken.balanceOf(account1)
                 await stakingToken.approve(assetRouter.address, balance1, {
-                    from: account1,
+                    from: account1
                 })
                 await assetRouter.deposit(
                     pool,
@@ -1206,10 +1152,10 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                     account1,
                     { from: account1 }
                 )
-
+                USDC = await IUniswapV2Pair.at('0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174')
                 balance2 = await stakingToken.balanceOf(account2)
                 await stakingToken.approve(assetRouter.address, balance2, {
-                    from: account2,
+                    from: account2
                 })
                 await assetRouter.deposit(
                     pool,
@@ -1221,12 +1167,8 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                     account2,
                     { from: account2 }
                 )
+                feeCollectorBalanceBefore = await USDC.balanceOf(feeCollector)
 
-                WETH = await IUniswapV2Pair.at(
-                    '0x49D5c2BdFfac6CE2BFdB6640F4F80f226bc10bAB'
-                )
-
-                feeCollectorBalanceBefore = await WETH.balanceOf(feeCollector)
                 await time.increase(5000000)
                 receipt = await assetRouter.distribute(
                     pool,
@@ -1234,27 +1176,25 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                         {
                             route: [
                                 rewardToken,
-                                '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                tokenA.address,
+                                '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174',
+                                tokenA.address
                             ],
-                            amountOutMin: 0,
+                            amountOutMin: 0
                         },
                         {
                             route: [
                                 rewardToken,
-                                '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                tokenB.address,
+                                tokenB.address
                             ],
-                            amountOutMin: 0,
-                        },
+                            amountOutMin: 0
+                        }
                     ],
                     {
                         route: [
                             rewardToken,
-                            '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                            WETH.address,
+                            '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'
                         ],
-                        amountOutMin: 0,
+                        amountOutMin: 0
                     },
                     feeCollector,
                     { from: distributor }
@@ -1277,7 +1217,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                 assert.ok(stake2.gt(balance2), 'Stake2 not increased')
             })
             it('collects fees', async () => {
-                const feeCollectorBalanceAfter = await WETH.balanceOf(
+                const feeCollectorBalanceAfter = await USDC.balanceOf(
                     feeCollector
                 )
                 assert.ok(
@@ -1298,27 +1238,25 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                             {
                                 route: [
                                     constants.ZERO_ADDRESS,
-                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    tokenA.address,
+                                    '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174',
+                                    tokenA.address
                                 ],
-                                amountOutMin: 0,
+                                amountOutMin: 0
                             },
                             {
                                 route: [
                                     rewardToken,
-                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    tokenB.address,
+                                    tokenB.address
                                 ],
-                                amountOutMin: 0,
-                            },
+                                amountOutMin: 0
+                            }
                         ],
                         {
                             route: [
                                 rewardToken,
-                                '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                WETH.address,
+                                '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'
                             ],
-                            amountOutMin: 0,
+                            amountOutMin: 0
                         },
                         feeCollector,
                         { from: distributor }
@@ -1332,27 +1270,25 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                             {
                                 route: [
                                     rewardToken,
-                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    tokenA.address,
+                                    '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174',
+                                    tokenA.address
                                 ],
-                                amountOutMin: 0,
+                                amountOutMin: 0
                             },
                             {
                                 route: [
                                     constants.ZERO_ADDRESS,
-                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    tokenB.address,
+                                    tokenB.address
                                 ],
-                                amountOutMin: 0,
-                            },
+                                amountOutMin: 0
+                            }
                         ],
                         {
                             route: [
                                 rewardToken,
-                                '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                WETH.address,
+                                USDC.address
                             ],
-                            amountOutMin: 0,
+                            amountOutMin: 0
                         },
                         feeCollector,
                         { from: distributor }
@@ -1366,27 +1302,25 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                             {
                                 route: [
                                     rewardToken,
-                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    tokenA.address,
+                                    '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174',
+                                    tokenA.address
                                 ],
-                                amountOutMin: 0,
+                                amountOutMin: 0
                             },
                             {
                                 route: [
                                     rewardToken,
-                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    tokenB.address,
+                                    tokenB.address
                                 ],
-                                amountOutMin: 0,
-                            },
+                                amountOutMin: 0
+                            }
                         ],
                         {
                             route: [
                                 constants.ZERO_ADDRESS,
-                                '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                WETH.address,
+                                USDC.address
                             ],
-                            amountOutMin: 0,
+                            amountOutMin: 0
                         },
                         feeCollector,
                         { from: distributor }
@@ -1402,27 +1336,25 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                             {
                                 route: [
                                     rewardToken,
-                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    constants.ZERO_ADDRESS,
+                                    '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174',
+                                    constants.ZERO_ADDRESS
                                 ],
-                                amountOutMin: 0,
+                                amountOutMin: 0
                             },
                             {
                                 route: [
                                     rewardToken,
-                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    tokenB.address,
+                                    tokenB.address
                                 ],
-                                amountOutMin: 0,
-                            },
+                                amountOutMin: 0
+                            }
                         ],
                         {
                             route: [
                                 rewardToken,
-                                '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                WETH.address,
+                                USDC.address
                             ],
-                            amountOutMin: 0,
+                            amountOutMin: 0
                         },
                         feeCollector,
                         { from: distributor }
@@ -1438,27 +1370,25 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                             {
                                 route: [
                                     rewardToken,
-                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    tokenA.address,
+                                    '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174',
+                                    tokenA.address
                                 ],
-                                amountOutMin: 0,
+                                amountOutMin: 0
                             },
                             {
                                 route: [
                                     rewardToken,
-                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    constants.ZERO_ADDRESS,
+                                    constants.ZERO_ADDRESS
                                 ],
-                                amountOutMin: 0,
-                            },
+                                amountOutMin: 0
+                            }
                         ],
                         {
                             route: [
                                 rewardToken,
-                                '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                WETH.address,
+                                USDC.address
                             ],
-                            amountOutMin: 0,
+                            amountOutMin: 0
                         },
                         feeCollector,
                         { from: distributor }
@@ -1478,8 +1408,8 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                     true,
                     account1,
                     { from: account1 }
-                )
-                ;({ stakeLP } = await assetRouter.userStake(account1, pool))
+                );
+                ({ stakeLP } = await assetRouter.userStake(account1, pool))
                 assert.equal(stakeLP.toString(), '0', 'acount1 stake not 0')
             })
             it('withdraws tokens for account2', async () => {
@@ -1492,8 +1422,8 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                     true,
                     account2,
                     { from: account2 }
-                )
-                ;({ stakeLP } = await assetRouter.userStake(account2, pool))
+                );
+                ({ stakeLP } = await assetRouter.userStake(account2, pool))
                 assert.equal(stakeLP.toString(), '0', 'acount2 stake not 0')
             })
             it('not leaves any tokens', async () => {
@@ -1521,49 +1451,51 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
             let tokenBAddress
             let token
             let stakingRewardsBalanceBefore
-            let ETHPid
+            let lpToken
 
             before(async () => {
-                amountETH = new BN(40000000000000)
-                amountToken = new BN(40000000000)
-                ;[tokenAAddress, tokenBAddress] = await assetRouter.getTokens(
-                    pool
-                )
+                amountETH = new BN(400000000)
+                amountToken = new BN(40000000)
 
+                lpToken = await IUniswapV2Pair.at(pool2)
+                tokenAAddress = await lpToken.token0()
+                tokenBAddress = await lpToken.token1()
                 ethPooltokenA = await IUniswapV2Pair.at(tokenAAddress)
                 ethPooltokenB = await IUniswapV2Pair.at(tokenBAddress)
-
-                const poolLength = await masterJoe.poolLength()
-
-                for (let i = 0; i < poolLength.toNumber(); i++) {
-                    const lpToken = (await masterJoe.poolInfo(i)).lpToken
-                    if (lpToken.toString() === pool) {
-                        ETHPid = i
-                        break
-                    }
-                }
-
-                const farmAddress = await factory.Farms(pool)
+                const farmAddress = await factory.Farms(pool2)
                 if (farmAddress === constants.ZERO_ADDRESS) {
                     stakingRewardsBalanceBefore = new BN(0)
                 } else {
                     const farmETH = await Farm.at(farmAddress)
                     stakingRewardsBalanceBefore = new BN(
-                        (await masterJoe.userInfo(ETHPid, farmETH.address))['0']
+                        (await lpToken.balanceOf(farmETH.address))
                     )
                 }
-
-                ;({
-                    stakeLP: stakeLPBefore,
-                    stakeA: stakeABefore,
-                    stakeB: stakeBBefore,
-                } = await assetRouter.userStake(account3, pool))
-                ;({ totalDepositsLP: totalDepositsLPBefore } =
-                    await assetRouter.totalDeposits(pool))
-
+                stakeLPBefore = new BN('0')
+                stakeABefore = new BN('0')
+                stakeBBefore = new BN('0')
+                const routerContract = await IUniswapV2Router01.at(
+                    meshswapRouter
+                )
+                await lpToken.approve(
+                    meshswapRouter,
+                    new BN(440000000000),
+                    { from: account3 }
+                )
+                await routerContract.removeLiquidity(
+                    tokenAAddress,
+                    tokenBAddress,
+                    new BN(440000000000),
+                    1,
+                    1,
+                    account3,
+                    '16415710000',
+                    { from: account3 }
+                )
+                totalDepositsLPBefore = new BN(0)
                 if (
-                    tokenAAddress.toLowerCase() ===
-                    '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7'.toLowerCase()
+                    tokenAAddress.toLowerCase()
+                    === '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270'.toLowerCase()
                 ) {
                     await ethPooltokenB.approve(
                         assetRouter.address,
@@ -1585,7 +1517,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
             it('fires events', async () => {
                 ethBalanceBefore = new BN(await web3.eth.getBalance(account3))
                 const receipt = await assetRouter.depositETH(
-                    pool,
+                    pool2,
                     amountToken,
                     0,
                     0,
@@ -1593,7 +1525,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                     account3,
                     {
                         from: account3,
-                        value: amountETH,
+                        value: amountETH
                     }
                 )
 
@@ -1605,21 +1537,20 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                 ETHSpentOnGas = gasUsed.mul(effectiveGasPrice)
 
                 expectEvent(receipt, 'Deposit', {
-                    lpPool: pool,
+                    lpPool: pool2,
                     sender: account3,
-                    recipient: account3,
+                    recipient: account3
                 })
             })
             it('withdraws tokens and ETH from balance', async () => {
-                const { stakeA: stakeAAfter, stakeB: stakeBAfter } =
-                    await assetRouter.userStake(account3, pool)
+                const { stakeA: stakeAAfter, stakeB: stakeBAfter } = await assetRouter.userStake(account3, pool2)
 
                 let tokenStakeDiff
                 let ETHStakeDiff
 
                 if (
-                    tokenAAddress.toLowerCase() ===
-                    '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7'.toLowerCase()
+                    tokenAAddress.toLowerCase()
+                    === '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270'.toLowerCase()
                 ) {
                     tokenStakeDiff = stakeBAfter.sub(stakeBBefore)
                     ETHStakeDiff = stakeAAfter.sub(stakeABefore)
@@ -1632,24 +1563,28 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                 assert.ok(!ETHStakeDiff.isNeg(), 'ETH Stake not increased')
             })
             it('updates stakes', async () => {
-                const { stakeLP } = await assetRouter.userStake(account3, pool)
+                const { stakeLP } = await assetRouter.userStake(account3, pool2)
                 assert.ok(stakeLP.gt(stakeLPBefore), 'Stake not increased')
             })
             it('updates totalDeposits', async () => {
                 const { totalDepositsLP } = await assetRouter.totalDeposits(
-                    pool
+                    pool2
                 )
                 assert.ok(
                     totalDepositsLP.gt(totalDepositsLPBefore),
                     'Stake not increased'
                 )
             })
-            it('stakes tokens in masterJoe', async () => {
+            it('balance of lp tokens', async () => {
                 const farmAddress = await factory.Farms(pool)
                 const farmETH = await Farm.at(farmAddress)
 
                 const stakingRewardsBalance = new BN(
-                    (await masterJoe.userInfo(ETHPid, farmETH.address))['0']
+                    (
+                        await (
+                            await IUniswapV2Pair.at(pool)
+                        ).balanceOf(farmETH.address)
+                    ).toString()
                 )
                 assert.ok(
                     stakingRewardsBalance.gt(stakingRewardsBalanceBefore),
@@ -1670,49 +1605,40 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
             let stakingRewardsBalanceBefore
             let ethBalanceBefore
             let ETHSpentOnGas
-            let ETHPid
+            let lpToken
 
             before(async () => {
-                amountETH = new BN(4000)
-                amountToken = new BN(4000)
-                ;[tokenAAddress, tokenBAddress] = await assetRouter.getTokens(
+                amountETH = new BN(400000000)
+                amountToken = new BN(40000000);
+                [tokenAAddress, tokenBAddress] = await assetRouter.getTokens(
                     pool
                 )
 
+                lpToken = await IUniswapV2Pair.at(pool2)
+
                 ethPooltokenA = await IUniswapV2Pair.at(tokenAAddress)
-                ethPooltokenB = await IUniswapV2Pair.at(tokenBAddress)
-                ;({ totalDepositsLP: totalDepositsLPBefore } =
-                    await assetRouter.totalDeposits(pool))
+                ethPooltokenB = await IUniswapV2Pair.at(tokenBAddress);
+                ({ totalDepositsLP: totalDepositsLPBefore } = await assetRouter.totalDeposits(pool2))
 
-                const poolLength = await masterJoe.poolLength()
-
-                for (let i = 0; i < poolLength.toNumber(); i++) {
-                    const lpToken = (await masterJoe.poolInfo(i)).lpToken
-                    if (lpToken.toString() === pool) {
-                        ETHPid = i
-                        break
-                    }
-                }
-
-                const farmAddress = await factory.Farms(pool)
+                const farmAddress = await factory.Farms(pool2)
                 if (farmAddress === constants.ZERO_ADDRESS) {
                     stakingRewardsBalanceBefore = new BN(0)
                 } else {
                     const farmETH = await Farm.at(farmAddress)
                     stakingRewardsBalanceBefore = new BN(
-                        (await masterJoe.userInfo(ETHPid, farmETH.address))['0']
+                        (await lpToken.balanceOf(farmETH.address))
                     )
                 }
 
-                ;({
+                ({
                     stakeLP: stakeLPBefore,
                     stakeA: stakeABefore,
-                    stakeB: stakeBBefore,
-                } = await assetRouter.userStake(account3, pool))
+                    stakeB: stakeBBefore
+                } = await assetRouter.userStake(account3, pool2))
 
                 if (
-                    tokenAAddress.toLowerCase() ===
-                    '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7'.toLowerCase()
+                    tokenAAddress.toLowerCase()
+                    === '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270'.toLowerCase()
                 ) {
                     token = ethPooltokenB
                     tokenBalanceBefore = await token.balanceOf(account3)
@@ -1725,13 +1651,13 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                 ethBalanceBefore = new BN(await web3.eth.getBalance(account3))
 
                 const receipt = await assetRouter.withdrawETH(
-                    pool,
+                    pool2,
                     stakeLPBefore,
                     0,
                     0,
                     account3,
                     {
-                        from: account3,
+                        from: account3
                     }
                 )
 
@@ -1743,18 +1669,18 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                 ETHSpentOnGas = gasUsed.mul(effectiveGasPrice)
 
                 expectEvent(receipt, 'Withdraw', {
-                    lpPool: pool,
+                    lpPool: pool2,
                     sender: account3,
-                    recipient: account3,
+                    recipient: account3
                 })
             })
             it('updates stakes', async () => {
-                const { stakeLP } = await assetRouter.userStake(account3, pool)
+                const { stakeLP } = await assetRouter.userStake(account3, pool2)
                 assert.ok(stakeLPBefore.gt(stakeLP), 'Stake not reduced')
             })
             it('updates totalDeposits', async () => {
                 const { totalDepositsLP } = await assetRouter.totalDeposits(
-                    pool
+                    pool2
                 )
                 assert.ok(
                     totalDepositsLPBefore.gt(totalDepositsLP),
@@ -1762,11 +1688,15 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                 )
             })
             it('unstakes tokens from StakingRewards contract', async () => {
-                const farmAddress = await factory.Farms(pool)
+                const farmAddress = await factory.Farms(pool2)
                 const farmETH = await Farm.at(farmAddress)
 
                 const stakingRewardsBalance = new BN(
-                    (await masterJoe.userInfo(ETHPid, farmETH.address))['0']
+                    (
+                        await (
+                            await IUniswapV2Pair.at(pool)
+                        ).balanceOf(farmETH.address)
+                    ).toString()
                 )
                 assert.ok(
                     stakingRewardsBalanceBefore.gt(stakingRewardsBalance),
@@ -1774,9 +1704,9 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                 )
             })
             it('adds tokens and ETH to balance', async () => {
-                const { stakeA: stakeAAfter, stakeB: stakeBAfter } =
-                    await assetRouter.userStake(account3, pool)
+                const { stakeA: stakeAAfter, stakeB: stakeBAfter } = await assetRouter.userStake(account3, pool2)
                 const tokenBalanceAfter = await token.balanceOf(account3)
+
                 const ethBalanceAfter = new BN(
                     await web3.eth.getBalance(account3)
                 )
@@ -1790,14 +1720,14 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                 let ETHStakeDiff
 
                 if (
-                    tokenAAddress.toLowerCase() ===
-                    '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7'.toLowerCase()
+                    tokenAAddress.toLowerCase()
+                    === '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270'.toLowerCase()
                 ) {
-                    tokenStakeDiff = stakeBAfter.sub(stakeBBefore)
-                    ETHStakeDiff = stakeAAfter.sub(stakeABefore)
-                } else {
                     tokenStakeDiff = stakeAAfter.sub(stakeABefore)
                     ETHStakeDiff = stakeBAfter.sub(stakeBBefore)
+                } else {
+                    tokenStakeDiff = stakeBAfter.sub(stakeBBefore)
+                    ETHStakeDiff = stakeAAfter.sub(stakeABefore)
                 }
 
                 approxeq(
@@ -1826,7 +1756,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                 // we get last transaction's hash by finding the last event because upgradeProxy returns contract instance instead of transaction receipt object
                 const events = await instance.getPastEvents('AllEvents', {
                     fromBlock: 'latest',
-                    toBlock: 'latest',
+                    toBlock: 'latest'
                 })
                 const _receipt = await web3.eth.getTransactionReceipt(
                     events[0].transactionHash
