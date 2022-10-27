@@ -7,6 +7,7 @@ import '../../interfaces/IUnoAccessManager.sol';
 import '../../interfaces/IUniswapV2Pair.sol';
 import '../../interfaces/IStakingRewards.sol';
 import '../../interfaces/IWMATIC.sol';
+import '../../interfaces/IUniswapV2Router.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol';
@@ -31,6 +32,8 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
     uint256 public fee;
 
     address public constant WMATIC = 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270;
+
+    IUniswapV2Router01 private constant quickswapRouter = IUniswapV2Router01(0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff);
 
     event Deposit(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Withdraw(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
@@ -62,18 +65,65 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
     receive() external payable {
         require(msg.sender == WMATIC, 'ONLY_ACCEPT_WMATIC'); // only accept ETH via fallback from the WMATIC contract
     }
-    function depositSingleAsset(address lpStakingPool, uint256 amount, address token, address recipient) external whenNotPaused returns(uint256 sentA, uint256 sentB, uint256 addedLiquidity){
+    /**
+     * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool} and deposits tokens in it. Emits a {Deposit} event.
+     * @param lpStakingPool - Address of the pool to deposit tokens in.
+     * @param token  - Address of a token to enter the pool.
+     * @param swapInfos - Arrays of structs with token arrays describing swap routes (from token to pool tokens) and minimum amounts of output tokens that must be received for the transaction not to revert.
+     * @param amountLP - Additional LP Token amount to deposit.
+     * @param recipient - Address which will receive the deposit.
+     
+     * @return sentA - Token A amount sent to the farm.
+     * @return sentB - Token B amount sent to the farm.
+     * @return liquidity - Total liquidity sent to the farm (in lpTokens).
+     */
+    function depositSingleAsset(address lpStakingPool, address token, uint256 amount, Farm.SwapInfo[2] calldata swapInfos, uint256 amountLP, address recipient) external whenNotPaused returns(uint256 sentA, uint256 sentB, uint256 liquidity){
         Farm farm = Farm(farmFactory.Farms(lpStakingPool));
         if(farm == Farm(address(0))){
             farm = Farm(farmFactory.createFarm(lpStakingPool));
         }
-        require(token == farm.tokenA() || token == farm.tokenB(), "INVALID_TOKEN.");
-        if(amount > 0){
-            IERC20Upgradeable(token).safeTransferFrom(msg.sender, address(farm), amount);
+        
+        require(amount / 2 > 0, "NOT_ENOUGH_TOKEN_SENT");
+
+        
+        IERC20Upgradeable(token).safeTransferFrom(msg.sender, address(this), amount);
+        
+
+        uint256 amountA = amount / 2;
+        uint256 amountB = amount / 2;
+
+        uint256 tokenBalanceBefore = IERC20Upgradeable(token).balanceOf(address(this));
+        
+        if (token != farm.tokenA()) {
+            address[] calldata route = swapInfos[0].route;
+            require(route[0] == token && route[route.length - 1] == farm.tokenA(), 'BAD_TOKEN_A_ROUTE');
+            amountA = quickswapRouter.swapExactTokensForTokens(amountA, swapInfos[0].amountOutMin, route, address(this), block.timestamp)[route.length - 1];
+        }
+        if (token != farm.tokenB()) {
+            address[] calldata route = swapInfos[1].route;
+            require(route[0] == token && route[route.length - 1] == farm.tokenB(), 'BAD_TOKEN_B_ROUTE');
+            amountB = quickswapRouter.swapExactTokensForTokens(amountB, swapInfos[1].amountOutMin, route, address(this), block.timestamp)[route.length - 1];
         }
 
-        (sentA, sentB, addedLiquidity) = farm.depositSingleAsset(amount, token, msg.sender, recipient);
-        emit Deposit(lpStakingPool, msg.sender, recipient, addedLiquidity);
+        {
+            uint256 tokenLeftovers = amount - (tokenBalanceBefore - IERC20Upgradeable(token).balanceOf(address(this)));
+            if (tokenLeftovers > 0) {
+                IERC20Upgradeable(token).safeTransfer(msg.sender, tokenLeftovers);
+            }
+        }
+
+        if(amountLP > 0){
+            IERC20Upgradeable(farm.lpPair()).safeTransferFrom(msg.sender, address(farm), amountLP);
+        }
+        if(amountA > 0){
+            IERC20Upgradeable(farm.tokenA()).safeTransferFrom(msg.sender, address(farm), amountA);
+        }
+        if(amountB > 0){
+            IERC20Upgradeable(farm.tokenB()).safeTransferFrom(msg.sender, address(farm), amountB);
+        }
+
+        (sentA, sentB, liquidity) = farm.deposit(amountA, amountB, swapInfos[0].amountOutMin, swapInfos[1].amountOutMin, amountLP, msg.sender, recipient);
+        emit Deposit(lpStakingPool, msg.sender, recipient, liquidity);
     }
     /**
      * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool} and deposits tokens in it. Emits a {Deposit} event.
