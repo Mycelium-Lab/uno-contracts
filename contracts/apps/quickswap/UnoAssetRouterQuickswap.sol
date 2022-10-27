@@ -82,9 +82,10 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
         if(farm == Farm(address(0))){
             farm = Farm(farmFactory.createFarm(lpStakingPool));
         }
-        
+
         require(amount / 2 > 0, "NOT_ENOUGH_TOKEN_SENT");
 
+        uint256 tokenBalanceBefore = IERC20Upgradeable(token).balanceOf(address(this));
         
         IERC20Upgradeable(token).safeTransferFrom(msg.sender, address(this), amount);
         
@@ -92,8 +93,6 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
         uint256 amountA = amount / 2;
         uint256 amountB = amount / 2;
 
-        uint256 tokenBalanceBefore = IERC20Upgradeable(token).balanceOf(address(this));
-        
         if (token != farm.tokenA()) {
             address[] calldata route = swapInfos[0].route;
             require(route[0] == token && route[route.length - 1] == farm.tokenA(), 'BAD_TOKEN_A_ROUTE');
@@ -106,7 +105,7 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
         }
 
         {
-            uint256 tokenLeftovers = amount - (tokenBalanceBefore - IERC20Upgradeable(token).balanceOf(address(this)));
+            uint256 tokenLeftovers = tokenBalanceBefore - IERC20Upgradeable(token).balanceOf(address(this));
             if (tokenLeftovers > 0) {
                 IERC20Upgradeable(token).safeTransfer(msg.sender, tokenLeftovers);
             }
