@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
 
-import "../../interfaces/IUniswapV2Pair.sol";
 import "../../interfaces/IUniswapV2Router.sol";
 import "../../interfaces/IExchangeMeshwap.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
@@ -121,8 +120,8 @@ contract UnoFarmMeshswap is Initializable, ReentrancyGuardUpgradeable {
 
 		rewardToken = IExchangeMeshwap(_lpPair).mesh();
 
-		tokenA = IUniswapV2Pair(lpPair).token0();
-		tokenB = IUniswapV2Pair(lpPair).token1();
+		tokenA = IExchangeMeshwap(lpPair).token0();
+		tokenB = IExchangeMeshwap(lpPair).token1();
 
 		distributionInfo[0] = DistributionInfo({
 			block: block.number,
@@ -340,7 +339,7 @@ contract UnoFarmMeshswap is Initializable, ReentrancyGuardUpgradeable {
 	 */
 	function getTotalDeposits() external view returns (uint256 _totalDeposits) {
 		if (totalDeposits > 0) {
-			_totalDeposits = IUniswapV2Pair(lpPair).balanceOf(address(this));
+			_totalDeposits = IExchangeMeshwap(lpPair).balanceOf(address(this));
 		}
 	}
 
