@@ -5,7 +5,8 @@ module.exports = {
     contracts_build_directory: './build',
 
     api_keys: {
-        polygonscan: process.env.POLYGONSCAN
+        polygonscan: process.env.POLYGONSCAN,
+        bscscan: process.env.BSCSCAN
     },
 
     networks: {
@@ -17,8 +18,6 @@ module.exports = {
                 pollingInterval: 30000
             }),
             networkCheckTimeout: 10000,
-            gas: 300000,
-            gasPrice: 5000000000,
             network_id: 56,
             addressIndex: 0
         },
