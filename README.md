@@ -85,7 +85,7 @@ All contracts are deployed on the Polygon(Matic) Blockchain
 
 #### UnoAssetRouterApeswap
 
-0xd121211de080D4cB3F588826a2EedaC75d721B17
+0xC3Ba87083b4B75B1AC918D946DCba24A431114aa
 
 #### UnoFarmFactory
 
