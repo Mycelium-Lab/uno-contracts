@@ -3,6 +3,7 @@ const AutoStrategyFactory = artifacts.require('UnoAutoStrategyFactory')
 const AssetRouterQuickswap = artifacts.require('UnoAssetRouterQuickswap')
 const AssetRouterQuickswapDual = artifacts.require('UnoAssetRouterQuickswapDual')
 const AssetRouterSushiswap = artifacts.require('UnoAssetRouterSushiswap')
+const AssetRouterApeswap = artifacts.require('UnoAssetRouterApeswap')
 const AssetRouterMeshswap = artifacts.require('UnoAssetRouterMeshswap')
 
 module.exports = async (deployer, network) => {
@@ -19,6 +20,10 @@ module.exports = async (deployer, network) => {
     const sushiswapRouterApproved = await autoStrategyFactory.assetRouterApproved(AssetRouterSushiswap.address)
     if (!sushiswapRouterApproved) {
         await autoStrategyFactory.approveAssetRouter(AssetRouterSushiswap.address)
+    }
+    const apeswapRouterApproved = await autoStrategyFactory.assetRouterApproved(AssetRouterApeswap.address)
+    if (!apeswapRouterApproved) {
+        await autoStrategyFactory.approveAssetRouter(AssetRouterApeswap.address)
     }
     const meshswapRouterApproved = await autoStrategyFactory.assetRouterApproved(AssetRouterMeshswap.address)
     if (!meshswapRouterApproved) {
