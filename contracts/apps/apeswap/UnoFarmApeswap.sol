@@ -96,7 +96,7 @@ contract UnoFarmApeswap is Initializable, ReentrancyGuardUpgradeable {
 
     uint256 private totalDeposits;
     uint256 private totalDepositAge;
-    uint256 private totalDepositLastUpdate; 
+    uint256 private totalDepositLastUpdate;
 
     uint32 private distributionID;
     mapping(address => UserInfo) private userInfo;

@@ -33,19 +33,19 @@ module.exports = async (deployer, network, accounts) => {
     await deployer.deploy(FarmFactory, Farm.address, AccessManager.address, assetRouter.address)
     await addFactoryAddress(FarmFactory.address)
 
-    // const accessManager = await AccessManager.deployed()
+    const accessManager = await AccessManager.deployed()
     // DISTRIBUTOR_ROLE
-    // const distributorHasRole = await accessManager.hasRole('0xfbd454f36a7e1a388bd6fc3ab10d434aa4578f811acbbcf33afb1c697486313c', distributor)
-    // if (!distributorHasRole) {
-    //     await accessManager.grantRole('0xfbd454f36a7e1a388bd6fc3ab10d434aa4578f811acbbcf33afb1c697486313c', distributor)
-    //     console.log('Distributor set')
-    // }
-    // // PAUSER_ROLE
-    // const pauserHasRole = await accessManager.hasRole('0x65d7a28e3265b37a6474929f336521b332c1681b933f6cb9f3376673440d862a', pauser)
-    // if (!pauserHasRole) {
-    //     await accessManager.grantRole('0x65d7a28e3265b37a6474929f336521b332c1681b933f6cb9f3376673440d862a', pauser)
-    //     console.log('Pauser set')
-    // }
+    const distributorHasRole = await accessManager.hasRole('0xfbd454f36a7e1a388bd6fc3ab10d434aa4578f811acbbcf33afb1c697486313c', distributor)
+    if (!distributorHasRole) {
+        await accessManager.grantRole('0xfbd454f36a7e1a388bd6fc3ab10d434aa4578f811acbbcf33afb1c697486313c', distributor)
+        console.log('Distributor set')
+    }
+    // PAUSER_ROLE
+    const pauserHasRole = await accessManager.hasRole('0x65d7a28e3265b37a6474929f336521b332c1681b933f6cb9f3376673440d862a', pauser)
+    if (!pauserHasRole) {
+        await accessManager.grantRole('0x65d7a28e3265b37a6474929f336521b332c1681b933f6cb9f3376673440d862a', pauser)
+        console.log('Pauser set')
+    }
 
     console.log('Deployed', assetRouter.address)
 }
