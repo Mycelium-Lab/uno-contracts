@@ -7,7 +7,7 @@ module.exports = async (deployer, network) => {
     if (network !== 'polygon') return
 
     // AssetRouter upgrade
-    const assetRouter = await AssetRouter.deployed()
+    const assetRouter = await AssetRouter.at('0xF5AE5c5151aE25019be8b328603C18153d669461')
     const impl = await prepareUpgrade(assetRouter.address, AssetRouter, { deployer })
 
     // Farm upgrade

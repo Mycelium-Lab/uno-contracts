@@ -14,7 +14,7 @@ Branch `polygon+` also includes the autostrategies contracts located in the `/co
 
 1. Provide your private key in the PRIVATE_KEY field in the `.env` file
 
-2. Compile all contracts before running migrations `truffle compile --all`
+2. Compile all contracts before running migrations `npm run compile`
 
 3. Run specific migration: `truffle migrate --network polygon --compile-none -f 2 --to 2`
 
@@ -24,7 +24,9 @@ Branch `polygon+` also includes the autostrategies contracts located in the `/co
 
 2. Start ganache with `npm run ganache`. *Note!* It's preconfigured here, so if you run your ganache differently, the tests will be failing.
 
-3. Run tests with `truffle test --network test`
+3. Compile all contracts before running tests `npm run compile`
+
+4. Run tests with `npm run test`
 
 
 # Deployed Smart Contracts
@@ -69,6 +71,16 @@ All contracts are deployed on the Polygon(Matic) Blockchain
 
 0xb8698FbDFcd6044fA9C56938a50D7D0FDD22e8F0
 
+## Balancer
+
+#### UnoAssetRouterBalancer
+
+0xa9877C4cbd6b4c38604ee44a11948Aa4716D5b37
+
+#### UnoFarmFactory
+
+0xBAE4733e8E761DE20DF4Cd2c62823776489957e8
+
 ## Apeswap
 
 #### UnoAssetRouterApeswap
@@ -78,3 +90,13 @@ All contracts are deployed on the Polygon(Matic) Blockchain
 #### UnoFarmFactory
 
 0x35E19FD59212985209339aDD9fe0649604ffB7Be
+
+## Meshswap
+
+#### UnoAssetRouterMeshswap
+
+0xa86212cDb51867022302D194d373c3D45b06f76D
+
+#### UnoFarmFactory
+
+0x7A7a1ccAd0Df7193Cef581eD04FD9B03E940411c
