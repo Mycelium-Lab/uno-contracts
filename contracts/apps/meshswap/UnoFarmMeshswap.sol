@@ -119,7 +119,6 @@ contract UnoFarmMeshswap is Initializable, ReentrancyGuardUpgradeable {
 		lpPair = _lpPair;
 
 		rewardToken = IExchangeMeshwap(_lpPair).mesh();
-
 		tokenA = IExchangeMeshwap(lpPair).token0();
 		tokenB = IExchangeMeshwap(lpPair).token1();
 
@@ -142,35 +141,17 @@ contract UnoFarmMeshswap is Initializable, ReentrancyGuardUpgradeable {
 	 * Deposits provided tokens in the Liquidity Pool, then stakes generated LP tokens in the {MasterApe}.
 	 */
 	function deposit(
-		uint256 amountA,
+		uint256 amountA, 
 		uint256 amountB,
-		uint256 amountAMin,
-		uint256 amountBMin,
-		uint256 amountLP,
-		address origin,
+		uint256 amountAMin, 
+		uint256 amountBMin, 
+		uint256 amountLP, 
+		address origin, 
 		address recipient
-	)
-		external
-		nonReentrant
-		onlyAssetRouter
-		returns (
-			uint256 sentA,
-			uint256 sentB,
-			uint256 liquidity
-		)
-	{
+	) external nonReentrant onlyAssetRouter returns (uint256 sentA, uint256 sentB, uint256 liquidity) {
 		uint256 addedLiquidity;
 		if (amountA > 0 && amountB > 0) {
-			(sentA, sentB, addedLiquidity) = MeshswapRouter.addLiquidity(
-				tokenA,
-				tokenB,
-				amountA,
-				amountB,
-				amountAMin,
-				amountBMin,
-				address(this),
-				block.timestamp
-			);
+			(sentA, sentB, addedLiquidity) = MeshswapRouter.addLiquidity(tokenA, tokenB, amountA, amountB, amountAMin, amountBMin, address(this), block.timestamp);
 		}
 		liquidity = addedLiquidity + amountLP;
 		require(liquidity > 0, "NO_LIQUIDITY_PROVIDED");
@@ -178,6 +159,7 @@ contract UnoFarmMeshswap is Initializable, ReentrancyGuardUpgradeable {
 		_updateDeposit(recipient);
 		userInfo[recipient].stake += liquidity;
 		totalDeposits += liquidity;
+
 		IERC20Upgradeable(tokenA).safeTransfer(origin, amountA - sentA);
 		IERC20Upgradeable(tokenB).safeTransfer(origin, amountB - sentB);
 	}
@@ -212,15 +194,7 @@ contract UnoFarmMeshswap is Initializable, ReentrancyGuardUpgradeable {
 			IERC20Upgradeable(lpPair).safeTransfer(recipient, amount);
 			return (0, 0);
 		}
-		(amountA, amountB) = MeshswapRouter.removeLiquidity(
-			tokenA,
-			tokenB,
-			amount,
-			amountAMin,
-			amountBMin,
-			recipient,
-			block.timestamp
-		);
+		(amountA, amountB) = MeshswapRouter.removeLiquidity(tokenA, tokenB, amount, amountAMin, amountBMin, recipient, block.timestamp);
 	}
 
 	/**
@@ -239,54 +213,24 @@ contract UnoFarmMeshswap is Initializable, ReentrancyGuardUpgradeable {
 
 		IExchangeMeshwap(lpPair).claimReward();
 
-		collectFees(feeSwapInfo, feeInfo, IERC20Upgradeable(rewardToken));
-		{
-			// scope to avoid stack too deep errors
-			uint256 rewardTokenHalf = IERC20Upgradeable(rewardToken).balanceOf(address(this)) / 2;
-			if (rewardTokenHalf > 0) {
-				if (tokenA != rewardToken) {
-					address[] calldata route = swapInfos[0].route;
-					require(route[0] == rewardToken && route[route.length - 1] == tokenA, "BAD_REWARD_TOKEN_A_ROUTE");
-					MeshswapRouter.swapExactTokensForTokens(
-						rewardTokenHalf,
-						swapInfos[0].amountOutMin,
-						route,
-						address(this),
-						block.timestamp
-					);
-				}
-
-				if (tokenB != rewardToken) {
-					address[] calldata route = swapInfos[1].route;
-					require(route[0] == rewardToken && route[route.length - 1] == tokenB, "BAD_REWARD_TOKEN_B_ROUTE");
-					MeshswapRouter.swapExactTokensForTokens(
-						rewardTokenHalf,
-						swapInfos[1].amountOutMin,
-						route,
-						address(this),
-						block.timestamp
-					);
-				}
-			}
+		collectFees(feeSwapInfo, feeInfo);
+		uint256 rewardTokenHalf = IERC20Upgradeable(rewardToken).balanceOf(address(this)) / 2;
+		if (tokenA != rewardToken) {
+			address[] calldata route = swapInfos[0].route;
+			require(route[0] == rewardToken && route[route.length - 1] == tokenA, "BAD_REWARD_TOKEN_A_ROUTE");
+			MeshswapRouter.swapExactTokensForTokens(rewardTokenHalf, swapInfos[0].amountOutMin, route, address(this), block.timestamp);
 		}
 
-		(, , reward) = MeshswapRouter.addLiquidity(
-			tokenA,
-			tokenB,
-			IERC20Upgradeable(tokenA).balanceOf(address(this)),
-			IERC20Upgradeable(tokenB).balanceOf(address(this)),
-			swapInfos[0].amountOutMin,
-			swapInfos[1].amountOutMin,
-			address(this),
-			block.timestamp
-		);
+		if (tokenB != rewardToken) {
+			address[] calldata route = swapInfos[1].route;
+			require(route[0] == rewardToken && route[route.length - 1] == tokenB, "BAD_REWARD_TOKEN_B_ROUTE");
+			MeshswapRouter.swapExactTokensForTokens(rewardTokenHalf, swapInfos[1].amountOutMin, route, address(this), block.timestamp);
+		}
 
-		uint256 rewardPerDepositAge = (reward * fractionMultiplier) /
-			(totalDepositAge + totalDeposits * (block.number - totalDepositLastUpdate));
-		uint256 cumulativeRewardAgePerDepositAge = distributionInfo[distributionID - 1]
-			.cumulativeRewardAgePerDepositAge +
-			rewardPerDepositAge *
-			(block.number - distributionInfo[distributionID - 1].block);
+		(,,reward) = MeshswapRouter.addLiquidity(tokenA, tokenB, IERC20Upgradeable(tokenA).balanceOf(address(this)), IERC20Upgradeable(tokenB).balanceOf(address(this)), swapInfos[0].amountOutMin, swapInfos[1].amountOutMin, address(this), block.timestamp);
+
+		uint256 rewardPerDepositAge = reward * fractionMultiplier / (totalDepositAge + totalDeposits * (block.number - totalDepositLastUpdate));
+		uint256 cumulativeRewardAgePerDepositAge = distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge + rewardPerDepositAge * (block.number - distributionInfo[distributionID - 1].block);
 
 		distributionInfo[distributionID] = DistributionInfo({
 			block: block.number,
@@ -302,27 +246,17 @@ contract UnoFarmMeshswap is Initializable, ReentrancyGuardUpgradeable {
 	/**
 	 * @dev Swaps and sends fees to feeTo.
 	 */
-	function collectFees(
-		SwapInfo calldata feeSwapInfo,
-		FeeInfo calldata feeInfo,
-		IERC20Upgradeable token
-	) internal {
-		if (address(token) != address(0) && feeInfo.feeTo != address(0)) {
-			uint256 feeAmount = (token.balanceOf(address(this)) * feeInfo.fee) / fractionMultiplier;
+	function collectFees(SwapInfo calldata feeSwapInfo, FeeInfo calldata feeInfo) internal {
+		if (feeInfo.feeTo != address(0)) {
+			uint256 feeAmount = IERC20Upgradeable(rewardToken).balanceOf(address(this)) * feeInfo.fee / fractionMultiplier;
 			if (feeAmount > 0) {
 				address[] calldata route = feeSwapInfo.route;
 				if (route.length > 0 && route[0] != route[route.length - 1]) {
-					require(route[0] == address(token), "BAD_FEE_TOKEN_ROUTE");
-					MeshswapRouter.swapExactTokensForTokens(
-						feeAmount,
-						feeSwapInfo.amountOutMin,
-						route,
-						feeInfo.feeTo,
-						block.timestamp
-					);
+					require(route[0] == rewardToken, "BAD_FEE_TOKEN_ROUTE");
+					MeshswapRouter.swapExactTokensForTokens(feeAmount, feeSwapInfo.amountOutMin, route, feeInfo.feeTo, block.timestamp);
 					return;
 				}
-				token.safeTransfer(feeInfo.feeTo, feeAmount);
+				IERC20Upgradeable(rewardToken).safeTransfer(feeInfo.feeTo, feeAmount);
 			}
 		}
 	}
@@ -364,21 +298,18 @@ contract UnoFarmMeshswap is Initializable, ReentrancyGuardUpgradeable {
 		totalDepositLastUpdate = block.number;
 	}
 
-	function userReward(address _address) internal view returns (uint256) {
-		UserInfo memory user = userInfo[_address];
-		if (user.lastDistribution == distributionID) {
-			// Return user.reward if the distribution after the last user deposit did not happen yet.
-			return user.reward;
-		}
-		DistributionInfo memory lastUserDistributionInfo = distributionInfo[user.lastDistribution];
-		uint256 userDepositAge = user.depositAge + user.stake * (lastUserDistributionInfo.block - user.lastUpdate);
-		// Calculate reward between the last user deposit and the distribution after that.
-		uint256 rewardBeforeDistibution = (userDepositAge * lastUserDistributionInfo.rewardPerDepositAge) /
-			fractionMultiplier;
-		// Calculate reward from the distributions that have happened after the last user deposit.
-		uint256 rewardAfterDistribution = (user.stake *
-			(distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge -
-				lastUserDistributionInfo.cumulativeRewardAgePerDepositAge)) / fractionMultiplier;
-		return user.reward + rewardBeforeDistibution + rewardAfterDistribution;
-	}
+    function userReward(address _address) internal view returns (uint256) {
+        UserInfo memory user = userInfo[_address];
+        if (user.lastDistribution == distributionID) {
+            // Return user.reward if the distribution after the last user deposit did not happen yet.
+            return user.reward;
+        }
+        DistributionInfo memory lastUserDistributionInfo = distributionInfo[user.lastDistribution];
+        uint256 userDepositAge = user.depositAge + user.stake * (lastUserDistributionInfo.block - user.lastUpdate);
+        // Calculate reward between the last user deposit and the distribution after that.
+        uint256 rewardBeforeDistibution = userDepositAge * lastUserDistributionInfo.rewardPerDepositAge / fractionMultiplier;
+        // Calculate reward from the distributions that have happened after the last user deposit.
+        uint256 rewardAfterDistribution = user.stake * (distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge - lastUserDistributionInfo.cumulativeRewardAgePerDepositAge) / fractionMultiplier;
+        return user.reward + rewardBeforeDistibution + rewardAfterDistribution;
+    }
 }

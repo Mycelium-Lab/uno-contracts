@@ -12,11 +12,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract UnoAssetRouterMeshswap is
-	Initializable,
-	PausableUpgradeable,
-	UUPSUpgradeable
-{
+contract UnoAssetRouterMeshswap is Initializable, PausableUpgradeable, UUPSUpgradeable {
 	using SafeERC20Upgradeable for IERC20Upgradeable;
 
 	/**
@@ -34,27 +30,14 @@ contract UnoAssetRouterMeshswap is
 
 	address public constant WMATIC = 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270;
 
-	event Deposit(
-		address indexed lpPool,
-		address indexed sender,
-		address indexed recipient,
-		uint256 amount
-	);
-	event Withdraw(
-		address indexed lpPool,
-		address indexed sender,
-		address indexed recipient,
-		uint256 amount
-	);
+	event Deposit(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
+	event Withdraw(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
 	event Distribute(address indexed lpPool, uint256 reward);
 
 	event FeeChanged(uint256 previousFee, uint256 newFee);
 
 	modifier onlyRole(bytes32 role) {
-		require(
-			accessManager.hasRole(role, msg.sender),
-			"CALLER_NOT_AUTHORIZED"
-		);
+		require(accessManager.hasRole(role, msg.sender), "CALLER_NOT_AUTHORIZED");
 		_;
 	}
 
@@ -65,10 +48,7 @@ contract UnoAssetRouterMeshswap is
 		_disableInitializers();
 	}
 
-	function initialize(address _accessManager, address _farmFactory)
-		external
-		initializer
-	{
+	function initialize(address _accessManager, address _farmFactory) external initializer{
 		require(_accessManager != address(0), "BAD_ACCESS_MANAGER");
 		require(_farmFactory != address(0), "BAD_FARM_FACTORY");
 
@@ -95,59 +75,23 @@ contract UnoAssetRouterMeshswap is
      * @return sentB - Token B amount sent to the farm.
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
-	function deposit(
-		address lpPair,
-		uint256 amountA,
-		uint256 amountB,
-		uint256 amountAMin,
-		uint256 amountBMin,
-		uint256 amountLP,
-		address recipient
-	)
-		external
-		whenNotPaused
-		returns (
-			uint256 sentA,
-			uint256 sentB,
-			uint256 liquidity
-		)
-	{
+	function deposit(address lpPair, uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin, uint256 amountLP, address recipient) external whenNotPaused returns (uint256 sentA, uint256 sentB, uint256 liquidity) {
 		Farm farm = Farm(farmFactory.Farms(lpPair));
 		if (farm == Farm(address(0))) {
 			farm = Farm(farmFactory.createFarm(lpPair));
 		}
 
 		if (amountLP > 0) {
-			IERC20Upgradeable(lpPair).safeTransferFrom(
-				msg.sender,
-				address(farm),
-				amountLP
-			);
+			IERC20Upgradeable(lpPair).safeTransferFrom(msg.sender, address(farm), amountLP);
 		}
 		if (amountA > 0) {
-			IERC20Upgradeable(farm.tokenA()).safeTransferFrom(
-				msg.sender,
-				address(farm),
-				amountA
-			);
+			IERC20Upgradeable(farm.tokenA()).safeTransferFrom(msg.sender, address(farm), amountA);
 		}
 		if (amountB > 0) {
-			IERC20Upgradeable(farm.tokenB()).safeTransferFrom(
-				msg.sender,
-				address(farm),
-				amountB
-			);
+			IERC20Upgradeable(farm.tokenB()).safeTransferFrom(msg.sender, address(farm), amountB);
 		}
 
-		(sentA, sentB, liquidity) = farm.deposit(
-			amountA,
-			amountB,
-			amountAMin,
-			amountBMin,
-			amountLP,
-			msg.sender,
-			recipient
-		);
+		(sentA, sentB, liquidity) = farm.deposit(amountA, amountB, amountAMin, amountBMin, amountLP, msg.sender, recipient);
 		emit Deposit(lpPair, msg.sender, recipient, liquidity);
 	}
 
@@ -164,23 +108,7 @@ contract UnoAssetRouterMeshswap is
      * @return sentETH - WMATIC amount sent to the farm.
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
-	function depositETH(
-		address lpPair,
-		uint256 amountToken,
-		uint256 amountTokenMin,
-		uint256 amountETHMin,
-		uint256 amountLP,
-		address recipient
-	)
-		external
-		payable
-		whenNotPaused
-		returns (
-			uint256 sentToken,
-			uint256 sentETH,
-			uint256 liquidity
-		)
-	{
+	function depositETH(address lpPair, uint256 amountToken, uint256 amountTokenMin, uint256 amountETHMin, uint256 amountLP, address recipient) external payable whenNotPaused returns (uint256 sentToken, uint256 sentETH, uint256 liquidity){
 		require(msg.value > 0, "NO_MATIC_SENT");
 		Farm farm = Farm(farmFactory.Farms(lpPair));
 		if (farm == Farm(address(0))) {
@@ -188,11 +116,7 @@ contract UnoAssetRouterMeshswap is
 		}
 
 		if (amountLP > 0) {
-			IERC20Upgradeable(lpPair).safeTransferFrom(
-				msg.sender,
-				address(farm),
-				amountLP
-			);
+			IERC20Upgradeable(lpPair).safeTransferFrom(msg.sender, address(farm), amountLP);
 		}
 
 		address tokenA = farm.tokenA();
@@ -202,39 +126,15 @@ contract UnoAssetRouterMeshswap is
 		IERC20Upgradeable(WMATIC).safeTransfer(address(farm), msg.value);
 		if (tokenA == WMATIC) {
 			if (amountToken > 0) {
-				IERC20Upgradeable(tokenB).safeTransferFrom(
-					msg.sender,
-					address(farm),
-					amountToken
-				);
+				IERC20Upgradeable(tokenB).safeTransferFrom(msg.sender, address(farm), amountToken);
 			}
-			(sentETH, sentToken, liquidity) = farm.deposit(
-				msg.value,
-				amountToken,
-				amountETHMin,
-				amountTokenMin,
-				amountLP,
-				address(this),
-				recipient
-			);
+			(sentETH, sentToken, liquidity) = farm.deposit(msg.value, amountToken, amountETHMin, amountTokenMin, amountLP, address(this), recipient);
 			IERC20Upgradeable(tokenB).safeTransfer(msg.sender, amountToken - sentToken);
 		} else if (tokenB == WMATIC) {
 			if (amountToken > 0) {
-				IERC20Upgradeable(tokenA).safeTransferFrom(
-					msg.sender,
-					address(farm),
-					amountToken
-				);
+				IERC20Upgradeable(tokenA).safeTransferFrom(msg.sender, address(farm), amountToken);
 			}
-			(sentToken, sentETH, liquidity) = farm.deposit(
-				amountToken,
-				msg.value,
-				amountTokenMin,
-				amountETHMin,
-				amountLP,
-				address(this),
-				recipient
-			);
+			(sentToken, sentETH, liquidity) = farm.deposit(amountToken, msg.value, amountTokenMin, amountETHMin, amountLP, address(this), recipient);
 			IERC20Upgradeable(tokenA).safeTransfer(msg.sender, amountToken - sentToken);
 		} else {
 			revert("NOT_WMATIC_POOL");
@@ -260,25 +160,11 @@ contract UnoAssetRouterMeshswap is
      * @return amountA - Token A amount sent to the {recipient}, 0 if withdrawLP == false.
      * @return amountB - Token B amount sent to the {recipient}, 0 if withdrawLP == false.
      */
-	function withdraw(
-		address lpPair,
-		uint256 amount,
-		uint256 amountAMin,
-		uint256 amountBMin,
-		bool withdrawLP,
-		address recipient
-	) external returns (uint256 amountA, uint256 amountB) {
+	function withdraw(address lpPair, uint256 amount, uint256 amountAMin, uint256 amountBMin, bool withdrawLP, address recipient) external returns (uint256 amountA, uint256 amountB) {
 		Farm farm = Farm(farmFactory.Farms(lpPair));
 		require(farm != Farm(address(0)), "FARM_NOT_EXISTS");
 
-		(amountA, amountB) = farm.withdraw(
-			amount,
-			amountAMin,
-			amountBMin,
-			withdrawLP,
-			msg.sender,
-			recipient
-		);
+		(amountA, amountB) = farm.withdraw(amount, amountAMin, amountBMin, withdrawLP, msg.sender, recipient);
 		emit Withdraw(lpPair, msg.sender, recipient, amount);
 	}
 
@@ -293,13 +179,7 @@ contract UnoAssetRouterMeshswap is
      * @return amountToken - Token amount sent to the {recipient}.
      * @return amountETH - MATIC amount sent to the {recipient}.
      */
-	function withdrawETH(
-		address lpPair,
-		uint256 amount,
-		uint256 amountTokenMin,
-		uint256 amountETHMin,
-		address recipient
-	) external payable returns (uint256 amountToken, uint256 amountETH) {
+	function withdrawETH(address lpPair, uint256 amount, uint256 amountTokenMin, uint256 amountETHMin, address recipient) external returns (uint256 amountToken, uint256 amountETH) {
 		Farm farm = Farm(farmFactory.Farms(lpPair));
 		require(farm != Farm(address(0)), "FARM_NOT_EXISTS");
 
@@ -307,24 +187,10 @@ contract UnoAssetRouterMeshswap is
 		address tokenB = farm.tokenB();
 
 		if (tokenA == WMATIC) {
-			(amountETH, amountToken) = farm.withdraw(
-				amount,
-				amountETHMin,
-				amountTokenMin,
-				false,
-				msg.sender,
-				address(this)
-			);
+			(amountETH, amountToken) = farm.withdraw(amount, amountETHMin, amountTokenMin, false, msg.sender, address(this));
 			IERC20Upgradeable(tokenB).safeTransfer(recipient, amountToken);
 		} else if (tokenB == WMATIC) {
-			(amountToken, amountETH) = farm.withdraw(
-				amount,
-				amountTokenMin,
-				amountETHMin,
-				false,
-				msg.sender,
-				address(this)
-			);
+			(amountToken, amountETH) = farm.withdraw(amount, amountTokenMin, amountETHMin, false, msg.sender, address(this));
 			IERC20Upgradeable(tokenA).safeTransfer(recipient, amountToken);
 		} else {
 			revert("NOT_WMATIC_POOL");
@@ -370,15 +236,7 @@ contract UnoAssetRouterMeshswap is
      * @return stakeA - Token A stake.
      * @return stakeB - Token B stake.
      */
-	function userStake(address _address, address lpPair)
-		external
-		view
-		returns (
-			uint256 stakeLP,
-			uint256 stakeA,
-			uint256 stakeB
-		)
-	{
+	function userStake(address _address, address lpPair) external view returns (uint256 stakeLP, uint256 stakeA, uint256 stakeB) {
 		Farm farm = Farm(farmFactory.Farms(lpPair));
 		if (farm != Farm(address(0))) {
 			stakeLP = farm.userBalance(_address);
@@ -394,22 +252,11 @@ contract UnoAssetRouterMeshswap is
      * @return totalDepositsA - Token A deposits.
      * @return totalDepositsB - Token B deposits.
      */
-	function totalDeposits(address lpPair)
-		external
-		view
-		returns (
-			uint256 totalDepositsLP,
-			uint256 totalDepositsA,
-			uint256 totalDepositsB
-		)
-	{
+	function totalDeposits(address lpPair) external view returns (uint256 totalDepositsLP, uint256 totalDepositsA, uint256 totalDepositsB) {
 		Farm farm = Farm(farmFactory.Farms(lpPair));
 		if (farm != Farm(address(0))) {
 			totalDepositsLP = farm.getTotalDeposits();
-			(totalDepositsA, totalDepositsB) = getTokenStake(
-				lpPair,
-				totalDepositsLP
-			);
+			(totalDepositsA, totalDepositsB) = getTokenStake(lpPair, totalDepositsLP);
 		}
 	}
 
@@ -419,11 +266,7 @@ contract UnoAssetRouterMeshswap is
 
      * @return tokens - Tokens addresses.
      */
-	function getTokens(address lpPair)
-		external
-		view
-		returns (IERC20Upgradeable[] memory tokens)
-	{
+	function getTokens(address lpPair) external view returns (IERC20Upgradeable[] memory tokens) {
 		tokens = new IERC20Upgradeable[](2);
 		tokens[0] = IERC20Upgradeable(IUniswapV2Pair(lpPair).token0());
 		tokens[1] = IERC20Upgradeable(IUniswapV2Pair(lpPair).token1());
@@ -437,20 +280,10 @@ contract UnoAssetRouterMeshswap is
      * @return amountA - Token A amount.
      * @return amountB - Token B amount.
      */
-	function getTokenStake(address lpPair, uint256 amountLP)
-		internal
-		view
-		returns (uint256 amountA, uint256 amountB)
-	{
+	function getTokenStake(address lpPair, uint256 amountLP) internal view returns (uint256 amountA, uint256 amountB){
 		uint256 totalSupply = IERC20Upgradeable(lpPair).totalSupply();
-		amountA =
-			(amountLP *
-				IERC20Upgradeable(IUniswapV2Pair(lpPair).token0()).balanceOf(lpPair)) /
-			totalSupply;
-		amountB =
-			(amountLP *
-				IERC20Upgradeable(IUniswapV2Pair(lpPair).token1()).balanceOf(lpPair)) /
-			totalSupply;
+		amountA = (amountLP * IERC20Upgradeable(IUniswapV2Pair(lpPair).token0()).balanceOf(lpPair)) / totalSupply;
+		amountB = (amountLP * IERC20Upgradeable(IUniswapV2Pair(lpPair).token1()).balanceOf(lpPair)) / totalSupply;
 	}
 
 	/**
@@ -459,10 +292,7 @@ contract UnoAssetRouterMeshswap is
 	 *
 	 * Note: This function can only be called by ADMIN_ROLE.
 	 */
-	function setFee(uint256 _fee)
-		external
-		onlyRole(accessManager.ADMIN_ROLE())
-	{
+	function setFee(uint256 _fee) external onlyRole(accessManager.ADMIN_ROLE()){
 		require(_fee <= 1 ether, "BAD_FEE");
 		if (fee != _fee) {
 			emit FeeChanged(fee, _fee);
@@ -478,9 +308,7 @@ contract UnoAssetRouterMeshswap is
 		_unpause();
 	}
 
-	function _authorizeUpgrade(address)
-		internal
-		override
-		onlyRole(accessManager.ADMIN_ROLE())
-	{}
+	function _authorizeUpgrade(address) internal override onlyRole(accessManager.ADMIN_ROLE()){
+
+	}
 }

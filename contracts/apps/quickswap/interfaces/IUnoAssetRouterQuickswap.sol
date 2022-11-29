@@ -23,7 +23,7 @@ interface IUnoAssetRouterQuickswap {
     function depositETH(address lpStakingPool, uint256 amountToken, uint256 amountTokenMin, uint256 amountETHMin, uint256 amountLP, address recipient) external payable returns(uint256 sentToken, uint256 sentETH, uint256 liquidity);
 
     function withdraw(address lpStakingPool, uint256 amount, uint256 amountAMin, uint256 amountBMin, bool withdrawLP, address recipient) external returns(uint256 amountA, uint256 amountB);
-    function withdrawETH(address lpStakingPool, uint256 amount, uint256 amountTokenMin, uint256 amountETHMin, address recipient) external payable returns(uint256 amountToken, uint256 amountETH);
+    function withdrawETH(address lpStakingPool, uint256 amount, uint256 amountTokenMin, uint256 amountETHMin, address recipient) external returns(uint256 amountToken, uint256 amountETH);
 
     function distribute(
         address lpStakingPool,
