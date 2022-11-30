@@ -16,7 +16,16 @@ Branch `polygon+` also includes the autostrategies contracts located in the `/co
 
 2. Compile all contracts before running migrations `npm run compile`
 
-3. Run specific migration: `truffle migrate --network polygon --compile-none -f 2 --to 2`
+3. Deploy specific app with: `npm run deploy-${appname}`, where appname can be:
+```
+quickswap
+quickswapDual
+sushiswap
+balancer
+meshswap
+apeswap
+autostrategy
+```
 
 # Testing
 
