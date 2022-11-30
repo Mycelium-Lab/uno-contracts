@@ -96,7 +96,7 @@ contract UnoAssetRouterPancakeswap is Initializable, PausableUpgradeable, UUPSUp
     }
 
     /**
-     * @dev Autoconverts MATIC into WBNB and deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool} and deposits tokens in it. Emits a {Deposit} event.
+     * @dev Autoconverts BNB into WBNB and deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool} and deposits tokens in it. Emits a {Deposit} event.
      * @param lpPair - Address of the pool to deposit tokens in.
      * @param amountToken  - Token amount to deposit.
      * @param amountTokenMin - Bounds the extent to which the TOKEN/WBNB price can go up before the transaction reverts.
@@ -109,7 +109,7 @@ contract UnoAssetRouterPancakeswap is Initializable, PausableUpgradeable, UUPSUp
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
     function depositETH(address lpPair, uint256 amountToken, uint256 amountTokenMin, uint256 amountETHMin, uint256 amountLP, address recipient) external payable whenNotPaused returns(uint256 sentToken, uint256 sentETH, uint256 liquidity){
-        require(msg.value > 0, "NO_MATIC_SENT");
+        require(msg.value > 0, "NO_BNB_SENT");
         Farm farm = Farm(farmFactory.Farms(lpPair));
         if(farm == Farm(address(0))){
             farm = Farm(farmFactory.createFarm(lpPair));
@@ -169,17 +169,17 @@ contract UnoAssetRouterPancakeswap is Initializable, PausableUpgradeable, UUPSUp
     }
 
     /** 
-     * @dev Autoconverts WBNB into MATIC and withdraws tokens from the pool. Emits a {Withdraw} event.
+     * @dev Autoconverts WBNB into BNB and withdraws tokens from the pool. Emits a {Withdraw} event.
      * @param lpPair - LP pool to withdraw from.
      * @param amount - LP amount to withdraw. 
      * @param amountTokenMin - The minimum amount of token that must be received for the transaction not to revert.
-     * @param amountETHMin - The minimum amount of MATIC that must be received for the transaction not to revert.
+     * @param amountETHMin - The minimum amount of BNB that must be received for the transaction not to revert.
      * @param recipient - The address which will receive tokens.
 
      * @return amountToken - Token amount sent to the {recipient}.
-     * @return amountETH - MATIC amount sent to the {recipient}.
+     * @return amountETH - BNB amount sent to the {recipient}.
      */ 
-    function withdrawETH(address lpPair, uint256 amount, uint256 amountTokenMin, uint256 amountETHMin, address recipient) external payable returns(uint256 amountToken, uint256 amountETH){
+    function withdrawETH(address lpPair, uint256 amount, uint256 amountTokenMin, uint256 amountETHMin, address recipient) external returns(uint256 amountToken, uint256 amountETH){
         Farm farm = Farm(farmFactory.Farms(lpPair));
         require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
 
@@ -193,7 +193,7 @@ contract UnoAssetRouterPancakeswap is Initializable, PausableUpgradeable, UUPSUp
             (amountToken, amountETH) = farm.withdraw(amount, amountTokenMin, amountETHMin, false, msg.sender, address(this)); 
             IBEP20(tokenA).safeTransfer(recipient, amountToken);
         } else {
-            revert("NOT_WMATIC_POOL");
+            revert("NOT_WBNB_POOL");
         }
 
         IWBNB(WBNB).withdraw(amountETH);

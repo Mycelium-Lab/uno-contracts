@@ -5,7 +5,6 @@ module.exports = {
     contracts_build_directory: './build',
 
     api_keys: {
-        polygonscan: process.env.POLYGONSCAN,
         bscscan: process.env.BSCSCAN
     },
 
