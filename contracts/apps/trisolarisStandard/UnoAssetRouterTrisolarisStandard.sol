@@ -213,7 +213,7 @@ contract UnoAssetRouterTrisolarisStandard is Initializable, PausableUpgradeable,
      * @return amountToken - Token amount sent to the {recipient}.
      * @return amountETH - ETH amount sent to the {recipient}.
      */ 
-    function withdrawETH(address lpPair, uint256 amount, uint256 amountTokenMin, uint256 amountETHMin, address recipient) external payable returns(uint256 amountToken, uint256 amountETH){
+    function withdrawETH(address lpPair, uint256 amount, uint256 amountTokenMin, uint256 amountETHMin, address recipient) external returns(uint256 amountToken, uint256 amountETH){
         Farm farm = Farm(farmFactory.Farms(lpPair));
         require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
 
