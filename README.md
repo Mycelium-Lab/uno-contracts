@@ -8,13 +8,8 @@
 
 3. Run specific migration: `npm run deploy-${appname}`, where appname can be:
 ```
-quickswap
-quickswapDual
-sushiswap
-balancer
-meshswap
-apeswap
-autostrategy
+trisolarisStandard
+trisolarisStable
 ```
 
 # Testing
