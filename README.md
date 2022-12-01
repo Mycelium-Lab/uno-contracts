@@ -17,7 +17,9 @@ pancakeswap
 
 2. Start ganache with `npm run ganache`. *Note!* It's preconfigured here, so if you run your ganache differently, the tests will be failing.
 
-3. Run tests with `npm run test`
+3. Compile all contracts before running tests `npm run compile`
+
+4. Run tests with `npm run test`
 
 
 # Deployed Smart Contracts
