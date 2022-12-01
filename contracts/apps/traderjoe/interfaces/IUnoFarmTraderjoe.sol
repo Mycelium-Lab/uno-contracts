@@ -31,13 +31,7 @@ interface IUnoFarmTraderjoe {
 		uint256 amountLP,
 		address origin,
 		address recipient
-	)
-		external
-		returns (
-			uint256 sentA,
-			uint256 sentB,
-			uint256 liquidity
-		);
+	) external returns (uint256 sentA, uint256 sentB, uint256 liquidity);
 
 	function withdraw(
 		uint256 amount,

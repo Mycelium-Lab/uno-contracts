@@ -25,6 +25,7 @@ contract UnoAssetRouterTraderjoe is Initializable, PausableUpgradeable, UUPSUpgr
 
 	bytes32 private constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
 	bytes32 private constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+	bytes32 private ADMIN_ROLE;
 
 	uint256 public fee;
 
@@ -53,7 +54,9 @@ contract UnoAssetRouterTraderjoe is Initializable, PausableUpgradeable, UUPSUpgr
 		require(_farmFactory != address(0), "BAD_FARM_FACTORY");
 
 		__Pausable_init();
+
 		accessManager = IUnoAccessManager(_accessManager);
+		ADMIN_ROLE = accessManager.ADMIN_ROLE();
 		farmFactory = IUnoFarmFactory(_farmFactory);
 	}
 
@@ -83,15 +86,7 @@ contract UnoAssetRouterTraderjoe is Initializable, PausableUpgradeable, UUPSUpgr
 		uint256 amountBMin,
 		uint256 amountLP,
 		address recipient
-	)
-		external
-		whenNotPaused
-		returns (
-			uint256 sentA,
-			uint256 sentB,
-			uint256 liquidity
-		)
-	{
+	) external whenNotPaused returns (uint256 sentA, uint256 sentB, uint256 liquidity){
 		Farm farm = Farm(farmFactory.Farms(lpPair));
 		if (farm == Farm(address(0))) {
 			farm = Farm(farmFactory.createFarm(lpPair));
@@ -112,7 +107,7 @@ contract UnoAssetRouterTraderjoe is Initializable, PausableUpgradeable, UUPSUpgr
 	}
 
 	/**
-     * @dev Autoconverts MATIC into WAVAX and deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool} and deposits tokens in it. Emits a {Deposit} event.
+     * @dev Autoconverts AVAX into WAVAX and deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool} and deposits tokens in it. Emits a {Deposit} event.
      * @param lpPair - Address of the pool to deposit tokens in.
      * @param amountToken  - Token amount to deposit.
      * @param amountTokenMin - Bounds the extent to which the TOKEN/WAVAX price can go up before the transaction reverts.
@@ -131,17 +126,8 @@ contract UnoAssetRouterTraderjoe is Initializable, PausableUpgradeable, UUPSUpgr
 		uint256 amountETHMin,
 		uint256 amountLP,
 		address recipient
-	)
-		external
-		payable
-		whenNotPaused
-		returns (
-			uint256 sentToken,
-			uint256 sentETH,
-			uint256 liquidity
-		)
-	{
-		require(msg.value > 0, "NO_MATIC_SENT");
+	) external payable whenNotPaused returns (uint256 sentToken, uint256 sentETH, uint256 liquidity) {
+		require(msg.value > 0, "NO_AVAX_SENT");
 		Farm farm = Farm(farmFactory.Farms(lpPair));
 		if (farm == Farm(address(0))) {
 			farm = Farm(farmFactory.createFarm(lpPair));
@@ -208,15 +194,15 @@ contract UnoAssetRouterTraderjoe is Initializable, PausableUpgradeable, UUPSUpgr
 	}
 
 	/** 
-     * @dev Autoconverts WAVAX into MATIC and withdraws tokens from the pool. Emits a {Withdraw} event.
+     * @dev Autoconverts WAVAX into AVAX and withdraws tokens from the pool. Emits a {Withdraw} event.
      * @param lpPair - LP pool to withdraw from.
      * @param amount - LP amount to withdraw. 
      * @param amountTokenMin - The minimum amount of token that must be received for the transaction not to revert.
-     * @param amountETHMin - The minimum amount of MATIC that must be received for the transaction not to revert.
+     * @param amountETHMin - The minimum amount of AVAX that must be received for the transaction not to revert.
      * @param recipient - The address which will receive tokens.
 
      * @return amountToken - Token amount sent to the {recipient}.
-     * @return amountETH - MATIC amount sent to the {recipient}.
+     * @return amountETH - AVAX amount sent to the {recipient}.
      */
 	function withdrawETH(
 		address lpPair,
@@ -224,7 +210,7 @@ contract UnoAssetRouterTraderjoe is Initializable, PausableUpgradeable, UUPSUpgr
 		uint256 amountTokenMin,
 		uint256 amountETHMin,
 		address recipient
-	) external payable returns (uint256 amountToken, uint256 amountETH) {
+	) external returns (uint256 amountToken, uint256 amountETH) {
 		Farm farm = Farm(farmFactory.Farms(lpPair));
 		require(farm != Farm(address(0)), "FARM_NOT_EXISTS");
 
@@ -238,7 +224,7 @@ contract UnoAssetRouterTraderjoe is Initializable, PausableUpgradeable, UUPSUpgr
 			(amountToken, amountETH) = farm.withdraw(amount, amountTokenMin, amountETHMin, false, msg.sender, address(this));
 			IERC20Upgradeable(tokenA).safeTransfer(recipient, amountToken);
 		} else {
-			revert("NOT_WMATIC_POOL");
+			revert("NOT_WAVAX_POOL");
 		}
 
 		IWAVAX(WAVAX).withdraw(amountETH);
@@ -277,15 +263,7 @@ contract UnoAssetRouterTraderjoe is Initializable, PausableUpgradeable, UUPSUpgr
      * @return stakeA - Token A stake.
      * @return stakeB - Token B stake.
      */
-	function userStake(address _address, address lpPair)
-		external
-		view
-		returns (
-			uint256 stakeLP,
-			uint256 stakeA,
-			uint256 stakeB
-		)
-	{
+	function userStake(address _address, address lpPair) external view returns (uint256 stakeLP, uint256 stakeA, uint256 stakeB) {
 		Farm farm = Farm(farmFactory.Farms(lpPair));
 		if (farm != Farm(address(0))) {
 			stakeLP = farm.userBalance(_address);
@@ -301,15 +279,7 @@ contract UnoAssetRouterTraderjoe is Initializable, PausableUpgradeable, UUPSUpgr
      * @return totalDepositsA - Token A deposits.
      * @return totalDepositsB - Token B deposits.
      */
-	function totalDeposits(address lpPair)
-		external
-		view
-		returns (
-			uint256 totalDepositsLP,
-			uint256 totalDepositsA,
-			uint256 totalDepositsB
-		)
-	{
+	function totalDeposits(address lpPair) external view returns (uint256 totalDepositsLP, uint256 totalDepositsA, uint256 totalDepositsB){
 		Farm farm = Farm(farmFactory.Farms(lpPair));
 		if (farm != Farm(address(0))) {
 			totalDepositsLP = farm.getTotalDeposits();
@@ -349,7 +319,7 @@ contract UnoAssetRouterTraderjoe is Initializable, PausableUpgradeable, UUPSUpgr
 	 *
 	 * Note: This function can only be called by ADMIN_ROLE.
 	 */
-	function setFee(uint256 _fee) external onlyRole(accessManager.ADMIN_ROLE()) {
+	function setFee(uint256 _fee) external onlyRole(ADMIN_ROLE) {
 		require(_fee <= 1 ether, "BAD_FEE");
 		if (fee != _fee) {
 			emit FeeChanged(fee, _fee);
@@ -365,5 +335,5 @@ contract UnoAssetRouterTraderjoe is Initializable, PausableUpgradeable, UUPSUpgr
 		_unpause();
 	}
 
-	function _authorizeUpgrade(address) internal override onlyRole(accessManager.ADMIN_ROLE()) {}
+	function _authorizeUpgrade(address) internal override onlyRole(ADMIN_ROLE) {}
 }

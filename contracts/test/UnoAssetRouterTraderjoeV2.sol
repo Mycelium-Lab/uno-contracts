@@ -29,6 +29,7 @@ contract UnoAssetRouterTraderjoeV2 is
 
 	bytes32 private constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
 	bytes32 private constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+	bytes32 private ADMIN_ROLE;
 
 	uint256 public constant version = 2;
 

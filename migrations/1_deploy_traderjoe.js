@@ -35,6 +35,8 @@ module.exports = async (deployer, network, accounts) => {
     await deployer.deploy(FarmFactory, Farm.address, AccessManager.address, assetRouter.address)
     await addFactoryAddress(FarmFactory.address)
 
+    await assetRouter.setFee('40000000000000000')
+
     const accessManager = await AccessManager.deployed()
     // DISTRIBUTOR_ROLE
     const distributorHasRole = await accessManager.hasRole('0xfbd454f36a7e1a388bd6fc3ab10d434aa4578f811acbbcf33afb1c697486313c', distributor)
