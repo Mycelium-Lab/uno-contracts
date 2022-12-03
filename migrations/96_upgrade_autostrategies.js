@@ -1,4 +1,13 @@
 const AutoStrategy = artifacts.require('UnoAutoStrategy')
+const { promises: fs } = require('fs')
+const path = require('path')
+
+async function readAddress(app) {
+    const data = await fs.readFile(path.resolve(__dirname, './addresses/addresses.json'))
+    const json = JSON.parse(data)
+
+    return json[app]
+}
 
 module.exports = async (deployer, network) => {
     if (network !== 'polygon') return

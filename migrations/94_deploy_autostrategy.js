@@ -1,5 +1,7 @@
 const AccessManager = artifacts.require('UnoAccessManager')
 const AutoStrategyFactory = artifacts.require('UnoAutoStrategyFactory')
+const { promises: fs } = require('fs')
+const path = require('path')
 
 const AutoStrategy = artifacts.require('UnoAutoStrategy')
 
