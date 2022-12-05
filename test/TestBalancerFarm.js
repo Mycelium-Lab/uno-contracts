@@ -82,7 +82,7 @@ contract('UnoFarmBalancer', (accounts) => {
                 'CALLER_NOT_ASSET_ROUTER'
             )
             await expectRevert(
-                implementation.withdraw(0, [], false, accounts[0], accounts[0], { from: accounts[1] }),
+                implementation.withdraw(web3.eth.abi.encodeParameter('uint256', '0'), [], false, accounts[0], accounts[0], { from: accounts[1] }),
                 'CALLER_NOT_ASSET_ROUTER'
             )
             await expectRevert(
@@ -98,7 +98,7 @@ contract('UnoFarmBalancer', (accounts) => {
                 'BAD_AMOUNTS_LENGTH'
             )
             await expectRevert(
-                implementation.withdraw(0, [], false, accounts[0], accounts[0], { from: assetRouter }),
+                implementation.withdraw(web3.eth.abi.encodeParameter('uint256', '0'), [], true, accounts[0], accounts[0], { from: assetRouter }),
                 'INSUFFICIENT_AMOUNT'
             )
             await expectRevert(

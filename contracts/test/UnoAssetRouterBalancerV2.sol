@@ -71,7 +71,7 @@ contract UnoAssetRouterBalancerV2 is Initializable, PausableUpgradeable, UUPSUpg
      * @param lpPool - Address of the pool to deposit tokens in.
      * @param amounts - Amounts of tokens to deposit.
      * @param tokens - Tokens to deposit.
-     * @param minAmountLP - Minimum LP the user will receive from {{tokens}} deposit.
+     * @param minAmountLP - Minimum LP the user will receive from {tokens} deposit.
      * @param amountLP - Additional amount of LP tokens to deposit.
      * @param recipient - Address which will receive the deposit.
 
@@ -97,12 +97,12 @@ contract UnoAssetRouterBalancerV2 is Initializable, PausableUpgradeable, UUPSUpg
         emit Deposit(lpPool, msg.sender, recipient, liquidity); 
     }
 
-        /**
+    /**
      * @dev Autoconverts MATIC into WMATIC and deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpPool} and deposits tokens in it.
      * @param lpPool - Address of the pool to deposit tokens in.
      * @param amounts - Amounts of tokens to deposit.
      * @param tokens - Tokens to deposit.
-     * @param minAmountLP - Minimum LP the user will receive from {{tokens}} deposit.
+     * @param minAmountLP - Minimum LP the user will receive from {tokens} deposit.
      * @param amountLP - Additional amount of LP tokens to deposit.
      * @param recipient - Address which will receive the deposit.
 
@@ -117,23 +117,21 @@ contract UnoAssetRouterBalancerV2 is Initializable, PausableUpgradeable, UUPSUpg
             farm = Farm(farmFactory.createFarm(lpPool));
         }
 
-        bool WMaticInTokens = false;
-        for (uint256 i = 0; i < tokens.length; i++) {
-            if(tokens[i] == WMATIC){
-                WMaticInTokens = true;
-                amounts[i] = msg.value;
-                break;
-            }
-        }
-        require(WMaticInTokens, "NO_WMATIC_IN_TOKENS");
-
+        bool WMATICInTokens;
         IWMATIC(WMATIC).deposit{value: msg.value}();
         IERC20Upgradeable(WMATIC).safeTransfer(address(farm), msg.value);
         for (uint256 i = 0; i < tokens.length; i++) {
-            if(amounts[i] > 0 && tokens[i] != WMATIC){
-                IERC20Upgradeable(tokens[i]).safeTransferFrom(msg.sender, address(farm), amounts[i]);
+            if(tokens[i] != WMATIC){
+                if(amounts[i] > 0){
+                    IERC20Upgradeable(tokens[i]).safeTransferFrom(msg.sender, address(farm), amounts[i]);
+                }
+                continue;
             }
+            amounts[i] = msg.value;
+            WMATICInTokens = true;
         }
+        require(WMATICInTokens, "NO_WMATIC_IN_TOKENS");
+
         if(amountLP > 0){
             IERC20Upgradeable(lpPool).safeTransferFrom(msg.sender, address(farm), amountLP);
         }
@@ -145,46 +143,51 @@ contract UnoAssetRouterBalancerV2 is Initializable, PausableUpgradeable, UUPSUpg
     /** 
      * @dev Withdraws tokens from the given pool. 
      * @param lpPool - LP pool to withdraw from.
-     * @param amount - LP amount to withdraw. 
+     * @param userData - If withdrawLP provide LP amount to withdraw, else use Balancer pool exit userData.
      * @param minAmountsOut - Minimum token amounts the user will receive.
      * @param withdrawLP - True: Withdraw in LP tokens, False: Withdraw in normal tokens.
      * @param recipient - The address which will receive tokens.
 
-     * @return amounts - Token amounts sent to the {recipient}
+     * @return amounts - Token amounts sent to the {recipient}.
+     * @return liquidity - Total liquidity sent to the user (in lpTokens).
      */ 
-    function withdraw(address lpPool, uint256 amount, uint256[] calldata minAmountsOut, bool withdrawLP, address recipient) external returns(uint256[] memory amounts){ 
+    function withdraw(address lpPool, bytes calldata userData, uint256[] calldata minAmountsOut, bool withdrawLP, address recipient) external returns(uint256[] memory amounts, uint256 liquidity){ 
         Farm farm = Farm(farmFactory.Farms(lpPool));
         require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
 
-        amounts = farm.withdraw(amount, minAmountsOut, withdrawLP, msg.sender, recipient);
-        emit Withdraw(lpPool, msg.sender, recipient, amount);  
+        (amounts, liquidity) = farm.withdraw(userData, minAmountsOut, withdrawLP, msg.sender, recipient);
+        emit Withdraw(lpPool, msg.sender, recipient, liquidity);
     }
 
     /** 
      * @dev Autoconverts WMATIC into MATIC and withdraws tokens from the given pool. 
      * @param lpPool - LP pool to withdraw from.
-     * @param amount - LP amount to withdraw. 
+     * @param userData -  Balancer pool exit userData.
      * @param minAmountsOut - Minimum token amounts the user will receive.
      * @param recipient - The address which will receive tokens.
 
-     * @return amounts - Token amounts sent to the {recipient}
+     * @return amounts - Token amounts sent to the {recipient}.
+     * @return liquidity - Total liquidity sent to the user (in lpTokens).
      */ 
-    function withdrawETH(address lpPool, uint256 amount, uint256[] calldata minAmountsOut, address recipient) external returns(uint256[] memory amounts){ 
+    function withdrawETH(address lpPool, bytes calldata userData, uint256[] calldata minAmountsOut, address recipient) external returns(uint256[] memory amounts, uint256 liquidity){ 
         Farm farm = Farm(farmFactory.Farms(lpPool));
         require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
 
-        amounts = farm.withdraw(amount, minAmountsOut, false, msg.sender, address(this));
+        (amounts, liquidity) = farm.withdraw(userData, minAmountsOut, false, msg.sender, address(this));
 
         IERC20[] memory tokens = getTokens(lpPool);
         for (uint256 i = 0; i < tokens.length; i++) {
+            if (amounts[i] == 0){
+                continue;
+            }
             if (address(tokens[i]) != WMATIC) {
                 IERC20Upgradeable(address(tokens[i])).safeTransfer(recipient, amounts[i]);
                 continue;
             }
             IWMATIC(WMATIC).withdraw(amounts[i]);
             payable(recipient).transfer(amounts[i]);
-        } 
-        emit Withdraw(lpPool, msg.sender, recipient, amount);  
+        }
+        emit Withdraw(lpPool, msg.sender, recipient, liquidity);  
     }
 
     /**
