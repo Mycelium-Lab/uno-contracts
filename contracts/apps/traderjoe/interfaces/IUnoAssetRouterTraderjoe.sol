@@ -22,23 +22,26 @@ interface IUnoAssetRouterTraderjoe {
 	function initialize(address _accessManager, address _farmFactory) external;
 
 	function deposit(
-		address lpStakingPool,
+		address lpPair,
 		uint256 amountA,
 		uint256 amountB,
 		uint256 amountAMin,
 		uint256 amountBMin,
 		uint256 amountLP,
 		address recipient
-	)
-		external
-		returns (
-			uint256 sentA,
-			uint256 sentB,
-			uint256 liquidity
-		);
+	) external returns (uint256 sentA, uint256 sentB, uint256 liquidity);
+
+	function depositETH(
+		address lpPair,
+		uint256 amountToken,
+		uint256 amountTokenMin,
+		uint256 amountETHMin,
+		uint256 amountLP,
+		address recipient
+	) external payable returns (uint256 sentToken, uint256 sentETH, uint256 liquidity);
 
 	function withdraw(
-		address lpStakingPool,
+		address lpPair,
 		uint256 amount,
 		uint256 amountAMin,
 		uint256 amountBMin,
@@ -46,32 +49,26 @@ interface IUnoAssetRouterTraderjoe {
 		address recipient
 	) external returns (uint256 amountA, uint256 amountB);
 
+	function withdrawETH(
+		address lpPair,
+		uint256 amount,
+		uint256 amountTokenMin,
+		uint256 amountETHMin,
+		address recipient
+	) external returns (uint256 amountToken, uint256 amountETH);
+
 	function distribute(
-		address lpStakingPool,
+		address lpPair,
 		Farm.SwapInfo[4] calldata swapInfos,
 		Farm.SwapInfo[2] calldata feeSwapInfo,
 		address feeTo
 	) external;
 
-	function userStake(address _address, address lpStakingPool)
-		external
-		view
-		returns (
-			uint256 stakeLP,
-			uint256 stakeA,
-			uint256 stakeB
-		);
+	function userStake(address _address, address lpPair) external view returns (uint256 stakeLP, uint256 stakeA, uint256 stakeB);
 
-	function totalDeposits(address lpStakingPool)
-		external
-		view
-		returns (
-			uint256 totalDepositsLP,
-			uint256 totalDepositsA,
-			uint256 totalDepositsB
-		);
+	function totalDeposits(address lpPair) external view returns (uint256 totalDepositsLP, uint256 totalDepositsA, uint256 totalDepositsB);
 
-	function getTokens(address lpStakingPool) external view returns (IERC20Upgradeable[] memory tokens);
+	function getTokens(address lpPair) external view returns (IERC20Upgradeable[] memory tokens);
 
 	function setFee(uint256 _fee) external;
 
