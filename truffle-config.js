@@ -4,10 +4,14 @@ const HDWalletProvider = require('@truffle/hdwallet-provider')
 module.exports = {
     contracts_build_directory: './build',
 
+    api_keys: {
+        snowtrace: process.env.SNOWTRACE
+    },
+
     networks: {
         avalanche: {
             provider: new HDWalletProvider({
-                mnemonic: process.env.PRIVATE_KEY,
+                privateKeys: [process.env.PRIVATE_KEY],
                 providerOrUrl: 'https://api.avax.network/ext/bc/C/rpc',
                 chainId: 43114,
                 pollingInterval: 30000,
