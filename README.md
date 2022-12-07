@@ -27,15 +27,15 @@ All contracts are deployed on the Avalanche Blockchain
 
 ### UnoAccessManager
 
-0x
+0x85f5A518399b072288Ff3fb7022EAdE71f99c7BC
 
 
 ## Traderjoe
 
 #### UnoAssetRouterTraderjoe
 
-0x
+0xe137ca875d80470B1B552aAFf1488093063f4322
 
 #### UnoFarmFactory
 
-0x
+0x6Eae93D177BFDDAF5ee238F55C36A847A35E62A0
