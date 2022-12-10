@@ -36,8 +36,8 @@ module.exports = async (deployer, network) => {
 
     const proposal = await client.createProposal({
         contractId: `matic-${AutoStrategyFactory}`, // Target contract
-        title: '-', // Title of the proposal
-        description: '--', // Description of the proposal
+        title: 'Upgrade', // Title of the proposal
+        description: 'Upgrade', // Description of the proposal
         type: 'custom', // Use 'custom' for custom admin actions
         targetFunction: { name: 'upgradeStrategies', inputs: [{ type: 'address', name: 'newImplementation' }] }, // Function ABI
         functionInputs: [impl], // Arguments to the function
