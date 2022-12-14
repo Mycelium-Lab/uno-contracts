@@ -33,13 +33,14 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
 
     address public constant WMATIC = 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270;
 
-    address public oneInchRouter = 0x1111111254EEB25477B68fb85Ed929f73A960582;
+    address public constant oneInchRouter = 0x1111111254EEB25477B68fb85Ed929f73A960582;
 
     event Deposit(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Withdraw(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Distribute(address indexed lpPool, uint256 reward);
 
     event FeeChanged(uint256 previousFee, uint256 newFee);
+    event SingleAssetEntryFeeChanged(uint256 previousFee, uint256 newFee);
 
     modifier onlyRole(bytes32 role){
         require(accessManager.hasRole(role, msg.sender), 'CALLER_NOT_AUTHORIZED');
@@ -65,6 +66,74 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
     receive() external payable {
         require(msg.sender == WMATIC, 'ONLY_ACCEPT_WMATIC'); // only accept ETH via fallback from the WMATIC contract
     }
+
+    /**
+     * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool} and deposits tokens in it. Emits a {Deposit} event.
+     * @param lpStakingPool - Address of the pool to deposit tokens in.
+     * @param token  - Address of a token to enter the pool.
+     * @param amount - Amount of token sent.
+     * @param swapData - Parameter with which 1inch router is being called with.
+     * @param amountAMin - Bounds the extent to which the B/A price can go up before the transaction reverts.
+     * @param amountBMin - Bounds the extent to which the A/B price can go up before the transaction reverts.
+     * @param amountLP - Additional LP Token amount to deposit.
+     * @param recipient - Address which will receive the deposit.
+     
+     * @return sentA - Token A amount sent to the farm.
+     * @return sentB - Token B amount sent to the farm.
+     * @return liquidity - Total liquidity sent to the farm (in lpTokens).
+     */
+    function depositSingleETH(address lpStakingPool, address token, uint256 amount, bytes[2] calldata swapData, uint256 amountAMin, uint256 amountBMin, uint256 amountLP, address recipient) external payable whenNotPaused returns(uint256 sentA, uint256 sentB, uint256 liquidity){
+        require(msg.value > 0, "NO_MATIC_SENT");
+        require(token == address(0), "INCORRECT_TOKEN_ADDRESS");
+        Farm farm = Farm(farmFactory.Farms(lpStakingPool));
+        if(farm == Farm(address(0))){
+            farm = Farm(farmFactory.createFarm(lpStakingPool));
+        }
+
+        amount = msg.value;
+        IWMATIC(WMATIC).deposit{value: msg.value}();
+        uint256 amountA;
+        uint256 amountB;
+
+        IERC20Upgradeable(WMATIC).approve(oneInchRouter, amount);
+        if (farm.tokenA() != WMATIC) {
+            (uint256 returnAmount, uint256 spentAmount) = swap(swapData[0]);
+            amount -= spentAmount;
+            amountA = returnAmount;
+        }
+        if (farm.tokenB() != WMATIC) {
+            (uint256 returnAmount, uint256 spentAmount) = swap(swapData[1]);
+            amount -= spentAmount;
+            amountB = returnAmount;
+        }
+        IERC20Upgradeable(WMATIC).approve(oneInchRouter, 0);
+        
+
+        if (farm.tokenA() == WMATIC) {
+            amountA = amount;
+        } else if (farm.tokenB() == WMATIC) {
+            amountB = amount;
+        } else {
+            if (amount > 0) {
+                IWMATIC(WMATIC).withdraw(amount);
+                payable(msg.sender).transfer(amount);
+            }
+        }
+
+        if(amountLP > 0){
+            IERC20Upgradeable(farm.lpPair()).safeTransferFrom(msg.sender, address(farm), amountLP);
+        }
+        if(amountA > 0){
+            IERC20Upgradeable(farm.tokenA()).safeTransfer(address(farm), amountA);
+        }
+        if(amountB > 0){
+            IERC20Upgradeable(farm.tokenB()).safeTransfer(address(farm), amountB);
+        }
+
+        (sentA, sentB, liquidity) = farm.deposit(amountA, amountB, amountAMin, amountBMin, amountLP, msg.sender, recipient);
+        emit Deposit(lpStakingPool, msg.sender, recipient, liquidity);
+    }
+
     /**
      * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool} and deposits tokens in it. Emits a {Deposit} event.
      * @param lpStakingPool - Address of the pool to deposit tokens in.
@@ -89,31 +158,30 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
         require(amount > 0, "NO_TOKEN_SENT");
         require(token != address(0), "INCORRECT_TOKEN_ADDRESS");
         IERC20Upgradeable(token).safeTransferFrom(msg.sender, address(this), amount);
-        uint256 spentOnSwap;
         uint256 amountA;
         uint256 amountB;
 
         IERC20Upgradeable(token).approve(oneInchRouter, amount);
         if (farm.tokenA() != token) {
             (uint256 returnAmount, uint256 spentAmount) = swap(swapData[0]);
-            spentOnSwap += spentAmount;
+            amount -= spentAmount;
             amountA = returnAmount;
         }
         if (farm.tokenB() != token) {
             (uint256 returnAmount, uint256 spentAmount) = swap(swapData[1]);
-            spentOnSwap += spentAmount;
+            amount -= spentAmount;
             amountB = returnAmount;
         }
         IERC20Upgradeable(token).approve(oneInchRouter, 0);
         
 
         if (farm.tokenA() == token) {
-            amountA = amount - spentOnSwap;
+            amountA = amount;
         } else if (farm.tokenB() == token) {
-            amountB = amount - spentOnSwap;
+            amountB = amount;
         } else {
-            if (amount - spentOnSwap > 0) {
-                IERC20Upgradeable(token).safeTransfer(msg.sender, amount - spentOnSwap);
+            if (amount > 0) {
+                IERC20Upgradeable(token).safeTransfer(msg.sender, amount);
             }
         }
 

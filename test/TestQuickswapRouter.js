@@ -2,6 +2,7 @@ const {
     expectRevert, expectEvent, BN, constants, time
 } = require('@openzeppelin/test-helpers')
 const { deployProxy, upgradeProxy } = require('@openzeppelin/truffle-upgrades')
+const fetch = require('node-fetch')
 
 const IStakingRewards = artifacts.require('IStakingRewards')
 const IStakingRewardsFactory = artifacts.require('IStakingRewardsFactory')
@@ -35,6 +36,27 @@ approxeq = (bn1, bn2, epsilon, message) => {
     const amountDelta = bn1.sub(bn2).add(epsilon)
     assert.ok(!amountDelta.isNeg(), message)
 }
+
+apiRequestUrl = (queryParams) => {
+    const baseApiRequestURL = 'https://api.1inch.io/v5.0/137/swap'
+    return `${baseApiRequestURL}?${(new URLSearchParams(queryParams)).toString()}`
+}
+
+fetchData = async (queryParams) => fetch(apiRequestUrl(queryParams)).then((res) => res.json()).then((res) => res.tx.data)
+
+swapParams = (
+    fromTokenAddress,
+    toTokenAddress,
+    amount,
+    fromAddress
+) => ({
+    fromTokenAddress,
+    toTokenAddress,
+    amount,
+    fromAddress,
+    slippage: 1,
+    disableEstimate: true
+})
 
 contract('UnoAssetRouterQuickswap', (accounts) => {
     const admin = accounts[0]
@@ -508,46 +530,6 @@ contract('UnoAssetRouterQuickswap', (accounts) => {
                 approxeq(
                     await stakingRewards.balanceOf(farm.address),
                     amounts[0].add(amounts[1]).add(amounts[2]).add(amounts[3]).add(amounts[4]),
-                    new BN(10),
-                    "Total amount sent doesn't equal totalDeposits"
-                )
-            })
-        })
-        describe('deposit single asset', () => {
-            let stakeABefore; let
-                stakeBBefore; let stakeLPBefore
-            let stakeA; let stakeB; let stakeLP
-            before(async () => {
-                balanceABefore = await tokenA.balanceOf(account4)
-                balanceBBefore = await tokenB.balanceOf(account4);
-                ({ stakeLP: stakeLPBefore, stakeA: stakeABefore, stakeB: stakeBBefore } = await assetRouter.userStake(account4, pool))
-                await tokenA.approve(assetRouter.address, amounts[5], { from: account4 })
-            })
-            it('fires events', async () => {
-                const receipt = await assetRouter.depositSingleAsset(pool, amounts[5], tokenA.address, account4, { from: account4 })
-                expectEvent(receipt, 'Deposit', { lpPool: pool, sender: account4, recipient: account4 })
-            })
-            it('checks stake', async () => {
-                ({ stakeLP, stakeA, stakeB } = await assetRouter.userStake(account4, pool))
-                const balanceAAfter = await tokenA.balanceOf(account4)
-                approxeq(stakeA.sub(stakeABefore), (amounts[5]).div(new BN(2)).sub(balanceAAfter), new BN(10), 'Stake is not correct')
-                assert.equal(stakeB.gt(stakeBBefore), true)
-            })
-            it('updates totalDeposits', async () => {
-                const { totalDepositsLP } = await assetRouter.totalDeposits(pool)
-                approxeq(
-                    totalDepositsLP,
-                    amounts[0].add(amounts[1]).add(amounts[2]).add(amounts[3]).add(amounts[4])
-                        .add(stakeLP),
-                    new BN(10),
-                    "Total amount sent doesn't equal totalDeposits"
-                )
-            })
-            it('stakes tokens in StakingRewards contract', async () => {
-                approxeq(
-                    await stakingRewards.balanceOf(farm.address),
-                    amounts[0].add(amounts[1]).add(amounts[2]).add(amounts[3]).add(amounts[4])
-                        .add(stakeLP),
                     new BN(10),
                     "Total amount sent doesn't equal totalDeposits"
                 )
