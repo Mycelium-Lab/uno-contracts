@@ -102,6 +102,59 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
     }
 
     /**
+     * @dev Autoconverts MATIC into WMATIC and deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool} and deposits tokens in it. Emits a {Deposit} event.
+     * @param lpStakingPool - Address of the pool to deposit tokens in.
+     * @param amountToken  - Token amount to deposit.
+     * @param amountTokenMin - Bounds the extent to which the TOKEN/WMATIC price can go up before the transaction reverts.
+     * @param amountETHMin - Bounds the extent to which the WMATIC/TOKEN price can go up before the transaction reverts.
+     * @param amountLP - Additional LP Token amount to deposit.
+     * @param recipient - Address which will receive the deposit.
+     
+     * @return sentToken - Token amount sent to the farm.
+     * @return sentETH - WMATIC amount sent to the farm.
+     * @return liquidity - Total liquidity sent to the farm (in lpTokens).
+     */
+    function depositETH(address lpStakingPool, uint256 amountToken, uint256 amountTokenMin, uint256 amountETHMin, uint256 amountLP, address recipient) external payable whenNotPaused returns(uint256 sentToken, uint256 sentETH, uint256 liquidity){
+        require(msg.value > 0, "NO_MATIC_SENT");
+        Farm farm = Farm(farmFactory.Farms(lpStakingPool));
+        if(farm == Farm(address(0))){
+            farm = Farm(farmFactory.createFarm(lpStakingPool));
+        }
+
+        if(amountLP > 0){
+            IERC20Upgradeable(farm.lpPair()).safeTransferFrom(msg.sender, address(farm), amountLP);
+        }
+
+        address tokenA = farm.tokenA();
+        address tokenB = farm.tokenB();
+
+        IWMATIC(WMATIC).deposit{value: msg.value}();
+        IERC20Upgradeable(WMATIC).safeTransfer(address(farm), msg.value);
+        if (tokenA == WMATIC) {
+            if (amountToken > 0) {
+                IERC20Upgradeable(tokenB).safeTransferFrom(msg.sender, address(farm), amountToken);
+            }
+            (sentETH, sentToken, liquidity) = farm.deposit(msg.value, amountToken, amountETHMin, amountTokenMin, amountLP, address(this), recipient);
+            IERC20Upgradeable(tokenB).safeTransfer(msg.sender, amountToken - sentToken);
+        } else if (tokenB == WMATIC) {
+            if (amountToken > 0) {
+                IERC20Upgradeable(tokenA).safeTransferFrom(msg.sender, address(farm), amountToken);
+            }
+            (sentToken, sentETH, liquidity) = farm.deposit(amountToken, msg.value, amountTokenMin, amountETHMin, amountLP, address(this), recipient);
+            IERC20Upgradeable(tokenA).safeTransfer(msg.sender, amountToken - sentToken);
+        } else {
+            revert("NOT_WMATIC_POOL");
+        }
+
+        uint256 dust = msg.value - sentETH;
+        if (dust > 0){
+            IWMATIC(WMATIC).withdraw(dust);
+            payable(msg.sender).transfer(dust);
+        }
+        emit Deposit(lpStakingPool, msg.sender, recipient, liquidity);
+    }
+
+    /**
      * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool} and deposits tokens in it. Emits a {Deposit} event.
      * @param lpStakingPool - Address of the pool to deposit tokens in.
      * @param token  - Address of a token to enter the pool.
@@ -218,59 +271,6 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
         }
 
         (,, liquidity) = farm.deposit(amountA, amountB, amountAMin, amountBMin, amountLP, msg.sender, recipient);
-        emit Deposit(lpStakingPool, msg.sender, recipient, liquidity);
-    }
-    
-    /**
-     * @dev Autoconverts MATIC into WMATIC and deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool} and deposits tokens in it. Emits a {Deposit} event.
-     * @param lpStakingPool - Address of the pool to deposit tokens in.
-     * @param amountToken  - Token amount to deposit.
-     * @param amountTokenMin - Bounds the extent to which the TOKEN/WMATIC price can go up before the transaction reverts.
-     * @param amountETHMin - Bounds the extent to which the WMATIC/TOKEN price can go up before the transaction reverts.
-     * @param amountLP - Additional LP Token amount to deposit.
-     * @param recipient - Address which will receive the deposit.
-     
-     * @return sentToken - Token amount sent to the farm.
-     * @return sentETH - WMATIC amount sent to the farm.
-     * @return liquidity - Total liquidity sent to the farm (in lpTokens).
-     */
-    function depositETH(address lpStakingPool, uint256 amountToken, uint256 amountTokenMin, uint256 amountETHMin, uint256 amountLP, address recipient) external payable whenNotPaused returns(uint256 sentToken, uint256 sentETH, uint256 liquidity){
-        require(msg.value > 0, "NO_MATIC_SENT");
-        Farm farm = Farm(farmFactory.Farms(lpStakingPool));
-        if(farm == Farm(address(0))){
-            farm = Farm(farmFactory.createFarm(lpStakingPool));
-        }
-
-        if(amountLP > 0){
-            IERC20Upgradeable(farm.lpPair()).safeTransferFrom(msg.sender, address(farm), amountLP);
-        }
-
-        address tokenA = farm.tokenA();
-        address tokenB = farm.tokenB();
-
-        IWMATIC(WMATIC).deposit{value: msg.value}();
-        IERC20Upgradeable(WMATIC).safeTransfer(address(farm), msg.value);
-        if (tokenA == WMATIC) {
-            if (amountToken > 0) {
-                IERC20Upgradeable(tokenB).safeTransferFrom(msg.sender, address(farm), amountToken);
-            }
-            (sentETH, sentToken, liquidity) = farm.deposit(msg.value, amountToken, amountETHMin, amountTokenMin, amountLP, address(this), recipient);
-            IERC20Upgradeable(tokenB).safeTransfer(msg.sender, amountToken - sentToken);
-        } else if (tokenB == WMATIC) {
-            if (amountToken > 0) {
-                IERC20Upgradeable(tokenA).safeTransferFrom(msg.sender, address(farm), amountToken);
-            }
-            (sentToken, sentETH, liquidity) = farm.deposit(amountToken, msg.value, amountTokenMin, amountETHMin, amountLP, address(this), recipient);
-            IERC20Upgradeable(tokenA).safeTransfer(msg.sender, amountToken - sentToken);
-        } else {
-            revert("NOT_WMATIC_POOL");
-        }
-
-        uint256 dust = msg.value - sentETH;
-        if (dust > 0){
-            IWMATIC(WMATIC).withdraw(dust);
-            payable(msg.sender).transfer(dust);
-        }
         emit Deposit(lpStakingPool, msg.sender, recipient, liquidity);
     }
 

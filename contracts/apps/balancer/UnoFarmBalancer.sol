@@ -144,7 +144,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
      * @dev Function that makes the deposits.
      * Deposits {amounts} of {tokens} from this contract's balance to the {Vault}.
      */
-    function deposit(uint256[] memory amounts, address[] memory tokens, uint256 minAmountLP, uint256 amountLP,  address recipient) external nonReentrant onlyAssetRouter returns(uint256 liquidity){
+    function deposit(uint256[] memory amounts, address[] calldata tokens, uint256 minAmountLP, uint256 amountLP,  address recipient) external nonReentrant onlyAssetRouter returns(uint256 liquidity){
         (IERC20[] memory _tokens, , ) = Vault.getPoolTokens(poolId);
         require (amounts.length == _tokens.length, 'BAD_AMOUNTS_LENGTH');
         require (tokens.length == _tokens.length, 'BAD_TOKENS_LENGTH');

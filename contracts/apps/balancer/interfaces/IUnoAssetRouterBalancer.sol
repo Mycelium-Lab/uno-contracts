@@ -20,8 +20,10 @@ interface IUnoAssetRouterBalancer {
 
     function initialize(address _accessManager, address _farmFactory) external;
 
-    function deposit(address lpPool, uint256[] memory amounts, address[] memory tokens, uint256 minAmountLP, uint256 amountLP, address recipient) external returns(uint256 liquidity);
-    function depositETH(address lpPool, uint256[] memory amounts, address[] memory tokens, uint256 minAmountLP, uint256 amountLP, address recipient) external payable returns(uint256 liquidity);
+    function deposit(address lpPool, uint256[] memory amounts, address[] calldata tokens, uint256 minAmountLP, uint256 amountLP, address recipient) external returns(uint256 liquidity);
+    function depositETH(address lpPool, uint256[] memory amounts, address[] calldata tokens, uint256 minAmountLP, uint256 amountLP, address recipient) external payable returns(uint256 liquidity);
+    function depositSingleAsset(address lpPool, address token, uint256 amount, bytes[] calldata swapData, address[] calldata tokens, uint256 minAmountLP, uint256 amountLP, address recipient) external returns(uint256 liquidity);
+    function depositSingleETH(address lpPool, bytes[] calldata swapData, address[] calldata tokens, uint256 minAmountLP, uint256 amountLP, address recipient) external payable returns(uint256 liquidity);
 
     function withdraw(address lpPool, uint256 amount, uint256[] calldata minAmountsOut, bool withdrawLP, address recipient) external returns(uint256[] memory amounts);
     function withdrawETH(address lpPool, uint256 amount, uint256[] calldata minAmountsOut, address recipient) external returns(uint256[] memory amounts);
