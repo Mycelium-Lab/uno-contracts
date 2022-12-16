@@ -18,4 +18,5 @@ pragma experimental ABIEncoderV2;
 import "./IVault.sol";
 interface IBasePool {
     function getPoolId() external view returns (bytes32);
+    function getBptIndex() external view returns (uint256);
 }

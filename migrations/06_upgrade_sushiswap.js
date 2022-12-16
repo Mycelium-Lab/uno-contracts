@@ -26,10 +26,10 @@ module.exports = async (deployer, network) => {
         // AssetRouter upgrade
         const UnoAssetRouter = await readAddress('sushiswap-router')
         const impl = await prepareUpgrade(UnoAssetRouter, AssetRouter, { deployer })
-        console.log('New Router implementation:', impl) // UpgradeTo(newImplementation)
+        console.log('New Router implementation:', impl) // upgradeTo(newImplementation)
 
-        const ABI = ['function UpgradeTo(address newImplementation)']
-        const data = (new ethers.utils.Interface(ABI)).encodeFunctionData('UpgradeTo', [impl])
+        const ABI = ['function upgradeTo(address newImplementation)']
+        const data = (new ethers.utils.Interface(ABI)).encodeFunctionData('upgradeTo', [impl])
         const timelock = {
             target: UnoAssetRouter,
             value: '0',
@@ -45,8 +45,8 @@ module.exports = async (deployer, network) => {
 
         const proposal = await client.createProposal({
             contractId: `matic-${UnoAssetRouter}`, // Target contract
-            title: 'Remove payable from withdrawETH', // Title of the proposal
-            description: 'Remove payable modifier from withdrawETH', // Description of the proposal
+            title: 'Upgrade', // Title of the proposal
+            description: 'Upgrade', // Description of the proposal
             type: 'custom', // Use 'custom' for custom admin actions
             targetFunction: { name: 'upgradeTo', inputs: [{ type: 'address', name: 'newImplementation' }] }, // Function ABI
             functionInputs: [impl], // Arguments to the function
@@ -65,10 +65,10 @@ module.exports = async (deployer, network) => {
 
         await deployer.deploy(Farm)
         const impl = Farm.address
-        console.log('New Farm implementation:', impl) // UpgradeFarms(newImplementation)
+        console.log('New Farm implementation:', impl) // upgradeFarms(newImplementation)
 
-        const ABI = ['function UpgradeFarms(address newImplementation)']
-        const data = (new ethers.utils.Interface(ABI)).encodeFunctionData('UpgradeFarms', [impl])
+        const ABI = ['function upgradeFarms(address newImplementation)']
+        const data = (new ethers.utils.Interface(ABI)).encodeFunctionData('upgradeFarms', [impl])
         const timelock = {
             target: UnoFarmFactory,
             value: '0',
@@ -84,10 +84,10 @@ module.exports = async (deployer, network) => {
 
         const proposal = await client.createProposal({
             contractId: `matic-${UnoFarmFactory}`, // Target contract
-            title: 'Remove payable from withdrawETH', // Title of the proposal
-            description: 'Remove payable modifier from withdrawETH', // Description of the proposal
+            title: 'Upgrade', // Title of the proposal
+            description: 'Upgrade', // Description of the proposal
             type: 'custom', // Use 'custom' for custom admin actions
-            targetFunction: { name: 'UpgradeFarms', inputs: [{ type: 'address', name: 'newImplementation' }] }, // Function ABI
+            targetFunction: { name: 'upgradeFarms', inputs: [{ type: 'address', name: 'newImplementation' }] }, // Function ABI
             functionInputs: [impl], // Arguments to the function
             via: multisig, // Address to execute proposal
             viaType: 'Gnosis Safe', // 'Gnosis Safe', 'Gnosis Multisig', or 'EOA'

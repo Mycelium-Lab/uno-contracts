@@ -20,14 +20,17 @@ const AssetRouterV2 = artifacts.require('UnoAssetRouterBalancerV2')
 const balancerVault = '0xBA12222222228d8Ba445958a75a0704d566BF2C8'
 const gaugeFactoryAddress = '0x3b8cA519122CdD8efb272b0D3085453404B25bD0'
 
-const pool = '0xaF5E0B5425dE1F5a630A8cB5AA9D97B8141C908D' // WMATIC-stMATIC
+const pool = '0x8159462d255C1D24915CB51ec361F700174cD994' // WMATIC-stMATIC
 const pool2 = '0x06Df3b2bbB68adc8B0e302443692037ED9f91b42' // USDC-DAI-miMATIC-USDT
 
-const account1 = '0x70D04384b5c3a466EC4D8CFB8213Efc31C6a9D15'// has to be unlocked and hold 0xaF5E0B5425dE1F5a630A8cB5AA9D97B8141C908D
-const account2 = '0x78D799BE3Fd3D96f0e024b9B35ADb4479a9556f5'// has to be unlocked and hold 0xaF5E0B5425dE1F5a630A8cB5AA9D97B8141C908D
-const account3 = '0x27C7e71AEF0dc5cbcF7af511f3aBAC8eE6845685' // has to be unlocked and hold 0x3A58a54C066FdC0f2D55FC9C89F0415C92eBf3C4 (stMATIC)
+const account1 = '0xD994932A46F1f2b456624327E8807455B7644b9d'// has to be unlocked and hold 0xaF5E0B5425dE1F5a630A8cB5AA9D97B8141C908D
+const account2 = '0xb73FbaFce92dFe47DA875D2fDc0a699BeB1DA1eF'// has to be unlocked and hold 0xaF5E0B5425dE1F5a630A8cB5AA9D97B8141C908D
+const account3 = '0x48A0CCaC57a3760e985Fdd2E3B11e69C7FC6e42F' // has to be unlocked and hold 0x3A58a54C066FdC0f2D55FC9C89F0415C92eBf3C4 (stMATIC)
 
-const amounts = [new BN(1000000), new BN(3000000), new BN(500000), new BN(4000000), new BN('1000000000000000')]
+const account4 = '0xFffbCD322cEace527C8ec6Da8de2461C6D9d4e6e' // has to be unlocked and hold 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270 (WMATIC)
+const account5 = '0x765C6d09EF9223B1BECD3b92a0eC01548D53CFba' // has to be unlocked and hold 0x3A58a54C066FdC0f2D55FC9C89F0415C92eBf3C4 (stMATIC)
+
+const amounts = [new BN(1000000), new BN(3000000), new BN(500000), new BN(400000000)]
 
 const feeCollector = '0xFFFf795B802CB03FD664092Ab169f5f5c236335c'
 const fee = new BN('40000000000000000')// 4%
@@ -255,10 +258,6 @@ contract('UnoAssetRouterBalancer', (accounts) => {
                 const farmAddress = await factory.Farms(pool)
                 farm = await Farm.at(farmAddress)
             })
-            it('sets isComposable', async () => {
-                const isComposable = await farm.isComposable()
-                assert.equal(isComposable, false, 'Is composable')
-            })
             it('fires events', async () => {
                 expectEvent(receipt, 'Deposit', {
                     lpPool: pool,
@@ -266,6 +265,10 @@ contract('UnoAssetRouterBalancer', (accounts) => {
                     recipient: account1,
                     amount: amounts[0]
                 })
+            })
+            it('sets isComposable', async () => {
+                const isComposable = await farm.isComposable()
+                assert.equal(isComposable, true, 'Is not composable')
             })
             it('updates stakes', async () => {
                 const stakeLP = await assetRouter.userStake(account1, pool)
@@ -407,51 +410,36 @@ contract('UnoAssetRouterBalancer', (accounts) => {
         })
         describe('deposit normal tokens', () => {
             const balancesBefore = []
-            const _amounts = []
 
             before(async () => {
-                const _balancesBefore = []
-                for (let i = 0; i < tokenContracts.length; i++) {
-                    _balancesBefore.push(await tokenContracts[i].balanceOf(account1))
-                }
-
-                await stakingToken.approve(Vault.address, amounts[4], { from: account1 })
-                await Vault.exitPool(
-                    poolId,
-                    account1,
-                    account1,
-                    {
-                        assets: tokens,
-                        minAmountsOut: zeroAmounts,
-                        userData: web3.eth.abi.encodeParameters(['uint256', 'uint256'], ['1', amounts[4].toString()]),
-                        toInternalBalance: false
-                    },
-                    { from: account1 }
-                )
+                await tokenContracts[0].transfer(account1, await tokenContracts[0].balanceOf(account4), { from: account4 }) // wmatic
+                await tokenContracts[1].transfer(account1, await tokenContracts[1].balanceOf(account5), { from: account5 }) // stmatic
 
                 for (let i = 0; i < tokenContracts.length; i++) {
-                    const balance = await tokenContracts[i].balanceOf(account1)
-                    balancesBefore.push(balance)
-
-                    const amount = balance.sub(_balancesBefore[i])
-                    _amounts.push(amount)
-                    await tokenContracts[i].approve(assetRouter.address, amount, { from: account1 })
+                    let balance = 0
+                    if (tokenContracts[i].address !== stakingToken.address) {
+                        balance = await tokenContracts[i].balanceOf(account1)
+                        await tokenContracts[i].approve(assetRouter.address, balance, { from: account1 })
+                    }
+                    balancesBefore.push(balance.toString())
                 }
             })
             it('reverts if minAmountLP is more than received amount', async () => {
                 await expectRevert(
-                    assetRouter.deposit(pool, _amounts, tokens, constants.MAX_UINT256, 0, account1, { from: account1 }),
+                    assetRouter.deposit(pool, balancesBefore, tokens, constants.MAX_UINT256, 0, account1, { from: account1 }),
                     'BAL#208'
                 )
             })
             it('fires events', async () => {
-                const receipt = await assetRouter.deposit(pool, _amounts, tokens, 0, 0, account1, { from: account1 })
+                const receipt = await assetRouter.deposit(pool, balancesBefore, tokens, 0, 0, account1, { from: account1 })
                 expectEvent(receipt, 'Deposit', { lpPool: pool, sender: account1, recipient: account1 })
             })
             it('withdraws tokens from balance', async () => {
                 for (let i = 0; i < tokenContracts.length; i++) {
-                    const balanceAfter = await tokenContracts[i].balanceOf(account1)
-                    assert.ok((balancesBefore[i].sub(balanceAfter)).gt('0'), 'Token not withdrawn')
+                    if (tokenContracts[i].address !== stakingToken.address) {
+                        balanceAfter = await tokenContracts[i].balanceOf(account1)
+                        assert.equal(balanceAfter, '0', 'Token not withdrawn')
+                    }
                 }
             })
 
@@ -650,8 +638,8 @@ contract('UnoAssetRouterBalancer', (accounts) => {
                 stakeLP1 = await assetRouter.userStake(account1, pool)
                 stakeLP2 = await assetRouter.userStake(account2, pool)
 
-                // Proportional Exit
-                const userData = web3.eth.abi.encodeParameters(['uint256', 'uint256'], ['1', stakeLP1.toString()])
+                // single token exit
+                const userData = web3.eth.abi.encodeParameters(['uint256', 'uint256', 'uint256'], ['0', stakeLP1.toString(), '0'])
                 receipt = await assetRouter.withdraw(pool, userData, zeroAmounts, false, account1, { from: account1 })
             })
             it('fires events', async () => {
@@ -679,19 +667,24 @@ contract('UnoAssetRouterBalancer', (accounts) => {
                 )
             })
             it('transfers tokens to user', async () => {
-                for (let i = 0; i < tokenContracts.length; i++) {
-                    const balanceAfter = await tokenContracts[i].balanceOf(account1)
-                    const delta = balanceAfter.sub(balancesBefore[i])
-                    assert.ok(delta.gt('0'), 'Token balance not increased')
-                }
+                const balance0After = await tokenContracts[0].balanceOf(account1)
+                const delta0 = balance0After.sub(balancesBefore[0])
+                assert.ok(delta0.gt('0'), 'Token0 balance not increased')
+
+                const balance1After = await tokenContracts[1].balanceOf(account1)
+                const delta1 = balance1After.sub(balancesBefore[1])
+                assert.equal(delta1.toString(), '0', 'Token1 balance changed')
             })
         })
         describe('withdraws normal tokens for a different user', () => {
             const balancesBefore = []
             let stakeLP1; let
                 stakeLP2
+            let delta1; let delta2
 
             let receipt
+            const tokenAmounts = ['100000000', '100000000']
+
             before(async () => {
                 for (let i = 0; i < tokenContracts.length; i++) {
                     balancesBefore.push(await tokenContracts[i].balanceOf(account1))
@@ -700,40 +693,55 @@ contract('UnoAssetRouterBalancer', (accounts) => {
                 stakeLP1 = await assetRouter.userStake(account1, pool)
                 stakeLP2 = await assetRouter.userStake(account2, pool)
 
-                // Proportional Exit
-                const userData = web3.eth.abi.encodeParameters(['uint256', 'uint256'], ['1', stakeLP2.toString()])
+                // exact tokens exit
+                const userData = web3.eth.abi.encodeParameters(['uint256', 'uint256[]', 'uint256'], ['1', tokenAmounts, stakeLP2.toString()])
                 receipt = await assetRouter.withdraw(pool, userData, zeroAmounts, false, account1, { from: account2 })
+
+                delta1 = stakeLP1.sub(await assetRouter.userStake(account1, pool))
+                delta2 = stakeLP2.sub(await assetRouter.userStake(account2, pool))
             })
             it('fires events', async () => {
                 expectEvent(receipt, 'Withdraw', {
                     lpPool: pool,
                     sender: account2,
-                    recipient: account1,
-                    amount: stakeLP2
+                    recipient: account1
                 })
             })
+
             it('correctly updates account2 stake', async () => {
-                const stakeLP = await assetRouter.userStake(account2, pool)
-                assert.equal(
-                    stakeLP.toString(),
-                    '0',
+                assert.ok(
+                    delta2.gt('0'),
                     'stakeLP is wrong'
                 )
             })
             it('doesnt update account1 stake', async () => {
-                const stakeLP = await assetRouter.userStake(account1, pool)
                 assert.equal(
-                    stakeLP.toString(),
-                    stakeLP1,
+                    delta1.toString(),
+                    '0',
                     'stakeLP is wrong'
                 )
             })
             it('transfers tokens to correct user', async () => {
-                for (let i = 0; i < tokenContracts.length; i++) {
-                    const balanceAfter = await tokenContracts[i].balanceOf(account1)
-                    const delta = balanceAfter.sub(balancesBefore[i])
-                    assert.ok(delta.gt('0'), 'Token balance not increased')
-                }
+                let delta = (await tokenContracts[0].balanceOf(account1)).sub(balancesBefore[0])
+                approxeq(
+                    delta,
+                    new BN(tokenAmounts[0]),
+                    new BN(1),
+                    'Token1 balance not increased'
+                )
+
+                delta = (await tokenContracts[1].balanceOf(account1)).sub(balancesBefore[1])
+                approxeq(
+                    delta,
+                    new BN(tokenAmounts[1]),
+                    new BN(1),
+                    'Token2 balance not increased'
+                )
+            })
+            after(async () => {
+                const stake = await assetRouter.userStake(account2, pool)
+                const userData = web3.eth.abi.encodeParameters(['uint256', 'uint256', 'uint256'], ['0', stake.toString(), '0'])
+                await assetRouter.withdraw(pool, userData, zeroAmounts, false, account1, { from: account2 })
             })
         })
     })
@@ -953,66 +961,61 @@ contract('UnoAssetRouterBalancer', (accounts) => {
         })
     })
 
-    describe('depoit ETH', () => {
+    describe('deposit ETH', () => {
         const balancesBefore = []
         const tokensWithoutWMATIC = []
         const _amounts = []
-        const amountETH = new BN(1000000000000)
 
         let ethBalanceBefore
         let ETHSpentOnGas
         let stakesBefore
         let totalDepositsLPBefore
         let stakingRewardBalanceBefore
+        let receipt
         before(async () => {
             for (let i = 0; i < tokenContracts.length; i++) {
-                if (tokenContracts[i].address !== '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270') {
+                if (tokenContracts[i].address !== '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270' && tokenContracts[i].address !== stakingToken.address) {
                     tokensWithoutWMATIC.push(tokenContracts[i])
                     const balance = await tokenContracts[i].balanceOf(account3)
+
                     balancesBefore.push(balance)
                     await tokenContracts[i].approve(assetRouter.address, balance, { from: account3 })
-                    _amounts.push(new BN(1000000000000))
+                    _amounts.push(balance)
                 } else {
                     _amounts.push(new BN(0))
                 }
-                stakesBefore = await assetRouter.userStake(account3, pool)
-                totalDepositsLPBefore = await assetRouter.totalDeposits(pool)
-
-                const farmAddress = await factory.Farms(pool)
-                if (farmAddress === constants.ZERO_ADDRESS) {
-                    stakingRewardBalanceBefore = new BN(0)
-                } else {
-                    const farmETH = await Farm.at(farmAddress)
-                    stakingRewardBalanceBefore = await gauge.balanceOf(farmETH.address)
-                }
             }
-        })
-        it('fires events', async () => {
+            stakesBefore = await assetRouter.userStake(account3, pool)
+            totalDepositsLPBefore = await assetRouter.totalDeposits(pool)
+
+            const farmAddress = await factory.Farms(pool)
+            stakingRewardBalanceBefore = await gauge.balanceOf(farmAddress)
             ethBalanceBefore = new BN(await web3.eth.getBalance(account3))
-            const receipt = await assetRouter.depositETH(pool, _amounts, tokens, 0, 0, account3, {
+
+            receipt = await assetRouter.depositETH(pool, _amounts, tokens, 0, 0, account3, {
                 from: account3,
-                value: amountETH
+                value: new BN('10000000000000')
             })
 
             const gasUsed = new BN(receipt.receipt.gasUsed)
             const effectiveGasPrice = new BN(receipt.receipt.effectiveGasPrice)
-
             ETHSpentOnGas = gasUsed.mul(effectiveGasPrice)
-
+        })
+        it('fires events', async () => {
             expectEvent(receipt, 'Deposit', { lpPool: pool, sender: account3, recipient: account3 })
         })
         it('withdraws tokens from balance', async () => {
             for (let i = 0; i < tokensWithoutWMATIC.length; i++) {
-                const balanceAfter = await tokensWithoutWMATIC[i].balanceOf(account3)
-                assert.ok(balancesBefore[i].sub(balanceAfter).gt('0'), 'Token not withdrawn')
+                if (tokensWithoutWMATIC[i].address !== stakingToken.address) {
+                    const balanceAfter = await tokensWithoutWMATIC[i].balanceOf(account3)
+                    assert.ok(balancesBefore[i].sub(balanceAfter).gt('0'), 'Token not withdrawn')
+                }
             }
         })
         it('withdraws ETH from balance', async () => {
             const ethBalanceAfter = new BN(await web3.eth.getBalance(account3))
-            approxeq(
-                ethBalanceBefore.sub(ethBalanceAfter).sub(ETHSpentOnGas),
-                amountETH,
-                new BN(10),
+            assert.ok(
+                ethBalanceBefore.sub(ethBalanceAfter).sub(ETHSpentOnGas).gt(new BN('0')),
                 'Amount ETH withdrawn is not correct'
             )
         })
@@ -1047,46 +1050,45 @@ contract('UnoAssetRouterBalancer', (accounts) => {
         let stakesBefore
         let totalDepositsLPBefore
         let stakingRewardBalanceBefore
+        let receipt
         before(async () => {
             for (let i = 0; i < tokenContracts.length; i++) {
-                if (tokenContracts[i].address !== '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270') {
+                if (tokenContracts[i].address !== '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270' && tokenContracts[i].address !== stakingToken.address) {
                     tokensWithoutWMATIC.push(tokenContracts[i])
                     const balance = await tokenContracts[i].balanceOf(account3)
                     balancesBefore.push(balance)
-                    _amounts.push(new BN(1000000000000))
+                    _amounts.push(balance)
                 } else {
                     _amounts.push(new BN(0))
                 }
-                stakesBefore = await assetRouter.userStake(account3, pool)
-                totalDepositsLPBefore = await assetRouter.totalDeposits(pool)
-
-                const farmAddress = await factory.Farms(pool)
-                if (farmAddress === constants.ZERO_ADDRESS) {
-                    stakingRewardBalanceBefore = new BN(0)
-                } else {
-                    const farmETH = await Farm.at(farmAddress)
-                    stakingRewardBalanceBefore = await gauge.balanceOf(farmETH.address)
-                }
             }
-        })
-        it('fires events', async () => {
+            stakesBefore = await assetRouter.userStake(account3, pool)
+            totalDepositsLPBefore = await assetRouter.totalDeposits(pool)
+
+            const farmAddress = await factory.Farms(pool)
+            stakingRewardBalanceBefore = await gauge.balanceOf(farmAddress)
             ethBalanceBefore = new BN(await web3.eth.getBalance(account3))
-            const userData = web3.eth.abi.encodeParameters(['uint256', 'uint256'], ['1', stakesBefore.toString()])
-            const receipt = await assetRouter.withdrawETH(pool, userData, zeroAmounts, account3, {
+
+            const tokenAmounts = ['100000000', '100000000']
+            const userData = web3.eth.abi.encodeParameters(['uint256', 'uint256[]', 'uint256'], ['1', tokenAmounts, stakesBefore.toString()])
+            // web3.eth.abi.encodeParameters(['uint256', 'uint256'], ['1', stakesBefore.toString()])
+            receipt = await assetRouter.withdrawETH(pool, userData, zeroAmounts, account3, {
                 from: account3
             })
 
             const gasUsed = new BN(receipt.receipt.gasUsed)
             const effectiveGasPrice = new BN(receipt.receipt.effectiveGasPrice)
-
             ETHSpentOnGas = gasUsed.mul(effectiveGasPrice)
-
+        })
+        it('fires events', async () => {
             expectEvent(receipt, 'Withdraw', { lpPool: pool, sender: account3, recipient: account3 })
         })
         it('tokens to balance', async () => {
             for (let i = 0; i < tokensWithoutWMATIC.length; i++) {
-                const balanceAfter = await tokensWithoutWMATIC[i].balanceOf(account3)
-                assert.ok(balanceAfter.sub(balancesBefore[i]).gt('0'), 'Token not added')
+                if (tokensWithoutWMATIC[i].address !== stakingToken.address) {
+                    const balanceAfter = await tokensWithoutWMATIC[i].balanceOf(account3)
+                    assert.ok(balanceAfter.sub(balancesBefore[i]).gt('0'), 'Token not added')
+                }
             }
         })
         it('adds ETH to balance', async () => {

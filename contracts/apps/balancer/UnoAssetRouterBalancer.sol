@@ -264,46 +264,51 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
     /** 
      * @dev Withdraws tokens from the given pool. 
      * @param lpPool - LP pool to withdraw from.
-     * @param amount - LP amount to withdraw. 
+     * @param userData - If withdrawLP provide LP amount to withdraw, else use Balancer pool exit userData.
      * @param minAmountsOut - Minimum token amounts the user will receive.
      * @param withdrawLP - True: Withdraw in LP tokens, False: Withdraw in normal tokens.
      * @param recipient - The address which will receive tokens.
 
-     * @return amounts - Token amounts sent to the {recipient}
+     * @return amounts - Token amounts sent to the {recipient}.
+     * @return liquidity - Total liquidity sent to the user (in lpTokens).
      */ 
-    function withdraw(address lpPool, uint256 amount, uint256[] calldata minAmountsOut, bool withdrawLP, address recipient) external returns(uint256[] memory amounts){ 
+    function withdraw(address lpPool, bytes calldata userData, uint256[] calldata minAmountsOut, bool withdrawLP, address recipient) external returns(uint256[] memory amounts, uint256 liquidity){ 
         Farm farm = Farm(farmFactory.Farms(lpPool));
         require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
 
-        amounts = farm.withdraw(amount, minAmountsOut, withdrawLP, msg.sender, recipient);
-        emit Withdraw(lpPool, msg.sender, recipient, amount);  
+        (amounts, liquidity) = farm.withdraw(userData, minAmountsOut, withdrawLP, msg.sender, recipient);
+        emit Withdraw(lpPool, msg.sender, recipient, liquidity);
     }
 
     /** 
      * @dev Autoconverts WMATIC into MATIC and withdraws tokens from the given pool. 
      * @param lpPool - LP pool to withdraw from.
-     * @param amount - LP amount to withdraw. 
+     * @param userData -  Balancer pool exit userData.
      * @param minAmountsOut - Minimum token amounts the user will receive.
      * @param recipient - The address which will receive tokens.
 
-     * @return amounts - Token amounts sent to the {recipient}
+     * @return amounts - Token amounts sent to the {recipient}.
+     * @return liquidity - Total liquidity sent to the user (in lpTokens).
      */ 
-    function withdrawETH(address lpPool, uint256 amount, uint256[] calldata minAmountsOut, address recipient) external returns(uint256[] memory amounts){ 
+    function withdrawETH(address lpPool, bytes calldata userData, uint256[] calldata minAmountsOut, address recipient) external returns(uint256[] memory amounts, uint256 liquidity){ 
         Farm farm = Farm(farmFactory.Farms(lpPool));
         require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
 
-        amounts = farm.withdraw(amount, minAmountsOut, false, msg.sender, address(this));
+        (amounts, liquidity) = farm.withdraw(userData, minAmountsOut, false, msg.sender, address(this));
 
         IERC20[] memory tokens = getTokens(lpPool);
         for (uint256 i = 0; i < tokens.length; i++) {
+            if (amounts[i] == 0){
+                continue;
+            }
             if (address(tokens[i]) != WMATIC) {
                 IERC20Upgradeable(address(tokens[i])).safeTransfer(recipient, amounts[i]);
                 continue;
             }
             IWMATIC(WMATIC).withdraw(amounts[i]);
             payable(recipient).transfer(amounts[i]);
-        } 
-        emit Withdraw(lpPool, msg.sender, recipient, amount);  
+        }
+        emit Withdraw(lpPool, msg.sender, recipient, liquidity);  
     }
 
     /**
