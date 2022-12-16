@@ -147,13 +147,12 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
      * @param swapData - Parameter with which 1inch router is being called with.
      * @param tokens - Tokens to deposit.
      * @param minAmountLP - Minimum LP the user will receive from {tokens} deposit.
-     * @param amountLP - Additional LP Token amount to deposit.
      * @param recipient - Address which will receive the deposit.
      
-     * @return sent - Total MATIC amount sent to the farm.
+     * @return sent - Total {token} amount sent to the farm. 
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
-    function depositSingleAsset(address lpPool, address token, uint256 amount, bytes[] calldata swapData, address[] calldata tokens, uint256 minAmountLP, uint256 amountLP, address recipient) external whenNotPaused returns(uint256 sent, uint256 liquidity){
+    function depositSingleAsset(address lpPool, address token, uint256 amount, bytes[] calldata swapData, address[] calldata tokens, uint256 minAmountLP, address recipient) external whenNotPaused returns(uint256 sent, uint256 liquidity){
         require(amount > 0, "NO_TOKEN_SENT");
         require (swapData.length == tokens.length, 'SWAPDATA_AND_TOKENS_LENGHTS_NOT_MATCH');
 
@@ -168,24 +167,22 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
         sent = amount;
         uint256[] memory amounts = new uint256[](tokens.length);
         {
-        bool isTokenPool;
-        uint256 tokenIndex;
+        int256 tokenIndex = -1;
         for (uint256 i = 0; i < tokens.length; i++) {
             if (tokens[i] == token) {
-                isTokenPool = true;
-                tokenIndex = i;
+                tokenIndex = int(i);
                 continue;
             }
             (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[i]);
             if (returnAmount > 0) {
                 amounts[i] = returnAmount;
-                IERC20Upgradeable(tokens[i]).safeTransfer(address(farm), amounts[i]);
+                IERC20Upgradeable(tokens[i]).safeTransfer(address(farm), returnAmount);
             }
             amount -= spentAmount;
         }
 
-        if (isTokenPool) {
-            amounts[tokenIndex] = amount;
+        if (tokenIndex != -1) {
+            amounts[uint256(tokenIndex)] = amount;
             IERC20Upgradeable(token).safeTransfer(address(farm), amount);
         } else if (amount > 0) {
             sent -= amount;
@@ -193,11 +190,7 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
         }
         }
 
-        if(amountLP > 0){
-            IERC20Upgradeable(lpPool).safeTransferFrom(msg.sender, address(farm), amountLP);
-        }
-        
-        liquidity = farm.deposit(amounts, tokens, minAmountLP, amountLP, recipient);
+        liquidity = farm.deposit(amounts, tokens, minAmountLP, 0, recipient);
         emit Deposit(lpPool, msg.sender, recipient, liquidity);
     }
 
@@ -207,13 +200,12 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
      * @param swapData - Parameter with which 1inch router is being called with.
      * @param tokens - Tokens to deposit.
      * @param minAmountLP - Minimum LP the user will receive from {tokens} deposit.
-     * @param amountLP - Additional LP Token amount to deposit.
      * @param recipient - Address which will receive the deposit.
      
-     * @return sentETH - Total MATIC amount sent to the farm.
+     * @return sentETH - Total MATIC amount sent to the farm. 
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
-    function depositSingleETH(address lpPool, bytes[] calldata swapData, address[] calldata tokens, uint256 minAmountLP, uint256 amountLP, address recipient) external payable whenNotPaused returns(uint256 sentETH, uint256 liquidity){
+    function depositSingleETH(address lpPool, bytes[] calldata swapData, address[] calldata tokens, uint256 minAmountLP, address recipient) external payable whenNotPaused returns(uint256 sentETH, uint256 liquidity){
         require(msg.value > 0, "NO_MATIC_SENT");
         require (swapData.length == tokens.length, 'SWAPDATA_AND_TOKENS_LENGHTS_NOT_MATCH');
 
@@ -224,28 +216,26 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
 
         uint256 amount = msg.value;
         sentETH = amount;
-        IWMATIC(WMATIC).deposit{value: msg.value}();
+        IWMATIC(WMATIC).deposit{value: amount}();
         IERC20Upgradeable(WMATIC).approve(oneInchRouter, amount);
 
-        bool isWMaticPool;
-        uint256 wmaticIndex;
+        int256 wmaticIndex = -1;
         uint256[] memory amounts = new uint256[](tokens.length);
         for (uint256 i = 0; i < tokens.length; i++) {
             if (tokens[i] == WMATIC) {
-                isWMaticPool = true;
-                wmaticIndex = i;
+                wmaticIndex = int(i);
                 continue;
             }
             (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[i]);
             if (returnAmount > 0) {
                 amounts[i] = returnAmount;
-                IERC20Upgradeable(tokens[i]).safeTransfer(address(farm), amounts[i]);
+                IERC20Upgradeable(tokens[i]).safeTransfer(address(farm), returnAmount);
             }
             amount -= spentAmount;
         }
 
-        if (isWMaticPool) {
-            amounts[wmaticIndex] = amount;
+        if (wmaticIndex != -1) {
+            amounts[uint(wmaticIndex)] = amount;
             IERC20Upgradeable(WMATIC).safeTransfer(address(farm), amount);
         } else if (amount > 0){
             sentETH -= amount;
@@ -253,11 +243,7 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
             payable(msg.sender).transfer(amount);
         }
 
-        if(amountLP > 0){
-            IERC20Upgradeable(lpPool).safeTransferFrom(msg.sender, address(farm), amountLP);
-        }
-
-        liquidity = farm.deposit(amounts, tokens, minAmountLP, amountLP, recipient);
+        liquidity = farm.deposit(amounts, tokens, minAmountLP, 0, recipient);
         emit Deposit(lpPool, msg.sender, recipient, liquidity);
     }
 
