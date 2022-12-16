@@ -165,15 +165,17 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
      * @param amountLP - Additional LP Token amount to deposit.
      * @param recipient - Address which will receive the deposit.
      
+     * @return sent - Total {token} amount sent to the farm. NOTE: Returns dust left from swap in {token}, but if A/B amounts are not correct also returns dust in pool's tokens.
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
-    function depositSingleAsset(address lpStakingPool, address token, uint256 amount, bytes[2] calldata swapData, uint256 amountAMin, uint256 amountBMin, uint256 amountLP, address recipient) external whenNotPaused returns(uint256 liquidity){
+    function depositSingleAsset(address lpStakingPool, address token, uint256 amount, bytes[2] calldata swapData, uint256 amountAMin, uint256 amountBMin, uint256 amountLP, address recipient) external whenNotPaused returns(uint256 sent, uint256 liquidity){
         require(amount > 0, "NO_TOKEN_SENT");
         Farm farm = Farm(farmFactory.Farms(lpStakingPool));
         if(farm == Farm(address(0))){
             farm = Farm(farmFactory.createFarm(lpStakingPool));
         }
 
+        sent = amount;
         uint256 amountA;
         uint256 amountB;
         address tokenA = farm.tokenA();
@@ -197,6 +199,7 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
         } else if (tokenB == token) {
             amountB = amount;
         } else if(amount > 0) {
+            sent -= amount;
             IERC20Upgradeable(token).safeTransfer(msg.sender, amount);
         }
 
@@ -223,9 +226,10 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
      * @param amountLP - Additional LP Token amount to deposit.
      * @param recipient - Address which will receive the deposit.
      
+     * @return sentETH - Total MATIC amount sent to the farm. NOTE: Returns dust left from swap in MATIC, but if A/B amount are not correct also returns dust in pool's tokens.
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
-    function depositSingleETH(address lpStakingPool, bytes[2] calldata swapData, uint256 amountAMin, uint256 amountBMin, uint256 amountLP, address recipient) external payable whenNotPaused returns(uint256 liquidity){
+    function depositSingleETH(address lpStakingPool, bytes[2] calldata swapData, uint256 amountAMin, uint256 amountBMin, uint256 amountLP, address recipient) external payable whenNotPaused returns(uint256 sentETH, uint256 liquidity){
         require(msg.value > 0, "NO_MATIC_SENT");
         Farm farm = Farm(farmFactory.Farms(lpStakingPool));
         if(farm == Farm(address(0))){
@@ -233,6 +237,7 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
         }
 
         uint256 amount = msg.value;
+        sentETH = amount;
         uint256 amountA;
         uint256 amountB;
         address tokenA = farm.tokenA();
@@ -258,6 +263,7 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
         } else if (amount > 0) {
             IWMATIC(WMATIC).withdraw(amount);
             payable(msg.sender).transfer(amount);
+            sentETH -= amount;
         }
 
         if(amountLP > 0){
@@ -270,7 +276,7 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
             IERC20Upgradeable(tokenB).safeTransfer(address(farm), amountB);
         }
 
-        (,, liquidity) = farm.deposit(amountA, amountB, amountAMin, amountBMin, amountLP, msg.sender, recipient);
+        (,,liquidity) = farm.deposit(amountA, amountB, amountAMin, amountBMin, amountLP, msg.sender, recipient);
         emit Deposit(lpStakingPool, msg.sender, recipient, liquidity);
     }
 
@@ -397,6 +403,14 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
         tokens[1] = IERC20(stakingToken.token1());
     }
 
+    /**
+     * @dev Swaps assets using 1inch exchange.
+     */  
+    function _swap(bytes calldata swapData) internal returns(uint256 returnAmount, uint256 spentAmount){
+        (bool success, bytes memory data) = oneInchRouter.call(swapData);
+        require(success, "SWAP_NOT_SUCCESSFUL");
+        (returnAmount, spentAmount) = abi.decode(data, (uint256, uint256));
+    }
 
     /**
      * @dev Converts LP tokens to normal tokens, value(amountA) == value(amountB) == 0.5*amountLP
@@ -436,11 +450,5 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
 
     function _authorizeUpgrade(address) internal override onlyRole(accessManager.ADMIN_ROLE()) {
 
-    }
-    
-    function _swap(bytes calldata swapData) internal returns(uint256 returnAmount, uint256 spentAmount){
-        (bool success, bytes memory data) = oneInchRouter.call(swapData);
-        require(success, "SWAP_NOT_SUCCESSFUL");
-        (returnAmount, spentAmount) = abi.decode(data, (uint256, uint256));
     }
 }

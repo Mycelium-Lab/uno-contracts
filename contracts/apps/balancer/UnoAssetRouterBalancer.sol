@@ -151,9 +151,10 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
      * @param amountLP - Additional LP Token amount to deposit.
      * @param recipient - Address which will receive the deposit.
      
+     * @return sent - Total MATIC amount sent to the farm.
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
-    function depositSingleAsset(address lpPool, address token, uint256 amount, bytes[] calldata swapData, address[] calldata tokens, uint256 minAmountLP, uint256 amountLP, address recipient) external whenNotPaused returns(uint256 liquidity){
+    function depositSingleAsset(address lpPool, address token, uint256 amount, bytes[] calldata swapData, address[] calldata tokens, uint256 minAmountLP, uint256 amountLP, address recipient) external whenNotPaused returns(uint256 sent, uint256 liquidity){
         require(amount > 0, "NO_TOKEN_SENT");
         require (swapData.length == tokens.length, 'SWAPDATA_AND_TOKENS_LENGHTS_NOT_MATCH');
 
@@ -165,6 +166,7 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
         IERC20Upgradeable(token).safeTransferFrom(msg.sender, address(this), amount);
         IERC20Upgradeable(token).approve(oneInchRouter, amount);
 
+        sent = amount;
         uint256[] memory amounts = new uint256[](tokens.length);
         {
         bool isTokenPool;
@@ -187,6 +189,7 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
             amounts[tokenIndex] = amount;
             IERC20Upgradeable(token).safeTransfer(address(farm), amount);
         } else if (amount > 0) {
+            sent -= amount;
             IERC20Upgradeable(token).safeTransfer(msg.sender, amount);
         }
         }
@@ -208,9 +211,10 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
      * @param amountLP - Additional LP Token amount to deposit.
      * @param recipient - Address which will receive the deposit.
      
+     * @return sentETH - Total MATIC amount sent to the farm.
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
-    function depositSingleETH(address lpPool, bytes[] calldata swapData, address[] calldata tokens, uint256 minAmountLP, uint256 amountLP, address recipient) external payable whenNotPaused returns(uint256 liquidity){
+    function depositSingleETH(address lpPool, bytes[] calldata swapData, address[] calldata tokens, uint256 minAmountLP, uint256 amountLP, address recipient) external payable whenNotPaused returns(uint256 sentETH, uint256 liquidity){
         require(msg.value > 0, "NO_MATIC_SENT");
         require (swapData.length == tokens.length, 'SWAPDATA_AND_TOKENS_LENGHTS_NOT_MATCH');
 
@@ -220,6 +224,7 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
         }
 
         uint256 amount = msg.value;
+        sentETH = amount;
         IWMATIC(WMATIC).deposit{value: msg.value}();
         IERC20Upgradeable(WMATIC).approve(oneInchRouter, amount);
 
@@ -244,6 +249,7 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
             amounts[wmaticIndex] = amount;
             IERC20Upgradeable(WMATIC).safeTransfer(address(farm), amount);
         } else if (amount > 0){
+            sentETH -= amount;
             IWMATIC(WMATIC).withdraw(amount);
             payable(msg.sender).transfer(amount);
         }
@@ -364,6 +370,15 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
     }
 
     /**
+     * @dev Swaps assets using 1inch exchange.
+     */  
+    function _swap(bytes calldata swapData) internal returns(uint256 returnAmount, uint256 spentAmount){
+        (bool success, bytes memory data) = oneInchRouter.call(swapData);
+        require(success, "SWAP_NOT_SUCCESSFUL");
+        (returnAmount, spentAmount) = abi.decode(data, (uint256, uint256));
+    }
+
+    /**
      * @dev Change fee amount.
      * @param _fee -New fee to collect from farms. [10^18 == 100%]
      *
@@ -387,11 +402,5 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
 
     function _authorizeUpgrade(address) internal override onlyRole(accessManager.ADMIN_ROLE()) {
 
-    }
-
-    function _swap(bytes calldata swapData) internal returns(uint256 returnAmount, uint256 spentAmount){
-        (bool success, bytes memory data) = oneInchRouter.call(swapData);
-        require(success, "1INCH_SWAP_NOT_SUCCESSFUL");
-        (returnAmount, spentAmount) = abi.decode(data, (uint256, uint256));
     }
 }
