@@ -32,8 +32,7 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
     uint256 public fee;
 
     address public constant WMATIC = 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270;
-    
-    address public constant oneInchRouter = 0x1111111254EEB25477B68fb85Ed929f73A960582;
+    address private constant oneInchRouter = 0x1111111254EEB25477B68fb85Ed929f73A960582;
 
     event Deposit(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Withdraw(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
@@ -141,7 +140,7 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
     }
 
     /**
-     * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpPool} and deposits tokens in it. Emits a {Deposit} event.
+     * @dev Deposits single token in the given pool. Creates new Farm contract if there isn't one deployed for the {lpPool}, swaps {token} for pool tokens and deposits them. Emits a {Deposit} event.
      * @param lpPool - Address of the pool to deposit tokens in.
      * @param token  - Address of a token to enter the pool.
      * @param amount - Amount of token sent.
@@ -203,7 +202,7 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
     }
 
     /**
-     * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpPool} and deposits tokens in it. Emits a {Deposit} event.
+     * @dev Deposits single MATIC in the given pool. Creates new Farm contract if there isn't one deployed for the {lpPool}, swaps MATIC for pool tokens and deposits them. Emits a {Deposit} event.
      * @param lpPool - Address of the pool to deposit tokens in.
      * @param swapData - Parameter with which 1inch router is being called with.
      * @param tokens - Tokens to deposit.
