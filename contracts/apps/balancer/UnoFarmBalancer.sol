@@ -152,62 +152,14 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
      * @dev Function that makes the deposits.
      * Deposits {amounts} of {tokens} from this contract's balance to the {Vault}.
      */
-    function deposit(uint256[] memory amounts, address[] calldata tokens, uint256 minAmountLP, uint256 amountLP,  address recipient) external nonReentrant onlyAssetRouter returns(uint256 liquidity){
-        (IERC20[] memory _tokens, , ) = Vault.getPoolTokens(poolId);
-        require (amounts.length == _tokens.length, 'BAD_AMOUNTS_LENGTH');
-        require (tokens.length == _tokens.length, 'BAD_TOKENS_LENGTH');
-
-        bool joinPool = false;
-        for (uint256 i = 0; i < _tokens.length; i++) {
-            require (IERC20(tokens[i]) == _tokens[i], 'TOKENS_NOT_MATCH_POOL_TOKENS');
-            if(amounts[i] > 0){
-                if(tokens[i] == lpPool){
-                    amountLP += amounts[i];
-                    amounts[i] == 0;
-                    continue;
-                }
-                if(!joinPool){
-                    joinPool = true;
-                }
-                _tokens[i].approve(address(Vault), amounts[i]);
-            }
-        }
-
-        if(joinPool){
-            uint256 amountBefore = IERC20(lpPool).balanceOf(address(this));
-
-            bytes memory userData;
-            if(isComposable){
-                //If pool has pre-minted BPT then don't include those in userData.
-                uint256[] memory _amounts = new uint256[](amounts.length - 1);
-                uint256 _i = 0;
-                for (uint256 i = 0; i < tokens.length; i++) {
-                    if(tokens[i] != lpPool){
-                        _amounts[_i] = amounts[i];
-                        _i += 1;
-                    }
-                }
-                userData = abi.encode(1, _amounts, minAmountLP);
-            } else {
-                userData = abi.encode(1, amounts, minAmountLP);
-            }
-
-            IVault.JoinPoolRequest memory joinPoolRequest = IVault.JoinPoolRequest(_tokens, amounts, userData, false);
-            Vault.joinPool(poolId, address(this), address(this), joinPoolRequest);
-            
-            uint256 amountAfter = IERC20(lpPool).balanceOf(address(this));
-            liquidity = amountAfter - amountBefore + amountLP;
-        } else {
-            liquidity = amountLP;
-        }
-
-        require (liquidity > 0, 'NO_LIQUIDITY_PROVIDED');
+    function deposit(uint256 amount, address recipient) external nonReentrant onlyAssetRouter{
+        require (amount > 0, 'NO_LIQUIDITY_PROVIDED');
         
         _updateDeposit(recipient);
-        userInfo[recipient].stake += liquidity;
-        totalDeposits += liquidity;
+        userInfo[recipient].stake += amount;
+        totalDeposits += amount;
 
-        gauge.deposit(liquidity);
+        gauge.deposit(amount);
     }
 
     /**
@@ -300,8 +252,10 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
         }
 
         (IERC20[] memory tokens, , ) = Vault.getPoolTokens(poolId);
+        address[] memory _tokens = new address[](tokens.length);
         uint256[] memory joinAmounts = new uint256[](tokens.length);
         for (uint256 i = 0; i < tokens.length; i++) {
+            _tokens[i] = address(tokens[i]);
             if (address(tokens[i]) != lpPool){
                 joinAmounts[i] = tokens[i].balanceOf(address(this));
                 if (joinAmounts[i] > 0){
@@ -325,7 +279,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
         } else {
             userData = abi.encode(1, joinAmounts, 1);
         }
-        Vault.joinPool(poolId, address(this), address(this), IVault.JoinPoolRequest(tokens, joinAmounts, userData, false));
+        Vault.joinPool(poolId, address(this), address(this), IVault.JoinPoolRequest(_tokens, joinAmounts, userData, false));
 
         reward = IERC20(lpPool).balanceOf(address(this));
 

@@ -138,7 +138,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         pool.tokenA.safeTransferFrom(msg.sender, address(this), amountA);
         pool.tokenB.safeTransferFrom(msg.sender, address(this), amountB);
 
-        (sentA, sentB,) = pool.assetRouter.deposit(pool.pool, amountA, amountB, amountAMin, amountBMin, 0, address(this));
+        (sentA, sentB,) = pool.assetRouter.deposit(pool.pool, amountA, amountB, amountAMin, amountBMin, address(this));
         liquidity = mint(recipient);
 
         pool.tokenA.safeTransfer(msg.sender, amountA - sentA);
@@ -260,7 +260,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
             OdosRouter.swap(inputs, outputs, type(uint256).max, valueOutMin, executor, pathDefinition);
         }
         
-        (,,reserveLP) = newPool.assetRouter.deposit(newPool.pool, newPool.tokenA.balanceOf(address(this)), newPool.tokenB.balanceOf(address(this)), amountAMin, amountBMin, 0, address(this));
+        (,,reserveLP) = newPool.assetRouter.deposit(newPool.pool, newPool.tokenA.balanceOf(address(this)), newPool.tokenB.balanceOf(address(this)), amountAMin, amountBMin, address(this));
        
         lastMoveInfo = MoveLiquidityInfo({
             leftoverA: newPool.tokenA.balanceOf(address(this)),

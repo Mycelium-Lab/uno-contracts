@@ -5,9 +5,7 @@ const { deployProxy } = require('@openzeppelin/truffle-upgrades')
 const fetch = require('node-fetch')
 
 const IStakingDualRewards = artifacts.require('IStakingDualRewards')
-const IStakingDualRewardsFactory = artifacts.require('IStakingDualRewardsFactory')
 const IUniswapV2Pair = artifacts.require('IUniswapV2Pair')
-const IUniswapV2Router01 = artifacts.require('IUniswapV2Router01')
 
 const AccessManager = artifacts.require('UnoAccessManager')
 const FarmFactory = artifacts.require('UnoFarmFactory')
@@ -17,12 +15,7 @@ const AssetRouter = artifacts.require('UnoAssetRouterQuickswapDual')
 
 const pool = '0x14977e7E263FF79c4c3159F497D9551fbE769625' // WMATIC-USDC
 
-const DQuickHolder = '0xcf0b86f9944a60a0ba22b51a33c11d9e4de1ce9f'// has to be unlocked and hold 0xf28164A485B0B2C90639E47b0f377b4a438a16B1
-const WMaticHolder = '0xFffbCD322cEace527C8ec6Da8de2461C6D9d4e6e'// has to be unlocked and hold 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270
 const DAIHolder = '0x06959153B974D0D5fDfd87D561db6d8d4FA0bb0B'// has to be unlocked and hold 0xf28164A485B0B2C90639E47b0f377b4a438a16B1
-const stakingRewardsOwner = '0x476307dac3fd170166e007fcaa14f0a129721463'// has to be unlocked
-
-const account1 = '0xDaBDab6115D32136d0E663A5d0e867923A923EeF'// has to be unlocked and hold 0x6e7a5FAFcec6BB1e78bAE2A1F0B612012BF14827
 
 approxeq = (bn1, bn2, epsilon, message) => {
     const amountDelta = bn1.sub(bn2).add(epsilon)
@@ -60,8 +53,6 @@ swapParams = (
 
 contract('UnoAssetRouterQuickswapDualSingleAssetDeposit', (accounts) => {
     const admin = accounts[0]
-    const pauser = accounts[1]
-    const distributor = accounts[2]
 
     let accessManager; let assetRouter; let
         factory
@@ -69,23 +60,14 @@ contract('UnoAssetRouterQuickswapDualSingleAssetDeposit', (accounts) => {
     let stakingRewards; let
         stakingToken
 
-    let tokenA; let
-        tokenB
-
     const initReceipt = {}
-    let rewardsTokenA; let
-        rewardsTokenB
 
     before(async () => {
-        const implementation = await Farm.new({ from: account1 })
+        const implementation = await Farm.new({ from: admin })
         accessManager = await AccessManager.new({ from: admin })// accounts[0] is admin
-
-        await accessManager.grantRole('0xfbd454f36a7e1a388bd6fc3ab10d434aa4578f811acbbcf33afb1c697486313c', distributor, { from: admin }) // DISTRIBUTOR_ROLE
-        await accessManager.grantRole('0x65d7a28e3265b37a6474929f336521b332c1681b933f6cb9f3376673440d862a', pauser, { from: admin }) // PAUSER_ROLE
-
         assetRouter = await deployProxy(AssetRouter, { kind: 'uups', initializer: false })
 
-        factory = await FarmFactory.new(implementation.address, accessManager.address, assetRouter.address, { from: account1 })
+        factory = await FarmFactory.new(implementation.address, accessManager.address, assetRouter.address, { from: admin })
 
         const _receipt = await web3.eth.getTransactionReceipt(factory.transactionHash)
         const events = await assetRouter.getPastEvents('AllEvents', {
@@ -108,29 +90,10 @@ contract('UnoAssetRouterQuickswapDualSingleAssetDeposit', (accounts) => {
 
         tokenA = await IUniswapV2Pair.at(tokenAAddress)// should be ERC20 but IUniswapV2Pair has everything we need
         tokenB = await IUniswapV2Pair.at(tokenBAddress)// should be ERC20 but IUniswapV2Pair has everything we need
-
-        const stakingRewardsFactoryAddress = await stakingRewards.dualRewardsDistribution()
-        const stakingRewardsFactory = await IStakingDualRewardsFactory.at(stakingRewardsFactoryAddress)
-
-        const rewardsTokenAAddress = await stakingRewards.rewardsTokenA()// dQuick
-        rewardsTokenA = await IUniswapV2Pair.at(rewardsTokenAAddress)
-        const rewardAmountA = await rewardsTokenA.balanceOf(DQuickHolder)
-        await rewardsTokenA.transfer(stakingRewardsFactory.address, rewardAmountA, { from: DQuickHolder })
-
-        const rewardsTokenBAddress = await stakingRewards.rewardsTokenB()// WMatic
-        rewardsTokenB = await IUniswapV2Pair.at(rewardsTokenBAddress)
-        const rewardAmountB = await rewardsTokenB.balanceOf(WMaticHolder)
-        await rewardsTokenB.transfer(stakingRewardsFactory.address, rewardAmountB, { from: WMaticHolder })
-
-        // add rewards to pool
-        await stakingRewardsFactory.update(stakingToken.address, rewardAmountA, rewardAmountB, 1000000, { from: stakingRewardsOwner })
-        await stakingRewardsFactory.notifyRewardAmount(stakingToken.address, { from: stakingRewardsOwner })
     })
 
     describe('Single Asset Deposit', () => {
         describe('deposit token', () => {
-            let tokenAAddress
-            let tokenBAddress
             let stakeLPBefore
             let stakeABefore
             let stakeBBefore
@@ -153,11 +116,11 @@ contract('UnoAssetRouterQuickswapDualSingleAssetDeposit', (accounts) => {
 
                 await DAIToken.approve(assetRouter.address, DAIAmount, { from: DAIHolder }) // change
 
-                const tokenASwapParams = swapParams(DAIToken.address, tokenAAddress, DAIAmount.div(new BN(2)).toString(), assetRouter.address)
-                const tokenBSwapParams = swapParams(DAIToken.address, tokenBAddress, DAIAmount.sub(DAIAmount.div(new BN(2))).toString(), assetRouter.address)
+                // const tokenASwapParams = swapParams(DAIToken.address, tokenAAddress, DAIAmount.div(new BN(2)).toString(), assetRouter.address)
+                // const tokenBSwapParams = swapParams(DAIToken.address, tokenBAddress, DAIAmount.sub(DAIAmount.div(new BN(2))).toString(), assetRouter.address)
 
-                tokenAData = await fetchData(tokenASwapParams)
-                tokenBData = await fetchData(tokenBSwapParams)
+                tokenAData = `0x12aa3caf0000000000000000000000000d15038f8a0362b4ce71d6c879d56bf9fc2884cf0000000000000000000000008f3cf7ad23cd3cadbd9735aff958023239c6a0630000000000000000000000000d500b1d8e8ef31e21c99d1db9a6444d3adf1270000000000000000000000000f5c3455d30458e9a1128f85941f533834f01d8b6000000000000000000000000${assetRouter.address.substring(2).toLowerCase()}00000000000000000000000000000000000000000000001b1ae4d6e2ef500000000000000000000000000000000000000000000000000022273a3b40943f2be5000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000160000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e40000000000000000000000000000000000000000000000000000c600009800a007e5c0d200000000000000000000000000000000000000000000000000007400003a4020f5c3455d30458e9a1128f85941f533834f01d8b6bd6015b4000000000000000000000000a71415675f68f29259ddd63215e5518d2735bf0a4020a71415675f68f29259ddd63215e5518d2735bf0add93f59a0000000000000000000000000d15038f8a0362b4ce71d6c879d56bf9fc2884cf80a06c4eca270d500b1d8e8ef31e21c99d1db9a6444d3adf12701111111254eeb25477b68fb85ed929f73a96058200000000000000000000000000000000000000000000000000000000cfee7c08`// await fetchData(tokenASwapParams)
+                tokenBData = `0x12aa3caf0000000000000000000000000d15038f8a0362b4ce71d6c879d56bf9fc2884cf0000000000000000000000008f3cf7ad23cd3cadbd9735aff958023239c6a0630000000000000000000000002791bca1f2de4661ed88a30c99a7a9449aa84174000000000000000000000000f5c3455d30458e9a1128f85941f533834f01d8b6000000000000000000000000${assetRouter.address.substring(2).toLowerCase()}00000000000000000000000000000000000000000000001b1ae4d6e2ef500000000000000000000000000000000000000000000000000000000000001d80ab220000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000001600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008600000000000000000000000000000000000000000000000000006800003a4020f5c3455d30458e9a1128f85941f533834f01d8b6bd6015b40000000000000000000000000d15038f8a0362b4ce71d6c879d56bf9fc2884cf80a06c4eca272791bca1f2de4661ed88a30c99a7a9449aa841741111111254eeb25477b68fb85ed929f73a9605820000000000000000000000000000000000000000000000000000cfee7c08`// await fetchData(tokenBSwapParams)
 
                 const farmAddress = await factory.Farms(pool)
 
@@ -176,7 +139,7 @@ contract('UnoAssetRouterQuickswapDualSingleAssetDeposit', (accounts) => {
                 ({ totalDepositsLP: totalDepositsLPBefore } = await assetRouter.totalDeposits(pool))
             })
             it('fires events', async () => {
-                const receipt = await assetRouter.depositSingleAsset(pool, DAIToken.address, DAIAmount, [tokenAData, tokenBData], 0, 0, 0, DAIHolder, { from: DAIHolder })
+                const receipt = await assetRouter.depositSingleAsset(pool, DAIToken.address, DAIAmount, [tokenAData, tokenBData], 0, 0, DAIHolder, { from: DAIHolder })
 
                 expectEvent(receipt, 'Deposit', { lpPool: pool, sender: DAIHolder, recipient: DAIHolder })
             })
@@ -206,8 +169,6 @@ contract('UnoAssetRouterQuickswapDualSingleAssetDeposit', (accounts) => {
             })
         })
         describe('deposit ETH', () => {
-            let tokenAAddress
-            let tokenBAddress
             let stakeLPBefore
             let stakeABefore
             let stakeBBefore
@@ -222,11 +183,11 @@ contract('UnoAssetRouterQuickswapDualSingleAssetDeposit', (accounts) => {
                 ([tokenAAddress, tokenBAddress] = await assetRouter.getTokens(pool))
                 amountETH = new BN('1000000000000000000') // 1 ether
 
-                const tokenASwapParams = swapParams(fromToken, tokenAAddress, amountETH.div(new BN(2)).toString(), assetRouter.address)
-                const tokenBSwapParams = swapParams(fromToken, tokenBAddress, amountETH.sub(amountETH.div(new BN(2))).toString(), assetRouter.address)
+                // const tokenASwapParams = swapParams(fromToken, tokenAAddress, amountETH.div(new BN(2)).toString(), assetRouter.address)
+                // const tokenBSwapParams = swapParams(fromToken, tokenBAddress, amountETH.sub(amountETH.div(new BN(2))).toString(), assetRouter.address)
 
-                tokenAData = await fetchData(tokenASwapParams)
-                tokenBData = await fetchData(tokenBSwapParams)
+                tokenAData = '0x'// await fetchData(tokenASwapParams)
+                tokenBData = `0x12aa3caf0000000000000000000000000d15038f8a0362b4ce71d6c879d56bf9fc2884cf0000000000000000000000000d500b1d8e8ef31e21c99d1db9a6444d3adf12700000000000000000000000002791bca1f2de4661ed88a30c99a7a9449aa84174000000000000000000000000cd353f79d9fade311fc3119b841e1f456b54e858000000000000000000000000${assetRouter.address.substring(2).toLowerCase()}00000000000000000000000000000000000000000000000006f05b59d3b20000000000000000000000000000000000000000000000000000000000000005ecef0000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000001600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008500000000000000000000000000000000000000000000000000000000006700206ae4071138002dc6c0cd353f79d9fade311fc3119b841e1f456b54e8581111111254eeb25477b68fb85ed929f73a960582000000000000000000000000000000000000000000000000000000000005ecef0d500b1d8e8ef31e21c99d1db9a6444d3adf1270000000000000000000000000000000000000000000000000000000cfee7c08`// await fetchData(tokenBSwapParams)
 
                 const farmAddress = await factory.Farms(pool)
 
@@ -246,7 +207,7 @@ contract('UnoAssetRouterQuickswapDualSingleAssetDeposit', (accounts) => {
             })
             it('fires events', async () => {
                 ethBalanceBefore = new BN(await web3.eth.getBalance(DAIHolder))
-                const receipt = await assetRouter.depositSingleETH(pool, constants.ZERO_ADDRESS, amountETH, [tokenAData, tokenBData], 0, 0, 0, DAIHolder, { from: DAIHolder, value: amountETH })
+                const receipt = await assetRouter.depositSingleETH(pool, [tokenAData, tokenBData], 0, 0, DAIHolder, { from: DAIHolder, value: amountETH })
 
                 const gasUsed = new BN(receipt.receipt.gasUsed)
                 const effectiveGasPrice = new BN(receipt.receipt.effectiveGasPrice)

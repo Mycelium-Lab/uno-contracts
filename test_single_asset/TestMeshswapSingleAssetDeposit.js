@@ -5,26 +5,17 @@ const { deployProxy } = require('@openzeppelin/truffle-upgrades')
 const fetch = require('node-fetch')
 
 const IUniswapV2Pair = artifacts.require('IUniswapV2Pair')
-const IUniswapV2Router01 = artifacts.require('IUniswapV2Router01')
-const IMiniChefV2 = artifacts.require('IMiniChefV2')
 const IERC20 = artifacts.require('IERC20')
-const IRewarder = artifacts.require('IRewarder')
 
 const AccessManager = artifacts.require('UnoAccessManager')
 const FarmFactory = artifacts.require('UnoFarmFactory')
 
-const Farm = artifacts.require('UnoFarmSushiswap')
-const AssetRouter = artifacts.require('UnoAssetRouterSushiswap')
+const Farm = artifacts.require('UnoFarmMeshswap')
+const AssetRouter = artifacts.require('UnoAssetRouterMeshswap')
 
-const pool = '0x4B1F1e2435A9C96f7330FAea190Ef6A7C8D70001' // usdt usdc
-const miniChefAddress = '0x0769fd68dFb93167989C6f7254cd0D766Fb2841F'
+const pool = '0x2915D57D076Ca2233F73B2E724Fea4F3DB967F9B' // usdt usdc
 
-const SUSHIHolder = '0x0f0c716B007C289C0011e470CC7f14DE4fE9Fc80'// has to be unlocked and hold 0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a
-const WMATICHolder = '0xFffbCD322cEace527C8ec6Da8de2461C6D9d4e6e'// has to be unlocked and hold 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270
 const DAIHolder = '0x06959153B974D0D5fDfd87D561db6d8d4FA0bb0B'// has to be unlocked and hold 0xf28164A485B0B2C90639E47b0f377b4a438a16B1
-const stakingRewardsOwner = '0x476307dac3fd170166e007fcaa14f0a129721463'// has to be unlocked
-
-const account1 = '0xdDdd9E9D429ebe7235514B9Addc25bd772a8eEe2'// has to be unlocked and hold 0x2cF7252e74036d1Da831d11089D326296e64a728
 
 approxeq = (bn1, bn2, epsilon, message) => {
     const amountDelta = bn1.sub(bn2).add(epsilon)
@@ -35,7 +26,6 @@ apiRequestUrl = (queryParams) => {
     const baseApiRequestURL = 'https://api.1inch.io/v5.0/137/swap'
     return `${baseApiRequestURL}?${(new URLSearchParams(queryParams)).toString()}`
 }
-
 fetchData = async (queryParams) => fetch(apiRequestUrl(queryParams)).then((res) => res.json()).then((res) => res.tx.data)
 
 swapParams = (
@@ -52,35 +42,20 @@ swapParams = (
     disableEstimate: true
 })
 
-contract('UnoAssetRouterSushiswapSingleAssetDeposit', (accounts) => {
+contract('UnoAssetRouterMeshswapSingleAssetDeposit', (accounts) => {
     const admin = accounts[0]
-    const pauser = accounts[1]
-    const distributor = accounts[2]
 
     let accessManager; let assetRouter; let
         factory
 
-    let stakingToken
-
-    let tokenA; let
-        tokenB
-    let miniChef; let
-        rewarder
-    let pid
-    let rewardToken; let
-        rewarderToken
-
     const initReceipt = {}
     before(async () => {
-        const implementation = await Farm.new({ from: account1 })
+        const implementation = await Farm.new({ from: admin })
         accessManager = await AccessManager.new({ from: admin })// accounts[0] is admin
-
-        await accessManager.grantRole('0xfbd454f36a7e1a388bd6fc3ab10d434aa4578f811acbbcf33afb1c697486313c', distributor, { from: admin }) // DISTRIBUTOR_ROLE
-        await accessManager.grantRole('0x65d7a28e3265b37a6474929f336521b332c1681b933f6cb9f3376673440d862a', pauser, { from: admin }) // PAUSER_ROLE
 
         assetRouter = await deployProxy(AssetRouter, { kind: 'uups', initializer: false })
 
-        factory = await FarmFactory.new(implementation.address, accessManager.address, assetRouter.address, { from: account1 })
+        factory = await FarmFactory.new(implementation.address, accessManager.address, assetRouter.address, { from: admin })
 
         const _receipt = await web3.eth.getTransactionReceipt(factory.transactionHash)
         const events = await assetRouter.getPastEvents('AllEvents', {
@@ -92,8 +67,6 @@ contract('UnoAssetRouterSushiswapSingleAssetDeposit', (accounts) => {
         initReceipt.receipt = _receipt
         initReceipt.logs = events
 
-        stakingToken = await IERC20.at(pool)
-
         const lpToken = await IUniswapV2Pair.at(pool)
 
         const tokenAAddress = await lpToken.token0()
@@ -101,44 +74,10 @@ contract('UnoAssetRouterSushiswapSingleAssetDeposit', (accounts) => {
 
         tokenA = await IERC20.at(tokenAAddress)
         tokenB = await IERC20.at(tokenBAddress)
-
-        miniChef = await IMiniChefV2.at(miniChefAddress)
-        const poolLength = await miniChef.poolLength()
-
-        for (let i = 0; i < poolLength.toNumber(); i++) {
-            const _lpToken = await miniChef.lpToken(i)
-            if (_lpToken.toString() === pool) {
-                pid = i
-                break
-            }
-        }
-
-        rewardToken = await miniChef.SUSHI()
-
-        try {
-            const rewarderAddress = await miniChef.rewarder(pid)
-
-            rewarder = await IRewarder.at(rewarderAddress)
-            const data = await rewarder.pendingTokens(pid, constants.ZERO_ADDRESS, 0)
-            rewarderToken = data['0']['0'].toString()
-
-            const WMATICtoken = await IERC20.at(rewarderToken)
-            const WMATICbalance = await WMATICtoken.balanceOf(WMATICHolder)
-
-            await WMATICtoken.transfer(rewarderAddress, WMATICbalance, { from: WMATICHolder })
-        } catch (error) {
-            rewarderToken = constants.ZERO_ADDRESS
-        }
-
-        const SUSHItoken = await IERC20.at(rewardToken)
-        const SUSHIbalance = await SUSHItoken.balanceOf(SUSHIHolder)
-        await SUSHItoken.transfer(miniChefAddress, SUSHIbalance, { from: SUSHIHolder })
     })
 
     describe('Single Asset Deposit', () => {
         describe('deposit token', () => {
-            let tokenAAddress
-            let tokenBAddress
             let stakeLPBefore
             let stakeABefore
             let stakeBBefore
@@ -161,11 +100,13 @@ contract('UnoAssetRouterSushiswapSingleAssetDeposit', (accounts) => {
 
                 await DAIToken.approve(assetRouter.address, DAIAmount, { from: DAIHolder }) // change
 
-                const tokenASwapParams = swapParams(DAIToken.address, tokenAAddress, DAIAmount.div(new BN(2)).toString(), assetRouter.address)
-                const tokenBSwapParams = swapParams(DAIToken.address, tokenBAddress, DAIAmount.sub(DAIAmount.div(new BN(2))).toString(), assetRouter.address)
+                // const tokenASwapParams = swapParams(DAIToken.address, tokenAAddress, DAIAmount.div(new BN(2)).toString(), assetRouter.address)
+                // const tokenBSwapParams = swapParams(DAIToken.address, tokenBAddress, DAIAmount.sub(DAIAmount.div(new BN(2))).toString(), assetRouter.address)
 
-                tokenAData = await fetchData(tokenASwapParams)
-                tokenBData = await fetchData(tokenBSwapParams)
+                tokenAData = `0x12aa3caf0000000000000000000000000d15038f8a0362b4ce71d6c879d56bf9fc2884cf0000000000000000000000008f3cf7ad23cd3cadbd9735aff958023239c6a0630000000000000000000000007ceb23fd6bc0add59e62ac25578270cff1b9f619000000000000000000000000f5c3455d30458e9a1128f85941f533834f01d8b6000000000000000000000000${assetRouter.address.substring(2).toLowerCase()}00000000000000000000000000000000000000000000001b1ae4d6e2ef50000000000000000000000000000000000000000000000000000005db6d1862af0da0000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000160000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002f50000000000000000000000000000000000000000000000000002d70002a900a007e5c0d200000000000000000000000000000000000000000000028500008900003a4020f5c3455d30458e9a1128f85941f533834f01d8b6bd6015b40000000000000000000000000d15038f8a0362b4ce71d6c879d56bf9fc2884cf02a0000000000000000000000000000000000000000000000022471eb8eede51ab59ee63c1e500a374094527e1673a86de625aa59517c5de346d322791bca1f2de4661ed88a30c99a7a9449aa8417400a0c9e75c48000000000000002607050000000000000000000000000000000000000000000001ce00017f00004f02a0000000000000000000000000000000000000000000000000009611bb0cea8831ee63c1e50133c4f0043e2e988b3c2e9c77e2c670efe709bfe30d500b1d8e8ef31e21c99d1db9a6444d3adf1270510610f4a785f458bc144e37065759248899549466390d500b1d8e8ef31e21c99d1db9a6444d3adf1270000438ed1739000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000d1ff67e23dae5600000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000d15038f8a0362b4ce71d6c879d56bf9fc2884cf0000000000000000000000000000000000000000000000000000000063a727bc00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000d500b1d8e8ef31e21c99d1db9a6444d3adf12700000000000000000000000007ceb23fd6bc0add59e62ac25578270cff1b9f61902a000000000000000000000000000000000000000000000000004735bf57386d719ee63c1e50186f1d8390222a3691c28938ec7404a1661e618e00d500b1d8e8ef31e21c99d1db9a6444d3adf127080a06c4eca277ceb23fd6bc0add59e62ac25578270cff1b9f6191111111254eeb25477b68fb85ed929f73a9605820000000000000000000000cfee7c08`
+                tokenBData = `0x12aa3caf0000000000000000000000000d15038f8a0362b4ce71d6c879d56bf9fc2884cf0000000000000000000000008f3cf7ad23cd3cadbd9735aff958023239c6a0630000000000000000000000002791bca1f2de4661ed88a30c99a7a9449aa841740000000000000000000000000975454aff666519a07eef401d5e97769cb2e82f000000000000000000000000${assetRouter.address.substring(2).toLowerCase()}00000000000000000000000000000000000000000000001b1ae4d6e2ef500000000000000000000000000000000000000000000000000000000000001d80b89a0000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000001600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008600000000000000000000000000000000000000000000000000006800003a40200975454aff666519a07eef401d5e97769cb2e82fdd93f59a0000000000000000000000000d15038f8a0362b4ce71d6c879d56bf9fc2884cf80a06c4eca272791bca1f2de4661ed88a30c99a7a9449aa841741111111254eeb25477b68fb85ed929f73a9605820000000000000000000000000000000000000000000000000000cfee7c08`
+
+                // console.log(tokenAData, tokenBData)
 
                 const farmAddress = await factory.Farms(pool)
 
@@ -173,7 +114,7 @@ contract('UnoAssetRouterSushiswapSingleAssetDeposit', (accounts) => {
                     stakingRewardsBalanceBefore = new BN(0)
                 } else {
                     const farm = await Farm.at(farmAddress)
-                    stakingRewardsBalanceBefore = (await miniChef.userInfo(pid, farm.address))['0']
+                    stakingRewardsBalanceBefore = await (await IUniswapV2Pair.at(pool)).balanceOf(farm.address)
                 }
                 ({
                     stakeLP: stakeLPBefore,
@@ -184,7 +125,7 @@ contract('UnoAssetRouterSushiswapSingleAssetDeposit', (accounts) => {
                 ({ totalDepositsLP: totalDepositsLPBefore } = await assetRouter.totalDeposits(pool))
             })
             it('fires events', async () => {
-                const receipt = await assetRouter.depositSingleAsset(pool, DAIToken.address, DAIAmount, [tokenAData, tokenBData], 0, 0, 0, DAIHolder, { from: DAIHolder })
+                const receipt = await assetRouter.depositSingleAsset(pool, DAIToken.address, DAIAmount, [tokenAData, tokenBData], 0, 0, DAIHolder, { from: DAIHolder })
 
                 expectEvent(receipt, 'Deposit', { lpPool: pool, sender: DAIHolder, recipient: DAIHolder })
             })
@@ -209,13 +150,11 @@ contract('UnoAssetRouterSushiswapSingleAssetDeposit', (accounts) => {
                 const farmAddress = await factory.Farms(pool)
                 const farm = await Farm.at(farmAddress)
 
-                const stakingRewardsBalance = (await miniChef.userInfo(pid, farm.address))['0']
+                const stakingRewardsBalance = await (await IUniswapV2Pair.at(pool)).balanceOf(farm.address)
                 assert.ok(stakingRewardsBalance.gt(stakingRewardsBalanceBefore), 'StakingRewards balance not increased')
             })
         })
         describe('deposit ETH', () => {
-            let tokenAAddress
-            let tokenBAddress
             let stakeLPBefore
             let stakeABefore
             let stakeBBefore
@@ -230,11 +169,11 @@ contract('UnoAssetRouterSushiswapSingleAssetDeposit', (accounts) => {
                 ([tokenAAddress, tokenBAddress] = await assetRouter.getTokens(pool))
                 amountETH = new BN('1000000000000000000') // 1 ether
 
-                const tokenASwapParams = swapParams(fromToken, tokenAAddress, amountETH.div(new BN(2)).toString(), assetRouter.address)
-                const tokenBSwapParams = swapParams(fromToken, tokenBAddress, amountETH.sub(amountETH.div(new BN(2))).toString(), assetRouter.address)
+                // const tokenASwapParams = swapParams(fromToken, tokenAAddress, amountETH.div(new BN(2)).toString(), assetRouter.address)
+                // const tokenBSwapParams = swapParams(fromToken, tokenBAddress, amountETH.sub(amountETH.div(new BN(2))).toString(), assetRouter.address)
 
-                tokenAData = await fetchData(tokenASwapParams)
-                tokenBData = await fetchData(tokenBSwapParams)
+                tokenAData = `0x12aa3caf0000000000000000000000000d15038f8a0362b4ce71d6c879d56bf9fc2884cf0000000000000000000000000d500b1d8e8ef31e21c99d1db9a6444d3adf12700000000000000000000000007ceb23fd6bc0add59e62ac25578270cff1b9f619000000000000000000000000def834ae4a1198bfec84544fb374ec7f1314a7c5000000000000000000000000${assetRouter.address.substring(2).toLowerCase()}00000000000000000000000000000000000000000000000006f05b59d3b2000000000000000000000000000000000000000000000000000000012c92202a32740000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000001600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008500000000000000000000000000000000000000000000000000000000006700206ae4071138000f4240def834ae4a1198bfec84544fb374ec7f1314a7c51111111254eeb25477b68fb85ed929f73a96058200000000000000000000000000000000000000000000000000012c92202a32740d500b1d8e8ef31e21c99d1db9a6444d3adf1270000000000000000000000000000000000000000000000000000000cfee7c08`// await fetchData(tokenASwapParams)
+                tokenBData = `0x12aa3caf0000000000000000000000000d15038f8a0362b4ce71d6c879d56bf9fc2884cf0000000000000000000000000d500b1d8e8ef31e21c99d1db9a6444d3adf12700000000000000000000000002791bca1f2de4661ed88a30c99a7a9449aa84174000000000000000000000000cd353f79d9fade311fc3119b841e1f456b54e858000000000000000000000000${assetRouter.address.substring(2).toLowerCase()}00000000000000000000000000000000000000000000000006f05b59d3b20000000000000000000000000000000000000000000000000000000000000005ea600000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000001600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008500000000000000000000000000000000000000000000000000000000006700206ae4071138002dc6c0cd353f79d9fade311fc3119b841e1f456b54e8581111111254eeb25477b68fb85ed929f73a960582000000000000000000000000000000000000000000000000000000000005ea600d500b1d8e8ef31e21c99d1db9a6444d3adf1270000000000000000000000000000000000000000000000000000000cfee7c08`// await fetchData(tokenBSwapParams)
 
                 const farmAddress = await factory.Farms(pool)
 
@@ -242,7 +181,7 @@ contract('UnoAssetRouterSushiswapSingleAssetDeposit', (accounts) => {
                     stakingRewardsBalanceBefore = new BN(0)
                 } else {
                     const farm = await Farm.at(farmAddress)
-                    stakingRewardsBalanceBefore = (await miniChef.userInfo(pid, farm.address))['0']
+                    stakingRewardsBalanceBefore = await (await IUniswapV2Pair.at(pool)).balanceOf(farm.address)
                 }
                 ({
                     stakeLP: stakeLPBefore,
@@ -254,7 +193,7 @@ contract('UnoAssetRouterSushiswapSingleAssetDeposit', (accounts) => {
             })
             it('fires events', async () => {
                 ethBalanceBefore = new BN(await web3.eth.getBalance(DAIHolder))
-                const receipt = await assetRouter.depositSingleETH(pool, constants.ZERO_ADDRESS, amountETH, [tokenAData, tokenBData], 0, 0, 0, DAIHolder, { from: DAIHolder, value: amountETH })
+                const receipt = await assetRouter.depositSingleETH(pool, [tokenAData, tokenBData], 0, 0, DAIHolder, { from: DAIHolder, value: amountETH })
 
                 const gasUsed = new BN(receipt.receipt.gasUsed)
                 const effectiveGasPrice = new BN(receipt.receipt.effectiveGasPrice)
@@ -284,7 +223,7 @@ contract('UnoAssetRouterSushiswapSingleAssetDeposit', (accounts) => {
                 const farmAddress = await factory.Farms(pool)
                 const farm = await Farm.at(farmAddress)
 
-                const stakingRewardsBalance = (await miniChef.userInfo(pid, farm.address))['0']
+                const stakingRewardsBalance = await (await IUniswapV2Pair.at(pool)).balanceOf(farm.address)
                 assert.ok(stakingRewardsBalance.gt(stakingRewardsBalanceBefore), 'StakingRewards balance not increased')
             })
         })

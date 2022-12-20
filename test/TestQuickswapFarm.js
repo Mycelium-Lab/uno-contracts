@@ -81,7 +81,7 @@ contract('UnoFarmQuickswap', (accounts) => {
         // CALLER_NOT_ASSET_ROUTER check fails
         it('Prevents function calls for not asset router', async () => {
             await expectRevert(
-                implementation.deposit(0, 0, 0, 0, 0, accounts[0], accounts[0], { from: accounts[1] }),
+                implementation.deposit(0, accounts[0], { from: accounts[1] }),
                 'CALLER_NOT_ASSET_ROUTER'
             )
             await expectRevert(
@@ -102,7 +102,7 @@ contract('UnoFarmQuickswap', (accounts) => {
         // ASSET_ROUTER check passes, revert for a different reason
         it('Allows function calls for asset router', async () => {
             await expectRevert(
-                implementation.deposit(0, 0, 0, 0, 0, accounts[0], accounts[0], { from: assetRouter }),
+                implementation.deposit(0, accounts[0], { from: assetRouter }),
                 'NO_LIQUIDITY_PROVIDED'
             )
             await expectRevert(

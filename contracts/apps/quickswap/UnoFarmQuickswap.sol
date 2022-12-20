@@ -143,21 +143,14 @@ contract UnoFarmQuickswap is Initializable, ReentrancyGuardUpgradeable {
      * @dev Function that makes the deposits.
      * Deposits provided tokens in the Liquidity Pool, then stakes generated LP tokens in the {lpStakingPool}.
      */
-    function deposit(uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin, uint256 amountLP, address origin, address recipient) external nonReentrant onlyAssetRouter returns(uint256 sentA, uint256 sentB, uint256 liquidity){
-        uint256 addedLiquidity;
-        if(amountA > 0 && amountB > 0){
-            (sentA, sentB, addedLiquidity) = quickswapRouter.addLiquidity(tokenA, tokenB, amountA, amountB, amountAMin, amountBMin, address(this), block.timestamp);
-        }
-        liquidity = addedLiquidity + amountLP;
-        require(liquidity > 0, 'NO_LIQUIDITY_PROVIDED');
+    function deposit(uint256 amount, address recipient) external nonReentrant onlyAssetRouter{
+        require(amount > 0, 'NO_LIQUIDITY_PROVIDED');
 
         _updateDeposit(recipient);
-        userInfo[recipient].stake += liquidity;
-        totalDeposits += liquidity;
+        userInfo[recipient].stake += amount;
+        totalDeposits += amount;
             
-        lpStakingPool.stake(liquidity);
-        IERC20Upgradeable(tokenA).safeTransfer(origin, amountA - sentA);
-        IERC20Upgradeable(tokenB).safeTransfer(origin, amountB - sentB);
+        lpStakingPool.stake(amount);
     }
 
     /**
