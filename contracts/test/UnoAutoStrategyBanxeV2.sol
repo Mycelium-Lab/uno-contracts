@@ -292,9 +292,9 @@ contract UnoAutoStrategyBanxeV2 is Initializable, ERC20Upgradeable, ReentrancyGu
         PoolInfo memory pool = pools[poolID];
         address[] memory _tokens = pool.assetRouter.getTokens(pool.pool);
         if(_tokens[0] == address(tokenA)){
-            (sentA, sentB, liquidity) = pool.assetRouter.deposit(pool.pool, amountA, amountB, amountAMin, amountBMin, 0, address(this));
+            (sentA, sentB, liquidity) = pool.assetRouter.deposit(pool.pool, amountA, amountB, amountAMin, amountBMin, address(this));
         } else {
-            (sentB, sentA, liquidity) = pool.assetRouter.deposit(pool.pool, amountB, amountA, amountBMin, amountAMin, 0, address(this));
+            (sentB, sentA, liquidity) = pool.assetRouter.deposit(pool.pool, amountB, amountA, amountBMin, amountAMin, address(this));
         }
     }
 

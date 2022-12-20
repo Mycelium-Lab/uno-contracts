@@ -216,7 +216,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
             })
             it('prevents function calls', async () => {
                 await expectRevert(
-                    assetRouter.deposit(pool, 0, 0, 0, 0, 0, account1, {
+                    assetRouter.deposit(pool, 0, 0, 0, 0, account1, {
                         from: account1
                     }),
                     'Pausable: paused'
@@ -257,10 +257,10 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
             it('allows function calls', async () => {
                 // Pausable: paused check passes. revert for a different reason
                 await expectRevert(
-                    assetRouter.deposit(pool, 0, 0, 0, 0, 0, account1, {
+                    assetRouter.deposit(pool, 0, 0, 0, 0, account1, {
                         from: account1
                     }),
-                    'NO_LIQUIDITY_PROVIDED'
+                    'NO_TOKENS_SENT'
                 )
                 await expectRevert(
                     assetRouter.distribute(
@@ -290,10 +290,10 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
         describe('reverts', () => {
             it('reverts if total amount provided is zero', async () => {
                 await expectRevert(
-                    assetRouter.deposit(pool, 0, 0, 0, 0, 0, account1, {
+                    assetRouter.deposit(pool, 0, 0, 0, 0, account1, {
                         from: account1
                     }),
-                    'NO_LIQUIDITY_PROVIDED'
+                    'NO_TOKENS_SENT'
                 )
             })
         })
@@ -303,12 +303,8 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                 await stakingToken.approve(assetRouter.address, amounts[0], {
                     from: account1
                 })
-                receipt = await assetRouter.deposit(
+                receipt = await assetRouter.depositLP(
                     pool,
-                    0,
-                    0,
-                    0,
-                    0,
                     amounts[0],
                     account1,
                     { from: account1 }
@@ -361,12 +357,8 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                 await stakingToken.approve(assetRouter.address, amounts[1], {
                     from: account1
                 })
-                receipt = await assetRouter.deposit(
+                receipt = await assetRouter.depositLP(
                     pool,
-                    0,
-                    0,
-                    0,
-                    0,
                     amounts[1],
                     account1,
                     { from: account1 }
@@ -417,12 +409,8 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                     from: account2
                 })
 
-                receipt = await assetRouter.deposit(
+                receipt = await assetRouter.depositLP(
                     pool,
-                    0,
-                    0,
-                    0,
-                    0,
                     amounts[2],
                     account2,
                     { from: account2 }
@@ -479,12 +467,8 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                 await stakingToken.approve(assetRouter.address, amounts[3], {
                     from: account1
                 })
-                receipt = await assetRouter.deposit(
+                receipt = await assetRouter.depositLP(
                     pool,
-                    0,
-                    0,
-                    0,
-                    0,
                     amounts[3],
                     account2,
                     { from: account1 }
@@ -597,11 +581,11 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
             })
             it('reverts if minAmountA > amountA || minAmountB > amountB', async () => {
                 await expectRevert(
-                    assetRouter.deposit(pool, amountA, new BN(1), amountA + 1, 0, 0, account1, { from: account1 }),
+                    assetRouter.deposit(pool, amountA, new BN(1), amountA + 1, 0, account1, { from: account1 }),
                     'minAmount0 is not satisfied'
                 )
                 await expectRevert(
-                    assetRouter.deposit(pool, new BN(1000), amountB, 3, amountB + 1000000, 0, account1, { from: account1 }),
+                    assetRouter.deposit(pool, new BN(1000), amountB, 3, amountB + 1000000, account1, { from: account1 }),
                     'minAmount1 is not satisfied'
                 )
             })
@@ -610,7 +594,6 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                     pool,
                     amountA,
                     amountB,
-                    0,
                     0,
                     0,
                     account1,
@@ -1139,12 +1122,8 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                 await stakingToken.approve(assetRouter.address, balance1, {
                     from: account1
                 })
-                await assetRouter.deposit(
+                await assetRouter.depositLP(
                     pool,
-                    0,
-                    0,
-                    0,
-                    0,
                     balance1,
                     account1,
                     { from: account1 }
@@ -1154,12 +1133,8 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                 await stakingToken.approve(assetRouter.address, balance2, {
                     from: account2
                 })
-                await assetRouter.deposit(
+                await assetRouter.depositLP(
                     pool,
-                    0,
-                    0,
-                    0,
-                    0,
                     balance2,
                     account2,
                     { from: account2 }
@@ -1516,7 +1491,6 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                 const receipt = await assetRouter.depositETH(
                     pool2,
                     amountToken,
-                    0,
                     0,
                     0,
                     account3,

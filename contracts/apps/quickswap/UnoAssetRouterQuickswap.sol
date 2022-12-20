@@ -2,6 +2,7 @@
 pragma solidity 0.8.10;
 
 import {IUnoFarmQuickswap as Farm} from './interfaces/IUnoFarmQuickswap.sol'; 
+import '../../interfaces/IUniswapV2Router.sol';
 import '../../interfaces/IUnoFarmFactory.sol';
 import '../../interfaces/IUnoAccessManager.sol'; 
 import '../../interfaces/IUniswapV2Pair.sol';
@@ -31,12 +32,15 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
     uint256 public fee;
 
     address public constant WMATIC = 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270;
+    IUniswapV2Router01 private constant QuickswapRouter = IUniswapV2Router01(0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff); 
+    address private constant OneInchRouter = 0x1111111254EEB25477B68fb85Ed929f73A960582;
 
     event Deposit(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Withdraw(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Distribute(address indexed lpPool, uint256 reward);
 
     event FeeChanged(uint256 previousFee, uint256 newFee);
+    event SingleAssetEntryFeeChanged(uint256 previousFee, uint256 newFee);
 
     modifier onlyRole(bytes32 role){
         require(accessManager.hasRole(role, msg.sender), 'CALLER_NOT_AUTHORIZED');
@@ -60,94 +64,205 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
     }
 
     receive() external payable {
-        require(msg.sender == WMATIC, 'ONLY_ACCEPT_WMATIC'); // only accept ETH via fallback from the WMATIC contract
+        require(msg.sender == WMATIC || msg.sender == address(QuickswapRouter), 'ONLY_ACCEPT_WMATIC_OR_ROUTER'); // only accept ETH via fallback from the WMATIC or router contract
     }
 
     /**
      * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool} and deposits tokens in it. Emits a {Deposit} event.
      * @param lpStakingPool - Address of the pool to deposit tokens in.
      * @param amountA  - Token A amount to deposit.
-     * @param amountB - Token B amount to deposit.
+     * @param amountB -  Token B amount to deposit.
      * @param amountAMin - Bounds the extent to which the B/A price can go up before the transaction reverts.
      * @param amountBMin - Bounds the extent to which the A/B price can go up before the transaction reverts.
-     * @param amountLP - Additional LP Token amount to deposit.
      * @param recipient - Address which will receive the deposit.
      
      * @return sentA - Token A amount sent to the farm.
      * @return sentB - Token B amount sent to the farm.
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
-    function deposit(address lpStakingPool, uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin, uint256 amountLP, address recipient) external whenNotPaused returns(uint256 sentA, uint256 sentB, uint256 liquidity){
+    function deposit(address lpStakingPool, uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin, address recipient) external whenNotPaused returns(uint256 sentA, uint256 sentB, uint256 liquidity){
+        require(amountA > 0 && amountB > 0, "NO_TOKENS_SENT");
         Farm farm = Farm(farmFactory.Farms(lpStakingPool));
         if(farm == Farm(address(0))){
             farm = Farm(farmFactory.createFarm(lpStakingPool));
         }
 
-        if(amountLP > 0){
-            IERC20Upgradeable(farm.lpPair()).safeTransferFrom(msg.sender, address(farm), amountLP);
-        }
-        if(amountA > 0){
-            IERC20Upgradeable(farm.tokenA()).safeTransferFrom(msg.sender, address(farm), amountA);
-        }
-        if(amountB > 0){
-            IERC20Upgradeable(farm.tokenB()).safeTransferFrom(msg.sender, address(farm), amountB);
-        }
+        address tokenA = farm.tokenA();
+        address tokenB = farm.tokenB();
+        IERC20Upgradeable(tokenA).safeTransferFrom(msg.sender, address(this), amountA);
+        IERC20Upgradeable(tokenB).safeTransferFrom(msg.sender, address(this), amountB);
 
-        (sentA, sentB, liquidity) = farm.deposit(amountA, amountB, amountAMin, amountBMin, amountLP, msg.sender, recipient);
-        emit Deposit(lpStakingPool, msg.sender, recipient, liquidity);
+        (sentA, sentB, liquidity) = _addLiquidity(tokenA, tokenB, amountA, amountB, amountAMin, amountBMin, address(farm));
+        farm.deposit(liquidity, recipient);
+
+        emit Deposit(lpStakingPool, msg.sender, recipient, liquidity); 
     }
-    
+
     /**
      * @dev Autoconverts MATIC into WMATIC and deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool} and deposits tokens in it. Emits a {Deposit} event.
      * @param lpStakingPool - Address of the pool to deposit tokens in.
      * @param amountToken  - Token amount to deposit.
      * @param amountTokenMin - Bounds the extent to which the TOKEN/WMATIC price can go up before the transaction reverts.
      * @param amountETHMin - Bounds the extent to which the WMATIC/TOKEN price can go up before the transaction reverts.
-     * @param amountLP - Additional LP Token amount to deposit.
      * @param recipient - Address which will receive the deposit.
      
      * @return sentToken - Token amount sent to the farm.
      * @return sentETH - WMATIC amount sent to the farm.
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
-    function depositETH(address lpStakingPool, uint256 amountToken, uint256 amountTokenMin, uint256 amountETHMin, uint256 amountLP, address recipient) external payable whenNotPaused returns(uint256 sentToken, uint256 sentETH, uint256 liquidity){
+    function depositETH(address lpStakingPool, uint256 amountToken, uint256 amountTokenMin, uint256 amountETHMin, address recipient) external payable whenNotPaused returns(uint256 sentToken, uint256 sentETH, uint256 liquidity){
+        require(msg.value > 0, "NO_MATIC_SENT");
+        require(amountToken > 0, "NO_TOKEN_SENT");
+        Farm farm = Farm(farmFactory.Farms(lpStakingPool));
+        if(farm == Farm(address(0))){
+            farm = Farm(farmFactory.createFarm(lpStakingPool));
+        }
+
+        address tokenA = farm.tokenA();
+        address tokenB = farm.tokenB();
+        if (tokenA == WMATIC) {
+            IERC20Upgradeable(tokenB).safeTransferFrom(msg.sender, address(this), amountToken);
+            (sentToken, sentETH, liquidity) = _addLiquidityETH(tokenB, amountToken, amountTokenMin, amountETHMin, address(farm));
+        } else if (tokenB == WMATIC) {
+            IERC20Upgradeable(tokenA).safeTransferFrom(msg.sender, address(this), amountToken);
+            (sentToken, sentETH, liquidity) = _addLiquidityETH(tokenA, amountToken, amountTokenMin, amountETHMin, address(farm));
+        } else {
+            revert("NOT_WMATIC_POOL");
+        }
+        farm.deposit(liquidity, recipient);
+
+        emit Deposit(lpStakingPool, msg.sender, recipient, liquidity);
+    }
+
+    /**
+     * @dev Deposits single token in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool}, swaps {token} for pool tokens and deposits them. Emits a {Deposit} event.
+     * @param lpStakingPool - Address of the pool to deposit tokens in.
+     * @param token  - Address of a token to enter the pool.
+     * @param amount - Amount of token sent.
+     * @param swapData - Parameter with which 1inch router is being called with.
+     * @param amountAMin - Bounds the extent to which the B/A price can go up before the transaction reverts.
+     * @param amountBMin - Bounds the extent to which the A/B price can go up before the transaction reverts.
+     * @param recipient - Address which will receive the deposit.
+     
+     * @return sent - Total {token} amount sent to the farm. NOTE: Returns dust left from swap in {token}, but if A/B amounts are not correct also returns dust in pool's tokens.
+     * @return liquidity - Total liquidity sent to the farm (in lpTokens).
+     */
+    function depositSingleAsset(address lpStakingPool, address token, uint256 amount, bytes[2] calldata swapData, uint256 amountAMin, uint256 amountBMin, address recipient) external whenNotPaused returns(uint256 sent, uint256 liquidity){
+        require(amount > 0, "NO_TOKEN_SENT");
+        Farm farm = Farm(farmFactory.Farms(lpStakingPool));
+        if(farm == Farm(address(0))){
+            farm = Farm(farmFactory.createFarm(lpStakingPool));
+        }
+
+        IERC20Upgradeable(token).safeTransferFrom(msg.sender, address(this), amount);
+        IERC20Upgradeable(token).approve(OneInchRouter, amount);
+
+        sent = amount;
+        uint256 amountA;
+        uint256 amountB;
+        address tokenA = farm.tokenA();
+        address tokenB = farm.tokenB();
+
+        if (tokenA != token) {
+            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[0]);
+            amount -= spentAmount;
+            amountA = returnAmount;
+        }
+        if (tokenB != token) {
+            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[1]);
+            amount -= spentAmount;
+            amountB = returnAmount;
+        }
+
+        if (tokenA == token) {
+            amountA = amount;
+        } else if (tokenB == token) {
+            amountB = amount;
+        } else if(amount > 0) {
+            sent -= amount;
+            IERC20Upgradeable(token).safeTransfer(msg.sender, amount);
+        }
+
+        require(amountA > 0 && amountB > 0, "NO_TOKENS_SENT");
+        (,,liquidity) = _addLiquidity(tokenA, tokenB, amountA, amountB, amountAMin, amountBMin, address(farm));
+        farm.deposit(liquidity, recipient);
+        
+        emit Deposit(lpStakingPool, msg.sender, recipient, liquidity);
+    }
+     
+    /**
+     * @dev Deposits single MATIC in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool}, swaps MATIC for pool tokens and deposits them. Emits a {Deposit} event.
+     * @param lpStakingPool - Address of the pool to deposit tokens in.
+     * @param swapData - Parameter with which 1inch router is being called with.
+     * @param amountAMin - Bounds the extent to which the B/A price can go up before the transaction reverts.
+     * @param amountBMin - Bounds the extent to which the A/B price can go up before the transaction reverts.
+     * @param recipient - Address which will receive the deposit.
+     
+     * @return sentETH - Total MATIC amount sent to the farm. NOTE: Returns dust left from swap in MATIC, but if A/B amount are not correct also returns dust in pool's tokens.
+     * @return liquidity - Total liquidity sent to the farm (in lpTokens).
+     */
+    function depositSingleETH(address lpStakingPool, bytes[2] calldata swapData, uint256 amountAMin, uint256 amountBMin, address recipient) external payable whenNotPaused returns(uint256 sentETH, uint256 liquidity){
         require(msg.value > 0, "NO_MATIC_SENT");
         Farm farm = Farm(farmFactory.Farms(lpStakingPool));
         if(farm == Farm(address(0))){
             farm = Farm(farmFactory.createFarm(lpStakingPool));
         }
 
-        if(amountLP > 0){
-            IERC20Upgradeable(farm.lpPair()).safeTransferFrom(msg.sender, address(farm), amountLP);
-        }
+        uint256 amount = msg.value;
+        IWMATIC(WMATIC).deposit{value: amount}();
+        IERC20Upgradeable(WMATIC).approve(OneInchRouter, amount);
 
+        sentETH = amount;
+        uint256 amountA;
+        uint256 amountB;
         address tokenA = farm.tokenA();
         address tokenB = farm.tokenB();
 
-        IWMATIC(WMATIC).deposit{value: msg.value}();
-        IERC20Upgradeable(WMATIC).safeTransfer(address(farm), msg.value);
-        if (tokenA == WMATIC) {
-            if (amountToken > 0) {
-                IERC20Upgradeable(tokenB).safeTransferFrom(msg.sender, address(farm), amountToken);
-            }
-            (sentETH, sentToken, liquidity) = farm.deposit(msg.value, amountToken, amountETHMin, amountTokenMin, amountLP, address(this), recipient);
-            IERC20Upgradeable(tokenB).safeTransfer(msg.sender, amountToken - sentToken);
-        } else if (tokenB == WMATIC) {
-            if (amountToken > 0) {
-                IERC20Upgradeable(tokenA).safeTransferFrom(msg.sender, address(farm), amountToken);
-            }
-            (sentToken, sentETH, liquidity) = farm.deposit(amountToken, msg.value, amountTokenMin, amountETHMin, amountLP, address(this), recipient);
-            IERC20Upgradeable(tokenA).safeTransfer(msg.sender, amountToken - sentToken);
-        } else {
-            revert("NOT_WMATIC_POOL");
+        if (tokenA != WMATIC) {
+            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[0]);
+            amount -= spentAmount;
+            amountA = returnAmount;
+        }
+        if (tokenB != WMATIC) {
+            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[1]);
+            amount -= spentAmount;
+            amountB = returnAmount;
         }
 
-        uint256 dust = msg.value - sentETH;
-        if (dust > 0){
-            IWMATIC(WMATIC).withdraw(dust);
-            payable(msg.sender).transfer(dust);
+        if (tokenA == WMATIC) {
+            amountA = amount;
+        } else if (tokenB == WMATIC) {
+            amountB = amount;
+        } else if (amount > 0) {
+            sentETH -= amount;
+            IWMATIC(WMATIC).withdraw(amount);
+            payable(msg.sender).transfer(amount);
         }
+
+        require(amountA > 0 && amountB > 0, "NO_TOKENS_SENT");
+        (,,liquidity) = _addLiquidity(tokenA, tokenB, amountA, amountB, amountAMin, amountBMin, address(farm));
+        farm.deposit(liquidity, recipient);
+
         emit Deposit(lpStakingPool, msg.sender, recipient, liquidity);
+    }
+
+    /**
+     * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool} and deposits tokens in it. Emits a {Deposit} event.
+     * @param lpStakingPool - Address of the pool to deposit tokens in.
+     * @param amount - LP Token amount to deposit.
+     * @param recipient - Address which will receive the deposit.
+     */
+    function depositLP(address lpStakingPool, uint256 amount, address recipient) external whenNotPaused{
+        require(amount > 0, "NO_TOKEN_SENT");
+        Farm farm = Farm(farmFactory.Farms(lpStakingPool));
+        if(farm == Farm(address(0))){
+            farm = Farm(farmFactory.createFarm(lpStakingPool));
+        }
+
+        IERC20Upgradeable(farm.lpPair()).safeTransferFrom(msg.sender, address(farm), amount);
+        farm.deposit(amount, recipient);
+
+        emit Deposit(lpStakingPool, msg.sender, recipient, amount); 
     }
 
     /** 
@@ -239,7 +354,7 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
         if (farm != Farm(address(0))) {
             stakeLP = farm.userBalance(_address);
             address lpPair = farm.lpPair();
-            (stakeA, stakeB) = getTokenStake(lpPair, stakeLP);
+            (stakeA, stakeB) = _getTokenStake(lpPair, stakeLP);
         }
     }
 
@@ -256,7 +371,7 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
         if (farm != Farm(address(0))) {
             totalDepositsLP = farm.getTotalDeposits();
             address lpPair = farm.lpPair();
-            (totalDepositsA, totalDepositsB) = getTokenStake(lpPair, totalDepositsLP);
+            (totalDepositsA, totalDepositsB) = _getTokenStake(lpPair, totalDepositsLP);
         }
     }
 
@@ -273,6 +388,53 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
         tokens[1] = IERC20(stakingToken.token1());
     }
 
+    /**
+     * @dev Deposits assets to router & refunds dust.
+     */ 
+    function _addLiquidity(
+        address tokenA,
+        address tokenB, 
+        uint256 amountA, 
+        uint256 amountB, 
+        uint256 amountAMin, 
+        uint256 amountBMin, 
+        address farm
+    ) internal returns(uint256 sentA, uint256 sentB, uint256 liquidity){
+        IERC20Upgradeable(tokenA).approve(address(QuickswapRouter), amountA);
+        IERC20Upgradeable(tokenB).approve(address(QuickswapRouter), amountB);
+
+        (sentA, sentB, liquidity) = QuickswapRouter.addLiquidity(tokenA, tokenB, amountA, amountB, amountAMin, amountBMin, farm, block.timestamp);
+        // Refund dust
+        IERC20Upgradeable(tokenA).safeTransfer(msg.sender, amountA - sentA);
+		IERC20Upgradeable(tokenB).safeTransfer(msg.sender, amountB - sentB);
+    }
+
+    /**
+     * @dev Deposits assets to router & refunds dust.
+     */ 
+    function _addLiquidityETH(
+        address token,
+        uint256 amount, 
+        uint256 amountTokenMin, 
+        uint256 amountETHMin, 
+        address farm
+    ) internal returns(uint256 sentToken, uint256 sentETH, uint256 liquidity){
+        IERC20Upgradeable(token).approve(address(QuickswapRouter), amount);
+
+        (sentToken, sentETH, liquidity) = QuickswapRouter.addLiquidityETH{value: msg.value}(token, amount, amountTokenMin, amountETHMin, farm, block.timestamp);
+        // Refund dust
+        IERC20Upgradeable(token).safeTransfer(msg.sender, amount - sentToken);
+        payable(msg.sender).transfer(msg.value - sentETH);
+    }
+
+    /**
+     * @dev Swaps assets using 1inch exchange.
+     */  
+    function _swap(bytes calldata swapData) internal returns(uint256 returnAmount, uint256 spentAmount){
+        (bool success, bytes memory data) = OneInchRouter.call(swapData);
+        require(success, "SWAP_NOT_SUCCESSFUL");
+        (returnAmount, spentAmount) = abi.decode(data, (uint256, uint256));
+    }
 
     /**
      * @dev Converts LP tokens to normal tokens, value(amountA) == value(amountB) == 0.5*amountLP
@@ -282,7 +444,7 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
      * @return amountA - Token A amount.
      * @return amountB - Token B amount.
      */ 
-    function getTokenStake(address lpPair, uint256 amountLP) internal view returns (uint256 amountA, uint256 amountB) {
+    function _getTokenStake(address lpPair, uint256 amountLP) internal view returns (uint256 amountA, uint256 amountB) {
         uint256 totalSupply = IERC20Upgradeable(lpPair).totalSupply();
         amountA = amountLP * IERC20Upgradeable(IUniswapV2Pair(lpPair).token0()).balanceOf(lpPair) / totalSupply;
         amountB = amountLP * IERC20Upgradeable(IUniswapV2Pair(lpPair).token1()).balanceOf(lpPair) / totalSupply;

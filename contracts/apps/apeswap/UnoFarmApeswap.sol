@@ -2,7 +2,7 @@
 pragma solidity 0.8.10;
  
 import '../../interfaces/IUniswapV2Pair.sol';
-import '../../interfaces/IApeRouter02.sol';
+import "../../interfaces/IUniswapV2Router.sol";
 import '../../interfaces/IMiniApeV2.sol';
 import '../../interfaces/IMiniComplexRewarderTime.sol';
 import '@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol';
@@ -75,7 +75,7 @@ contract UnoFarmApeswap is Initializable, ReentrancyGuardUpgradeable {
      * {apeswapRouter} - The contract that executes swaps.
      * {MiniApe} -The contract that distibutes {rewardToken}.
      */
-    IApeRouter02 private constant apeswapRouter = IApeRouter02(0xC0788A3aD43d79aa53B09c2EaCc313A787d1d607);
+    IUniswapV2Router01 private constant apeswapRouter = IUniswapV2Router01(0xC0788A3aD43d79aa53B09c2EaCc313A787d1d607);
     IMiniApeV2 private constant MiniApe = IMiniApeV2(0x54aff400858Dcac39797a81894D9920f16972D1D);
 
     /**
@@ -157,21 +157,14 @@ contract UnoFarmApeswap is Initializable, ReentrancyGuardUpgradeable {
      * @dev Function that makes the deposits.
      * Deposits provided tokens in the Liquidity Pool, then stakes generated LP tokens in the {MiniApe}.
      */
-    function deposit(uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin, uint256 amountLP, address origin, address recipient) external nonReentrant onlyAssetRouter returns(uint256 sentA, uint256 sentB, uint256 liquidity){
-        uint256 addedLiquidity;
-        if(amountA > 0 && amountB > 0){
-            (sentA, sentB, addedLiquidity) = apeswapRouter.addLiquidity(tokenA, tokenB, amountA, amountB, amountAMin, amountBMin, address(this), block.timestamp);
-        }
-        liquidity = addedLiquidity + amountLP;
-        require(liquidity > 0, 'NO_LIQUIDITY_PROVIDED');
+    function deposit(uint256 amount, address recipient) external nonReentrant onlyAssetRouter{
+        require(amount > 0, 'NO_LIQUIDITY_PROVIDED');
 
         _updateDeposit(recipient);
-        userInfo[recipient].stake += liquidity;
-        totalDeposits += liquidity;
+        userInfo[recipient].stake += amount;
+        totalDeposits += amount;
             
-        MiniApe.deposit(pid, liquidity, address(this));
-        IERC20Upgradeable(tokenA).safeTransfer(origin, amountA - sentA);
-        IERC20Upgradeable(tokenB).safeTransfer(origin, amountB - sentB);
+        MiniApe.deposit(pid, amount, address(this));
     }
 
     /**

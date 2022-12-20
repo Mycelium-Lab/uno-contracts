@@ -17,10 +17,11 @@ interface IUnoFarmBalancer {
     function lpPool() external view returns (address);
     function poolId() external view returns (bytes32);
     function assetRouter() external view returns (address);
+    function isComposable() external view returns (bool);
 
     function initialize( address _lpPool, address _assetRouter) external;
 
-    function deposit(uint256[] memory amounts, address[] memory tokens, uint256 minAmountLP, uint256 amountLP, address recipient) external returns(uint256 liquidity);
+    function deposit(uint256 amount, address recipient) external;
     function withdraw(bytes calldata userData, uint256[] calldata minAmountsOut, bool withdrawLP, address origin, address recipient) external returns(uint256[] memory amounts, uint256 liquidity);
 
     function distribute(
