@@ -108,7 +108,7 @@ contract UnoAssetRouterApeswap is Initializable, PausableUpgradeable, UUPSUpgrad
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
     function depositETH(address lpPair, uint256 amountToken, uint256 amountTokenMin, uint256 amountETHMin, address recipient) external payable whenNotPaused returns(uint256 sentToken, uint256 sentETH, uint256 liquidity){
-        require(msg.value > 0, "NO_MATIC_SENT");
+        require(msg.value > 0, "NO_BNB_SENT");
         require(amountToken > 0, "NO_TOKEN_SENT");
         Farm farm = Farm(farmFactory.Farms(lpPair));
         if(farm == Farm(address(0))){
@@ -188,18 +188,18 @@ contract UnoAssetRouterApeswap is Initializable, PausableUpgradeable, UUPSUpgrad
     }
      
     /**
-     * @dev Deposits single MATIC in the given pool. Creates new Farm contract if there isn't one deployed for the {lpPair}, swaps MATIC for pool tokens and deposits them. Emits a {Deposit} event.
+     * @dev Deposits single BNB in the given pool. Creates new Farm contract if there isn't one deployed for the {lpPair}, swaps BNB for pool tokens and deposits them. Emits a {Deposit} event.
      * @param lpPair - Address of the pool to deposit tokens in.
      * @param swapData - Parameter with which 1inch router is being called with.
      * @param amountAMin - Bounds the extent to which the B/A price can go up before the transaction reverts.
      * @param amountBMin - Bounds the extent to which the A/B price can go up before the transaction reverts.
      * @param recipient - Address which will receive the deposit.
      
-     * @return sentETH - Total MATIC amount sent to the farm. NOTE: Returns dust left from swap in MATIC, but if A/B amount are not correct also returns dust in pool's tokens.
+     * @return sentETH - Total BNB amount sent to the farm. NOTE: Returns dust left from swap in BNB, but if A/B amount are not correct also returns dust in pool's tokens.
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
     function depositSingleETH(address lpPair, bytes[2] calldata swapData, uint256 amountAMin, uint256 amountBMin, address recipient) external payable whenNotPaused returns(uint256 sentETH, uint256 liquidity){
-        require(msg.value > 0, "NO_MATIC_SENT");
+        require(msg.value > 0, "NO_BNB_SENT");
         Farm farm = Farm(farmFactory.Farms(lpPair));
         if(farm == Farm(address(0))){
             farm = Farm(farmFactory.createFarm(lpPair));
