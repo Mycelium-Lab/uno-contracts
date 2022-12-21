@@ -202,7 +202,7 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
             })
             it('prevents function calls', async () => {
                 await expectRevert(
-                    assetRouter.deposit(swapAddress, [0, 0, 0], 0, 0, account1, { from: account1 }),
+                    assetRouter.deposit(swapAddress, [0, 0, 0], 0, account1, { from: account1 }),
                     'Pausable: paused'
                 )
                 await expectRevert(
@@ -236,7 +236,7 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
             it('allows function calls', async () => {
                 // Pausable: paused check passes. revert for a different reason
                 await expectRevert(
-                    assetRouter.deposit(swapAddress, [0, 0, 0], 0, 0, account1, { from: account1 }),
+                    assetRouter.deposit(swapAddress, [0, 0, 0], 0, account1, { from: account1 }),
                     'NO_LIQUIDITY_PROVIDED'
                 )
                 await expectRevert(
@@ -262,19 +262,19 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
         describe('reverts', () => {
             it('reverts if total amount provided is zero', async () => {
                 await expectRevert(
-                    assetRouter.deposit(swapAddress, [0, 0, 0], 0, 0, account1, { from: account1 }),
+                    assetRouter.deposit(swapAddress, [0, 0, 0], 0, account1, { from: account1 }),
                     'NO_LIQUIDITY_PROVIDED'
                 )
             })
             it('cant deposit using depositETH without value', async () => {
                 await expectRevert(
-                    assetRouter.depositETH(swapAddress, [0, 0, 0], 0, 0, account1, { from: account1 }),
+                    assetRouter.depositETH(swapAddress, [0, 0, 0], 0, account1, { from: account1 }),
                     'NO_ETH_SENT'
                 )
             })
             it('cant deposit using depositETH in not weth pool', async () => {
                 await expectRevert(
-                    assetRouter.depositETH(swapAddress, [0, 0, 0], 0, 0, account1, { from: account1, value: 1 }),
+                    assetRouter.depositETH(swapAddress, [0, 0, 0], 0, account1, { from: account1, value: 1 }),
                     'NOT_WETH_POOL'
                 )
             })
@@ -284,10 +284,8 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
             before(async () => {
                 await stakingToken.approve(assetRouter.address, amounts[0], { from: account1 })
 
-                receipt = await assetRouter.deposit(
+                receipt = await assetRouter.depositLP(
                     swapAddress,
-                    [0, 0, 0],
-                    0,
                     amounts[0],
                     account1,
                     {
@@ -334,10 +332,8 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
             let receipt
             before(async () => {
                 await stakingToken.approve(assetRouter.address, amounts[1], { from: account1 })
-                receipt = await assetRouter.deposit(
+                receipt = await assetRouter.depositLP(
                     swapAddress,
-                    [0, 0, 0],
-                    0,
                     amounts[1],
                     account1,
                     {
@@ -381,10 +377,8 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
             let receipt
             before(async () => {
                 await stakingToken.approve(assetRouter.address, amounts[2], { from: account2 })
-                receipt = await assetRouter.deposit(
+                receipt = await assetRouter.depositLP(
                     swapAddress,
-                    [0, 0, 0],
-                    0,
                     amounts[2],
                     account2,
                     {
@@ -436,10 +430,8 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
             let receipt
             before(async () => {
                 await stakingToken.approve(assetRouter.address, amounts[3], { from: account1 })
-                receipt = await assetRouter.deposit(
+                receipt = await assetRouter.depositLP(
                     swapAddress,
-                    [0, 0, 0],
-                    0,
                     amounts[3],
                     account2,
                     {
@@ -508,7 +500,6 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
                 receipt = await assetRouter.deposit(
                     swapAddress,
                     [amounts[1], amounts[2], amounts[3]],
-                    0,
                     0,
                     accountNormalTokens,
                     {
@@ -796,10 +787,10 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
                 await stakingToken.approve(assetRouter.address, amounts[1], { from: account1 })
                 await stakingToken.approve(assetRouter.address, amounts[3], { from: account2 })
 
-                await assetRouter.deposit(swapAddress, [0, 0, 0], 0, amounts[1], account1, {
+                await assetRouter.depositLP(swapAddress, amounts[1], account1, {
                     from: account1
                 })
-                await assetRouter.deposit(swapAddress, [0, 0, 0], 0, amounts[3], account2, {
+                await assetRouter.depositLP(swapAddress, amounts[3], account2, {
                     from: account2
                 })
 
@@ -864,10 +855,10 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
                 await stakingToken.approve(assetRouter.address, amounts[1], { from: account1 })
                 await stakingToken.approve(assetRouter.address, amounts[3], { from: account2 })
 
-                await assetRouter.deposit(swapAddress, [0, 0, 0], 0, amounts[1], account1, {
+                await assetRouter.depositLP(swapAddress, amounts[1], account1, {
                     from: account1
                 })
-                await assetRouter.deposit(swapAddress, [0, 0, 0], 0, amounts[3], account2, {
+                await assetRouter.depositLP(swapAddress, amounts[3], account2, {
                     from: account2
                 })
 
@@ -1069,13 +1060,13 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
             before(async () => {
                 balance1 = await stakingToken.balanceOf(account1)
                 await stakingToken.approve(assetRouter.address, balance1, { from: account1 })
-                await assetRouter.deposit(swapAddress, [0, 0, 0], 0, balance1, account1, {
+                await assetRouter.depositLP(swapAddress, balance1, account1, {
                     from: account1
                 })
 
                 balance2 = await stakingToken.balanceOf(account2)
                 await stakingToken.approve(assetRouter.address, balance2, { from: account2 })
-                await assetRouter.deposit(swapAddress, [0, 0, 0], 0, balance2, account2, {
+                await assetRouter.depositLP(swapAddress, balance2, account2, {
                     from: account2
                 })
 
@@ -2296,6 +2287,7 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
             })
         })
     })
+
     describe('Upgradeability', () => {
         describe('updates', () => {
             const receipt = {}

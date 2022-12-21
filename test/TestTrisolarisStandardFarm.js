@@ -139,11 +139,6 @@ contract('Test UnoFarmTrisolarisStandard initialization', (accounts) => {
             await expectRevert(
                 implementation.deposit(
                     0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    constants.ZERO_ADDRESS,
                     constants.ZERO_ADDRESS,
                     {
                         from: accounts[1]
@@ -178,7 +173,7 @@ contract('Test UnoFarmTrisolarisStandard initialization', (accounts) => {
         // ASSET_ROUTER check passes, revert for a different reason
         it('Allows function calls for asset router', async () => {
             await expectRevert(
-                implementation.deposit(0, 0, 0, 0, 0, accounts[0], accounts[0], { from: assetRouter }),
+                implementation.deposit(0, accounts[0], { from: assetRouter }),
                 'NO_LIQUIDITY_PROVIDED'
             )
             await expectRevert(

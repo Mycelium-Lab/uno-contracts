@@ -17,10 +17,16 @@ interface IUnoAssetRouterTrisolarisStable {
     function accessManager() external view returns(IUnoAccessManager);
     function fee() external view returns(uint256);
 
+    function WETH() external view returns(address);
+    function TrisolarisRouter() external view returns(address);
+
     function initialize(address _accessManager, address _farmFactory) external;
 
-    function deposit(address swap, uint256[] memory amounts, uint256 minAmountLP, uint256 amountLP, address recipient) external returns (uint256 liquidity);
-    function depositETH(address swap, uint256[] memory amounts, uint256 minAmountLP, uint256 amountLP, address recipient) external payable returns(uint256 liquidity);
+    function deposit(address swap, uint256[] memory amounts, uint256 minAmountLP, address recipient) external returns (uint256 liquidity);
+    function depositETH(address swap, uint256[] memory amounts, uint256 minAmountLP, address recipient) external payable returns(uint256 liquidity);
+    function depositSingleAsset(address swap, address token, uint256 amount, bytes[] calldata swapData, uint256 minAmountLP, address recipient) external returns(uint256 sent, uint256 liquidity);
+    function depositSingleETH(address swap, bytes[] calldata swapData, uint256 minAmountLP, address recipient) external payable returns(uint256 sentETH, uint256 liquidity);
+    function depositLP(address swap, uint256 amount, address recipient) external;
 
     function withdraw(address swap, uint256 amount, uint256[] calldata minAmounts, bool withdrawLP, address recipient) external returns (uint256[] memory amounts);
     function withdrawETH(address swap, uint256 amount, uint256[] calldata minAmountsOut, address recipient) external returns(uint256[] memory amounts);

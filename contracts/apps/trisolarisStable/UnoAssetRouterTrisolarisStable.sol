@@ -30,6 +30,7 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
     uint256 public fee;
 
     address public constant WETH = 0xC9BdeEd33CD01541e1eeD10f90519d2C06Fe3feB;
+    address private constant OneInchRouter = 0x1111111254EEB25477B68fb85Ed929f73A960582;
 
     event Deposit(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Withdraw(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
@@ -69,18 +70,13 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
      * @param swap - Address of the Swap contract.
      * @param amounts - Amounts of tokens to deposit.
      * @param minAmountLP - Minimum LP the user will receive from {amounts} deposit.
-     * @param amountLP - Additional amount of LP tokens to deposit.
      * @param recipient - Address which will receive the deposit.
 
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
-    function deposit(
-        address swap,
-        uint256[] memory amounts,
-        uint256 minAmountLP,
-        uint256 amountLP,
-        address recipient
-    ) external whenNotPaused returns (uint256 liquidity) {
+    function deposit(address swap, uint256[] memory amounts, uint256 minAmountLP, address recipient) external whenNotPaused returns (uint256 liquidity) {
+        IERC20[] memory tokens = getTokens(swap);
+        require(amounts.length == tokens.length, "BAD_AMOUNTS_LENGTH");
         Farm farm = Farm(farmFactory.Farms(swap));
         if (farm == Farm(address(0))) {
             farm = Farm(farmFactory.createFarm(swap));
@@ -88,36 +84,30 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
 
         for (uint256 i = 0; i < amounts.length; i++) { 
             if (amounts[i] > 0) {
-                IERC20Upgradeable(farm.tokens(i)).safeTransferFrom(msg.sender, address(farm), amounts[i]); 
+                IERC20Upgradeable(farm.tokens(i)).safeTransferFrom(msg.sender, address(this), amounts[i]); 
             }
         }
-
-        if (amountLP > 0) {
-            IERC20Upgradeable(farm.lpPair()).safeTransferFrom(msg.sender, address(farm), amountLP);
-        }
  
-        liquidity = farm.deposit(amounts, minAmountLP, amountLP, recipient);
+        liquidity = _addLiquidity(swap, amounts, tokens, minAmountLP, farm);
+        farm.deposit(liquidity, recipient);
+
         emit Deposit(swap, msg.sender, recipient, liquidity);
     }
 
     /**
-     * @dev Autoconverts ETH into WETH and deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpPool} and deposits tokens in it.
+     * @dev Autoconverts ETH into WETH and deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {swap} and deposits tokens in it.
      * @param swap - Address of the Swap contract.
      * @param amounts - Amounts of tokens to deposit.
      * @param minAmountLP - Minimum LP the user will receive from {amounts} deposit.
-     * @param amountLP - Additional amount of LP tokens to deposit.
      * @param recipient - Address which will receive the deposit.
 
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
-    function depositETH(
-        address swap,
-        uint256[] memory amounts,
-        uint256 minAmountLP,
-        uint256 amountLP,
-        address recipient
-    ) external payable whenNotPaused returns(uint256 liquidity){
+    function depositETH(address swap, uint256[] memory amounts, uint256 minAmountLP, address recipient) external payable whenNotPaused returns(uint256 liquidity){
         require(msg.value > 0, "NO_ETH_SENT");
+        IERC20[] memory tokens = getTokens(swap);
+        require(amounts.length == tokens.length, "BAD_AMOUNTS_LENGTH");
+
         Farm farm = Farm(farmFactory.Farms(swap));
         if (farm == Farm(address(0))) {
             farm = Farm(farmFactory.createFarm(swap));
@@ -125,26 +115,150 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
 
         bool WETHInTokens;
         IWETH(WETH).deposit{value: msg.value}();
-        IERC20Upgradeable(WETH).safeTransfer(address(farm), msg.value);
         for (uint256 i = 0; i < amounts.length; i++) {
             address token = farm.tokens(i);
-            if(token != WETH){
-                if(amounts[i] > 0){
-                    IERC20Upgradeable(token).safeTransferFrom(msg.sender, address(farm), amounts[i]);
-                }
+            if(token == WETH){
+                amounts[i] = msg.value;
+                WETHInTokens = true;
                 continue;
             }
-            amounts[i] = msg.value;
-            WETHInTokens = true;
+            if(amounts[i] > 0){
+                IERC20Upgradeable(token).safeTransferFrom(msg.sender, address(this), amounts[i]);
+            }
         }
         require(WETHInTokens, "NOT_WETH_POOL");
-
-        if(amountLP > 0){
-            IERC20Upgradeable(farm.lpPair()).safeTransferFrom(msg.sender, address(farm), amountLP);
-        }
         
-        liquidity = farm.deposit(amounts, minAmountLP, amountLP, recipient);
+        liquidity = _addLiquidity(swap, amounts, tokens, minAmountLP, farm);
+        farm.deposit(liquidity, recipient);
+
         emit Deposit(swap, msg.sender, recipient, liquidity); 
+    }
+
+    /**
+     * @dev Deposits single token in the given pool. Creates new Farm contract if there isn't one deployed for the {swap}, swaps {token} for pool tokens and deposits them. Emits a {Deposit} event.
+     * @param swap - Address of the pool to deposit tokens in.
+     * @param token  - Address of a token to enter the pool.
+     * @param amount - Amount of token sent.
+     * @param swapData - Parameter with which 1inch router is being called with.
+     * @param minAmountLP - Minimum LP the user will receive from {tokens} deposit.
+     * @param recipient - Address which will receive the deposit.
+     
+     * @return sent - Total {token} amount sent to the farm. 
+     * @return liquidity - Total liquidity sent to the farm (in lpTokens).
+     */
+    function depositSingleAsset(address swap, address token, uint256 amount, bytes[] calldata swapData, uint256 minAmountLP, address recipient) external whenNotPaused returns(uint256 sent, uint256 liquidity){
+        require (amount > 0, "NO_TOKEN_SENT");
+        IERC20[] memory tokens = getTokens(swap);
+        require (swapData.length == tokens.length, 'BAD_SWAP_DATA_LENGTH');
+        
+        Farm farm = Farm(farmFactory.Farms(swap));
+        if(farm == Farm(address(0))){
+            farm = Farm(farmFactory.createFarm(swap));
+        }
+
+        IERC20Upgradeable(token).safeTransferFrom(msg.sender, address(this), amount);
+        IERC20Upgradeable(token).approve(OneInchRouter, amount);
+
+        uint256[] memory amounts = new uint256[](tokens.length);
+        {
+        sent = amount;
+        int256 tokenIndex = -1;
+        for (uint256 i = 0; i < tokens.length; i++) {
+            if (address(tokens[i]) == token) {
+                tokenIndex = int(i);
+                continue;
+            }
+            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[i]);
+            amounts[i] = returnAmount;
+            amount -= spentAmount;
+        }
+
+        if (tokenIndex != -1) {
+            amounts[uint256(tokenIndex)] = amount;
+        } else if (amount > 0) {
+            sent -= amount;
+            IERC20Upgradeable(token).safeTransfer(msg.sender, amount);
+        }
+        }
+
+        liquidity = _addLiquidity(swap, amounts, tokens, minAmountLP, farm);
+        farm.deposit(liquidity, recipient);
+
+        emit Deposit(swap, msg.sender, recipient, liquidity);
+    }
+
+    /**
+     * @dev Deposits single MATIC in the given pool. Creates new Farm contract if there isn't one deployed for the {swap}, swaps MATIC for pool tokens and deposits them. Emits a {Deposit} event.
+     * @param swap - Address of the pool to deposit tokens in.
+     * @param swapData - Parameter with which 1inch router is being called with.
+     * @param minAmountLP - Minimum LP the user will receive from {tokens} deposit.
+     * @param recipient - Address which will receive the deposit.
+     
+     * @return sentETH - Total MATIC amount sent to the farm. 
+     * @return liquidity - Total liquidity sent to the farm (in lpTokens).
+     */
+    function depositSingleETH(address swap, bytes[] calldata swapData, uint256 minAmountLP, address recipient) external payable whenNotPaused returns(uint256 sentETH, uint256 liquidity){
+        require (msg.value > 0, "NO_MATIC_SENT");
+        IERC20[] memory tokens = getTokens(swap);
+        require (swapData.length == tokens.length, 'BAD_SWAP_DATA_LENGTH');
+        
+        Farm farm = Farm(farmFactory.Farms(swap));
+        if(farm == Farm(address(0))){
+            farm = Farm(farmFactory.createFarm(swap));
+        }
+
+        uint256 amount = msg.value;
+        IWETH(WETH).deposit{value: amount}();
+        IERC20Upgradeable(WETH).approve(OneInchRouter, amount);
+
+        uint256[] memory amounts = new uint256[](tokens.length);
+        {
+        sentETH = amount;
+        int256 wmaticIndex = -1;
+        for (uint256 i = 0; i < tokens.length; i++) {
+            if (address(tokens[i]) == WETH) {
+                wmaticIndex = int(i);
+                continue;
+            }
+            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[i]);
+            if (returnAmount > 0) {
+                amounts[i] = returnAmount;
+            }
+            amount -= spentAmount;
+        }
+
+        if (wmaticIndex != -1) {
+            amounts[uint(wmaticIndex)] = amount;
+        } else if (amount > 0){
+            sentETH -= amount;
+            IWETH(WETH).withdraw(amount);
+            payable(msg.sender).transfer(amount);
+        }
+        }
+
+        liquidity = _addLiquidity(swap, amounts, tokens, minAmountLP, farm);
+        farm.deposit(liquidity, recipient);
+
+        emit Deposit(swap, msg.sender, recipient, liquidity);
+    }
+
+    /**
+     * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpPair} and deposits tokens in it. Emits a {Deposit} event.
+     * @param swap - Address of the pool to deposit tokens in.
+     * @param amount - LP Token amount to deposit.
+     * @param recipient - Address which will receive the deposit.
+     */
+    function depositLP(address swap, uint256 amount, address recipient) external whenNotPaused{
+        require(amount > 0, "NO_TOKEN_SENT");
+        Farm farm = Farm(farmFactory.Farms(swap));
+        if(farm == Farm(address(0))){
+            farm = Farm(farmFactory.createFarm(swap));
+        }
+
+        IERC20Upgradeable(farm.lpPair()).safeTransferFrom(msg.sender, address(farm), amount);
+        farm.deposit(amount, recipient);
+
+        emit Deposit(swap, msg.sender, recipient, amount); 
     }
 
     /** 
@@ -252,6 +366,39 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
         if (farm != Farm(address(0))) {
             totalDepositsLP = farm.getTotalDeposits();
         }
+    }
+
+    /**
+     * @dev Deposits assets to router
+     */ 
+    function _addLiquidity(
+        address swap,
+        uint256[] memory amounts, 
+        IERC20[] memory tokens,
+        uint256 minAmountLP,
+        Farm farm
+    ) internal returns(uint256 liquidity){
+        bool joinPool;
+        for (uint256 i = 0; i < amounts.length; i++) {
+            if(amounts[i] > 0){
+                if(!joinPool){
+                    joinPool = true;
+                }
+                tokens[i].approve(address(swap), amounts[i]);
+            }
+        }
+        require (joinPool, 'NO_LIQUIDITY_PROVIDED');
+        liquidity = ISwap(swap).addLiquidity(amounts, minAmountLP, block.timestamp);
+        IERC20Upgradeable(farm.lpPair()).safeTransfer(address(farm), liquidity);
+    }
+
+    /**
+     * @dev Swaps assets using 1inch exchange.
+     */  
+    function _swap(bytes calldata swapData) internal returns(uint256 returnAmount, uint256 spentAmount){
+        (bool success, bytes memory data) = OneInchRouter.call(swapData);
+        require(success, "SWAP_NOT_SUCCESSFUL");
+        (returnAmount, spentAmount) = abi.decode(data, (uint256, uint256));
     }
 
     /**

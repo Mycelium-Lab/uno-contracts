@@ -119,7 +119,7 @@ contract('Test UnoFarmTrisolarisStable initialization', (accounts) => {
         // CALLER_NOT_ASSET_ROUTER check fails
         it('Prevents function calls for not asset router', async () => {
             await expectRevert(
-                implementation.deposit([0, 0, 0], 0, 0, constants.ZERO_ADDRESS, {
+                implementation.deposit(0, constants.ZERO_ADDRESS, {
                     from: accounts[1]
                 }),
                 'CALLER_NOT_ASSET_ROUTER'
@@ -152,7 +152,7 @@ contract('Test UnoFarmTrisolarisStable initialization', (accounts) => {
         // ASSET_ROUTER check passes, revert for a different reason
         it('Allows function calls for asset router', async () => {
             await expectRevert(
-                implementation.deposit([0, 0, 0], 0, 0, constants.ZERO_ADDRESS, { from: assetRouter }),
+                implementation.deposit(0, constants.ZERO_ADDRESS, { from: assetRouter }),
                 'NO_LIQUIDITY_PROVIDED'
             )
             await expectRevert(

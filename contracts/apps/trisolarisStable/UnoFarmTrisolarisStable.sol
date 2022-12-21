@@ -162,34 +162,14 @@ contract UnoFarmTrisolarisStable is Initializable, ReentrancyGuardUpgradeable {
      * @dev Function that makes the deposits.
      * Deposits provided tokens in the Liquidity Pool, then stakes generated LP tokens in the {MasterChef}.
      */
-    function deposit(
-        uint256[] memory amounts,
-        uint256 minAmountLP,
-        uint256 amountLP,
-        address recipient
-    ) external nonReentrant onlyAssetRouter returns (uint256 liquidity) {
-        require(amounts.length == tokens.length, "BAD_AMOUNTS_LENGTH");
-        
-        bool joinPool = false;
-        for (uint256 i = 0; i < tokens.length; i++) {
-            if ((amounts[i] != 0) && !joinPool) {
-                joinPool = true;
-            }
-        }
-
-        uint256 addedLiquidity;
-        if (joinPool) {
-            addedLiquidity = swap.addLiquidity(amounts, minAmountLP, block.timestamp);
-        }
-
-        liquidity = addedLiquidity + amountLP;
-        require(liquidity > 0, "NO_LIQUIDITY_PROVIDED");
+    function deposit(uint256 amount, address recipient) external nonReentrant onlyAssetRouter {
+        require(amount > 0, "NO_LIQUIDITY_PROVIDED");
 
         _updateDeposit(recipient);
-        userInfo[recipient].stake += liquidity;
-        totalDeposits += liquidity;
+        userInfo[recipient].stake += amount;
+        totalDeposits += amount;
         
-        MasterChef.deposit(pid, liquidity, address(this));
+        MasterChef.deposit(pid, amount, address(this));
     }
 
     /**
