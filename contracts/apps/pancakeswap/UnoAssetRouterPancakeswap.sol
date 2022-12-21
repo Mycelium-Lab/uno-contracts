@@ -2,6 +2,7 @@
 pragma solidity 0.8.10;
 
 import {IUnoFarmPancakeswap as Farm} from './interfaces/IUnoFarmPancakeswap.sol'; 
+import "../../interfaces/IUniswapV2Router.sol";
 import '../../interfaces/IUnoFarmFactory.sol';
 import '../../interfaces/IUnoAccessManager.sol'; 
 import '../../interfaces/IUniswapV2Pair.sol';
@@ -29,6 +30,8 @@ contract UnoAssetRouterPancakeswap is Initializable, PausableUpgradeable, UUPSUp
     uint256 public fee;
 
     address public constant WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+    IUniswapV2Router01 public constant PancakeswapRouter = IUniswapV2Router01(0x10ED43C718714eb63d5aA57B78B54704E256024E);
+    address private constant OneInchRouter = 0x1111111254EEB25477B68fb85Ed929f73A960582;
 
     event Deposit(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
     event Withdraw(address indexed lpPool, address indexed sender, address indexed recipient, uint256 amount);
@@ -58,7 +61,7 @@ contract UnoAssetRouterPancakeswap is Initializable, PausableUpgradeable, UUPSUp
     }
 
     receive() external payable {
-        require(msg.sender == WBNB, 'ONLY_ACCEPT_WBNB'); // only accept ETH via fallback from the WBNB contract
+        require(msg.sender == WBNB || msg.sender == address(PancakeswapRouter), 'ONLY_ACCEPT_WBNB'); // only accept ETH via fallback from the WBNB or router contract
     }
 
     /**
@@ -68,30 +71,27 @@ contract UnoAssetRouterPancakeswap is Initializable, PausableUpgradeable, UUPSUp
      * @param amountB -  Token B amount to deposit.
      * @param amountAMin - Bounds the extent to which the B/A price can go up before the transaction reverts.
      * @param amountBMin - Bounds the extent to which the A/B price can go up before the transaction reverts.
-     * @param amountLP - Additional LP Token amount to deposit.
      * @param recipient - Address which will receive the deposit.
      
      * @return sentA - Token A amount sent to the farm.
      * @return sentB - Token B amount sent to the farm.
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
-    function deposit(address lpPair, uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin, uint256 amountLP, address recipient) external whenNotPaused returns(uint256 sentA, uint256 sentB, uint256 liquidity){
+    function deposit(address lpPair, uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin, address recipient) external whenNotPaused returns(uint256 sentA, uint256 sentB, uint256 liquidity){
+        require(amountA > 0 && amountB > 0, "NO_TOKENS_SENT");
         Farm farm = Farm(farmFactory.Farms(lpPair));
         if(farm == Farm(address(0))){
             farm = Farm(farmFactory.createFarm(lpPair));
         }
 
-        if(amountLP > 0){
-            IBEP20(lpPair).safeTransferFrom(msg.sender, address(farm), amountLP);
-        }
-        if(amountA > 0){
-            IBEP20(farm.tokenA()).safeTransferFrom(msg.sender, address(farm), amountA);
-        }
-        if(amountB > 0){
-            IBEP20(farm.tokenB()).safeTransferFrom(msg.sender, address(farm), amountB);
-        }
+        address tokenA = farm.tokenA();
+        address tokenB = farm.tokenB();
+        IBEP20(tokenA).safeTransferFrom(msg.sender, address(this), amountA);
+        IBEP20(tokenB).safeTransferFrom(msg.sender, address(this), amountB);
 
-        (sentA, sentB, liquidity) = farm.deposit(amountA, amountB, amountAMin, amountBMin, amountLP, msg.sender, recipient);
+        (sentA, sentB, liquidity) = _addLiquidity(tokenA, tokenB, amountA, amountB, amountAMin, amountBMin, address(farm));
+        farm.deposit(liquidity, recipient);
+
         emit Deposit(lpPair, msg.sender, recipient, liquidity); 
     }
 
@@ -101,51 +101,165 @@ contract UnoAssetRouterPancakeswap is Initializable, PausableUpgradeable, UUPSUp
      * @param amountToken  - Token amount to deposit.
      * @param amountTokenMin - Bounds the extent to which the TOKEN/WBNB price can go up before the transaction reverts.
      * @param amountETHMin - Bounds the extent to which the WBNB/TOKEN price can go up before the transaction reverts.
-     * @param amountLP - Additional LP Token amount to deposit.
      * @param recipient - Address which will receive the deposit.
      
      * @return sentToken - Token amount sent to the farm.
      * @return sentETH - WBNB amount sent to the farm.
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
-    function depositETH(address lpPair, uint256 amountToken, uint256 amountTokenMin, uint256 amountETHMin, uint256 amountLP, address recipient) external payable whenNotPaused returns(uint256 sentToken, uint256 sentETH, uint256 liquidity){
-        require(msg.value > 0, "NO_BNB_SENT");
+    function depositETH(address lpPair, uint256 amountToken, uint256 amountTokenMin, uint256 amountETHMin, address recipient) external payable whenNotPaused returns(uint256 sentToken, uint256 sentETH, uint256 liquidity){
+        require(msg.value > 0, "NO_MATIC_SENT");
+        require(amountToken > 0, "NO_TOKEN_SENT");
         Farm farm = Farm(farmFactory.Farms(lpPair));
         if(farm == Farm(address(0))){
             farm = Farm(farmFactory.createFarm(lpPair));
         }
 
-        if(amountLP > 0){
-            IBEP20(lpPair).safeTransferFrom(msg.sender, address(farm), amountLP);
-        }
-
         address tokenA = farm.tokenA();
         address tokenB = farm.tokenB();
-
-        IWBNB(WBNB).deposit{value: msg.value}();
-        IBEP20(WBNB).safeTransfer(address(farm), msg.value);
         if (tokenA == WBNB) {
-            if (amountToken > 0) {
-                IBEP20(tokenB).safeTransferFrom(msg.sender, address(farm), amountToken);
-            }
-            (sentETH, sentToken, liquidity) = farm.deposit(msg.value, amountToken, amountETHMin, amountTokenMin, amountLP, address(this), recipient);
-            IBEP20(tokenB).safeTransfer(msg.sender, amountToken - sentToken);
+            IBEP20(tokenB).safeTransferFrom(msg.sender, address(this), amountToken);
+            (sentToken, sentETH, liquidity) = _addLiquidityETH(tokenB, amountToken, amountTokenMin, amountETHMin, address(farm));
         } else if (tokenB == WBNB) {
-            if (amountToken > 0) {
-                IBEP20(tokenA).safeTransferFrom(msg.sender, address(farm), amountToken);
-            }
-            (sentToken, sentETH, liquidity) = farm.deposit(amountToken, msg.value, amountTokenMin, amountETHMin, amountLP, address(this), recipient);
-            IBEP20(tokenA).safeTransfer(msg.sender, amountToken - sentToken);
+            IBEP20(tokenA).safeTransferFrom(msg.sender, address(this), amountToken);
+            (sentToken, sentETH, liquidity) = _addLiquidityETH(tokenA, amountToken, amountTokenMin, amountETHMin, address(farm));
         } else {
             revert("NOT_WBNB_POOL");
         }
+        farm.deposit(liquidity, recipient);
 
-        uint256 dust = msg.value - sentETH;
-        if (dust > 0){
-            IWBNB(WBNB).withdraw(dust);
-            payable(msg.sender).transfer(dust);
-        }
         emit Deposit(lpPair, msg.sender, recipient, liquidity);
+    }
+
+    /**
+     * @dev Deposits single token in the given pool. Creates new Farm contract if there isn't one deployed for the {lpPair}, swaps {token} for pool tokens and deposits them. Emits a {Deposit} event.
+     * @param lpPair - Address of the pool to deposit tokens in.
+     * @param token  - Address of a token to enter the pool.
+     * @param amount - Amount of token sent.
+     * @param swapData - Parameter with which 1inch router is being called with.
+     * @param amountAMin - Bounds the extent to which the B/A price can go up before the transaction reverts.
+     * @param amountBMin - Bounds the extent to which the A/B price can go up before the transaction reverts.
+     * @param recipient - Address which will receive the deposit.
+     
+     * @return sent - Total {token} amount sent to the farm. NOTE: Returns dust left from swap in {token}, but if A/B amounts are not correct also returns dust in pool's tokens.
+     * @return liquidity - Total liquidity sent to the farm (in lpTokens).
+     */
+    function depositSingleAsset(address lpPair, address token, uint256 amount, bytes[2] calldata swapData, uint256 amountAMin, uint256 amountBMin, address recipient) external whenNotPaused returns(uint256 sent, uint256 liquidity){
+        require(amount > 0, "NO_TOKEN_SENT");
+        Farm farm = Farm(farmFactory.Farms(lpPair));
+        if(farm == Farm(address(0))){
+            farm = Farm(farmFactory.createFarm(lpPair));
+        }
+
+        IBEP20(token).safeTransferFrom(msg.sender, address(this), amount);
+        IBEP20(token).approve(OneInchRouter, amount);
+
+        sent = amount;
+        uint256 amountA;
+        uint256 amountB;
+        address tokenA = farm.tokenA();
+        address tokenB = farm.tokenB();
+
+        if (tokenA != token) {
+            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[0]);
+            amount -= spentAmount;
+            amountA = returnAmount;
+        }
+        if (tokenB != token) {
+            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[1]);
+            amount -= spentAmount;
+            amountB = returnAmount;
+        }
+
+        if (tokenA == token) {
+            amountA = amount;
+        } else if (tokenB == token) {
+            amountB = amount;
+        } else if(amount > 0) {
+            sent -= amount;
+            IBEP20(token).safeTransfer(msg.sender, amount);
+        }
+
+        require(amountA > 0 && amountB > 0, "NO_TOKENS_SENT");
+        (,,liquidity) = _addLiquidity(tokenA, tokenB, amountA, amountB, amountAMin, amountBMin, address(farm));
+        farm.deposit(liquidity, recipient);
+        
+        emit Deposit(lpPair, msg.sender, recipient, liquidity);
+    }
+     
+    /**
+     * @dev Deposits single MATIC in the given pool. Creates new Farm contract if there isn't one deployed for the {lpPair}, swaps MATIC for pool tokens and deposits them. Emits a {Deposit} event.
+     * @param lpPair - Address of the pool to deposit tokens in.
+     * @param swapData - Parameter with which 1inch router is being called with.
+     * @param amountAMin - Bounds the extent to which the B/A price can go up before the transaction reverts.
+     * @param amountBMin - Bounds the extent to which the A/B price can go up before the transaction reverts.
+     * @param recipient - Address which will receive the deposit.
+     
+     * @return sentETH - Total MATIC amount sent to the farm. NOTE: Returns dust left from swap in MATIC, but if A/B amount are not correct also returns dust in pool's tokens.
+     * @return liquidity - Total liquidity sent to the farm (in lpTokens).
+     */
+    function depositSingleETH(address lpPair, bytes[2] calldata swapData, uint256 amountAMin, uint256 amountBMin, address recipient) external payable whenNotPaused returns(uint256 sentETH, uint256 liquidity){
+        require(msg.value > 0, "NO_MATIC_SENT");
+        Farm farm = Farm(farmFactory.Farms(lpPair));
+        if(farm == Farm(address(0))){
+            farm = Farm(farmFactory.createFarm(lpPair));
+        }
+
+        uint256 amount = msg.value;
+        IWBNB(WBNB).deposit{value: amount}();
+        IBEP20(WBNB).approve(OneInchRouter, amount);
+
+        sentETH = amount;
+        uint256 amountA;
+        uint256 amountB;
+        address tokenA = farm.tokenA();
+        address tokenB = farm.tokenB();
+
+        if (tokenA != WBNB) {
+            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[0]);
+            amount -= spentAmount;
+            amountA = returnAmount;
+        }
+        if (tokenB != WBNB) {
+            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[1]);
+            amount -= spentAmount;
+            amountB = returnAmount;
+        }
+
+        if (tokenA == WBNB) {
+            amountA = amount;
+        } else if (tokenB == WBNB) {
+            amountB = amount;
+        } else if (amount > 0) {
+            sentETH -= amount;
+            IWBNB(WBNB).withdraw(amount);
+            payable(msg.sender).transfer(amount);
+        }
+
+        require(amountA > 0 && amountB > 0, "NO_TOKENS_SENT");
+        (,,liquidity) = _addLiquidity(tokenA, tokenB, amountA, amountB, amountAMin, amountBMin, address(farm));
+        farm.deposit(liquidity, recipient);
+
+        emit Deposit(lpPair, msg.sender, recipient, liquidity);
+    }
+
+    /**
+     * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpPair} and deposits tokens in it. Emits a {Deposit} event.
+     * @param lpPair - Address of the pool to deposit tokens in.
+     * @param amount - LP Token amount to deposit.
+     * @param recipient - Address which will receive the deposit.
+     */
+    function depositLP(address lpPair, uint256 amount, address recipient) external whenNotPaused{
+        require(amount > 0, "NO_TOKEN_SENT");
+        Farm farm = Farm(farmFactory.Farms(lpPair));
+        if(farm == Farm(address(0))){
+            farm = Farm(farmFactory.createFarm(lpPair));
+        }
+
+        IBEP20(lpPair).safeTransferFrom(msg.sender, address(farm), amount);
+        farm.deposit(amount, recipient);
+
+        emit Deposit(lpPair, msg.sender, recipient, amount); 
     }
 
     /** 
@@ -236,7 +350,7 @@ contract UnoAssetRouterPancakeswap is Initializable, PausableUpgradeable, UUPSUp
         Farm farm = Farm(farmFactory.Farms(lpPair));
         if (farm != Farm(address(0))) {
             stakeLP = farm.userBalance(_address);
-            (stakeA, stakeB) = getTokenStake(lpPair, stakeLP);
+            (stakeA, stakeB) = _getTokenStake(lpPair, stakeLP);
         }
     }
 
@@ -252,7 +366,7 @@ contract UnoAssetRouterPancakeswap is Initializable, PausableUpgradeable, UUPSUp
         Farm farm = Farm(farmFactory.Farms(lpPair));
         if (farm != Farm(address(0))) {
             totalDepositsLP = farm.getTotalDeposits(); 
-            (totalDepositsA, totalDepositsB) = getTokenStake(lpPair, totalDepositsLP);
+            (totalDepositsA, totalDepositsB) = _getTokenStake(lpPair, totalDepositsLP);
         }
     }
 
@@ -269,6 +383,54 @@ contract UnoAssetRouterPancakeswap is Initializable, PausableUpgradeable, UUPSUp
     }
 
     /**
+     * @dev Deposits assets to router & refunds dust.
+     */ 
+    function _addLiquidity(
+        address tokenA,
+        address tokenB, 
+        uint256 amountA, 
+        uint256 amountB, 
+        uint256 amountAMin, 
+        uint256 amountBMin, 
+        address farm
+    ) internal returns(uint256 sentA, uint256 sentB, uint256 liquidity){
+        IBEP20(tokenA).approve(address(PancakeswapRouter), amountA);
+        IBEP20(tokenB).approve(address(PancakeswapRouter), amountB);
+
+        (sentA, sentB, liquidity) = PancakeswapRouter.addLiquidity(tokenA, tokenB, amountA, amountB, amountAMin, amountBMin, farm, block.timestamp);
+        // Refund dust
+        IBEP20(tokenA).safeTransfer(msg.sender, amountA - sentA);
+		IBEP20(tokenB).safeTransfer(msg.sender, amountB - sentB);
+    }
+
+    /**
+     * @dev Deposits assets to router & refunds dust.
+     */ 
+    function _addLiquidityETH(
+        address token,
+        uint256 amount, 
+        uint256 amountTokenMin, 
+        uint256 amountETHMin, 
+        address farm
+    ) internal returns(uint256 sentToken, uint256 sentETH, uint256 liquidity){
+        IBEP20(token).approve(address(PancakeswapRouter), amount);
+
+        (sentToken, sentETH, liquidity) = PancakeswapRouter.addLiquidityETH{value: msg.value}(token, amount, amountTokenMin, amountETHMin, farm, block.timestamp);
+        // Refund dust
+        IBEP20(token).safeTransfer(msg.sender, amount - sentToken);
+        payable(msg.sender).transfer(msg.value - sentETH);
+    }
+
+    /**
+     * @dev Swaps assets using 1inch exchange.
+     */  
+    function _swap(bytes calldata swapData) internal returns(uint256 returnAmount, uint256 spentAmount){
+        (bool success, bytes memory data) = OneInchRouter.call(swapData);
+        require(success, "SWAP_NOT_SUCCESSFUL");
+        (returnAmount, spentAmount) = abi.decode(data, (uint256, uint256));
+    }
+
+    /**
      * @dev Converts LP tokens to normal tokens, value(amountA) == value(amountB) == 0.5*amountLP
      * @param lpPair - LP pair for conversion.
      * @param amountLP - Amount of LP tokens to convert.
@@ -276,7 +438,7 @@ contract UnoAssetRouterPancakeswap is Initializable, PausableUpgradeable, UUPSUp
      * @return amountA - Token A amount.
      * @return amountB - Token B amount.
      */ 
-    function getTokenStake(address lpPair, uint256 amountLP) internal view returns (uint256 amountA, uint256 amountB) {
+    function _getTokenStake(address lpPair, uint256 amountLP) internal view returns (uint256 amountA, uint256 amountB) {
         uint256 totalSupply = IBEP20(lpPair).totalSupply();
         amountA = amountLP * IBEP20(IUniswapV2Pair(lpPair).token0()).balanceOf(lpPair) / totalSupply;
         amountB = amountLP * IBEP20(IUniswapV2Pair(lpPair).token1()).balanceOf(lpPair) / totalSupply;

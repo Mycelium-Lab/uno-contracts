@@ -208,7 +208,7 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                 )
             })
             it('prevents function calls', async () => {
-                await expectRevert(assetRouter.deposit(pool, 0, 0, 0, 0, 0, account1, { from: account1 }), 'Pausable: paused')
+                await expectRevert(assetRouter.deposit(pool, 0, 0, 0, 0, account1, { from: account1 }), 'Pausable: paused')
                 await expectRevert(
                     assetRouter.distribute(
                         pool,
@@ -246,8 +246,8 @@ contract('UnoAssetRouterApeswap', (accounts) => {
             it('allows function calls', async () => {
                 // Pausable: paused check passes. revert for a different reason
                 await expectRevert(
-                    assetRouter.deposit(pool, 0, 0, 0, 0, 0, account1, { from: account1 }),
-                    'NO_LIQUIDITY_PROVIDED'
+                    assetRouter.deposit(pool, 0, 0, 0, 0, account1, { from: account1 }),
+                    'NO_TOKENS_SENT'
                 )
                 await expectRevert(
                     assetRouter.distribute(
@@ -274,8 +274,8 @@ contract('UnoAssetRouterApeswap', (accounts) => {
         describe('reverts', () => {
             it('reverts if total amount provided is zero', async () => {
                 await expectRevert(
-                    assetRouter.deposit(pool, 0, 0, 0, 0, 0, account1, { from: account1 }),
-                    'NO_LIQUIDITY_PROVIDED'
+                    assetRouter.deposit(pool, 0, 0, 0, 0, account1, { from: account1 }),
+                    'NO_TOKENS_SENT'
                 )
             })
         })
@@ -283,7 +283,7 @@ contract('UnoAssetRouterApeswap', (accounts) => {
             let receipt
             before(async () => {
                 await stakingToken.approve(assetRouter.address, amounts[0], { from: account1 })
-                receipt = await assetRouter.deposit(pool, 0, 0, 0, 0, amounts[0], account1, { from: account1 })
+                receipt = await assetRouter.depositLP(pool, amounts[0], account1, { from: account1 })
 
                 const farmAddress = await factory.Farms(pool)
                 farm = await Farm.at(farmAddress)
@@ -324,7 +324,7 @@ contract('UnoAssetRouterApeswap', (accounts) => {
             let receipt
             before(async () => {
                 await stakingToken.approve(assetRouter.address, amounts[1], { from: account1 })
-                receipt = await assetRouter.deposit(pool, 0, 0, 0, 0, amounts[1], account1, { from: account1 })
+                receipt = await assetRouter.depositLP(pool, amounts[1], account1, { from: account1 })
             })
             it('fires events', async () => {
                 expectEvent(receipt, 'Deposit', {
@@ -362,7 +362,7 @@ contract('UnoAssetRouterApeswap', (accounts) => {
             let receipt
             before(async () => {
                 await stakingToken.approve(assetRouter.address, amounts[2], { from: account2 })
-                receipt = await assetRouter.deposit(pool, 0, 0, 0, 0, amounts[2], account2, { from: account2 })
+                receipt = await assetRouter.depositLP(pool, amounts[2], account2, { from: account2 })
             })
             it('fires events', async () => {
                 expectEvent(receipt, 'Deposit', {
@@ -408,7 +408,7 @@ contract('UnoAssetRouterApeswap', (accounts) => {
             let receipt
             before(async () => {
                 await stakingToken.approve(assetRouter.address, amounts[3], { from: account1 })
-                receipt = await assetRouter.deposit(pool, 0, 0, 0, 0, amounts[3], account2, { from: account1 })
+                receipt = await assetRouter.depositLP(pool, amounts[3], account2, { from: account1 })
             })
             it('fires event', async () => {
                 expectEvent(receipt, 'Deposit', {
@@ -489,16 +489,16 @@ contract('UnoAssetRouterApeswap', (accounts) => {
             })
             it('reverts if minAmountA > amountA || minAmountB > amountB', async () => {
                 await expectRevert(
-                    assetRouter.deposit(pool, amountA, new BN(1), amountA, 0, 0, account1, { from: account1 }),
+                    assetRouter.deposit(pool, amountA, new BN(1), amountA, 0, account1, { from: account1 }),
                     'INSUFFICIENT_A_AMOUNT'
                 )
                 await expectRevert(
-                    assetRouter.deposit(pool, new BN(1), amountB, 0, amountB, 0, account1, { from: account1 }),
+                    assetRouter.deposit(pool, new BN(1), amountB, 0, amountB, account1, { from: account1 }),
                     'INSUFFICIENT_B_AMOUNT'
                 )
             })
             it('fires events', async () => {
-                const receipt = await assetRouter.deposit(pool, amountA, amountB, 0, 0, 0, account1, { from: account1 })
+                const receipt = await assetRouter.deposit(pool, amountA, amountB, 0, 0, account1, { from: account1 })
                 expectEvent(receipt, 'Deposit', { lpPool: pool, sender: account1, recipient: account1 })
             })
             it('withdraws tokens from balance', async () => {
@@ -921,11 +921,11 @@ contract('UnoAssetRouterApeswap', (accounts) => {
             before(async () => {
                 balance1 = await stakingToken.balanceOf(account1)
                 await stakingToken.approve(assetRouter.address, balance1, { from: account1 })
-                await assetRouter.deposit(pool, 0, 0, 0, 0, balance1, account1, { from: account1 })
+                await assetRouter.depositLP(pool, balance1, account1, { from: account1 })
 
                 balance2 = await stakingToken.balanceOf(account2)
                 await stakingToken.approve(assetRouter.address, balance2, { from: account2 })
-                await assetRouter.deposit(pool, 0, 0, 0, 0, balance2, account2, { from: account2 })
+                await assetRouter.depositLP(pool, balance2, account2, { from: account2 })
 
                 BUSD = await IUniswapV2Pair.at('0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56')
 
@@ -1257,7 +1257,7 @@ contract('UnoAssetRouterApeswap', (accounts) => {
             })
             it('fires events', async () => {
                 ethBalanceBefore = new BN(await web3.eth.getBalance(account3))
-                const receipt = await assetRouter.depositETH(pool, amountToken, 0, 0, 0, account3, {
+                const receipt = await assetRouter.depositETH(pool, amountToken, 0, 0, account3, {
                     from: account3,
                     value: amountETH
                 })
