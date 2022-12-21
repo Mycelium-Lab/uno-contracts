@@ -4,7 +4,7 @@ pragma solidity 0.8.10;
 interface IUniswapV2Router01 {
 	function factory() external pure returns (address);
 
-	function WETH() external pure returns (address);
+	function WAVAX() external pure returns (address);
 
 	function addLiquidity(
 		address tokenA,
@@ -23,11 +23,11 @@ interface IUniswapV2Router01 {
 			uint256 liquidity
 		);
 
-	function addLiquidityETH(
+	function addLiquidityAVAX(
 		address token,
 		uint256 amountTokenDesired,
 		uint256 amountTokenMin,
-		uint256 amountETHMin,
+		uint256 amountAVAXMin,
 		address to,
 		uint256 deadline
 	)
@@ -35,7 +35,7 @@ interface IUniswapV2Router01 {
 		payable
 		returns (
 			uint256 amountToken,
-			uint256 amountETH,
+			uint256 amountAVAX,
 			uint256 liquidity
 		);
 
@@ -49,14 +49,14 @@ interface IUniswapV2Router01 {
 		uint256 deadline
 	) external returns (uint256 amountA, uint256 amountB);
 
-	function removeLiquidityETH(
+	function removeLiquidityAVAX(
 		address token,
 		uint256 liquidity,
 		uint256 amountTokenMin,
-		uint256 amountETHMin,
+		uint256 amountAVAXMin,
 		address to,
 		uint256 deadline
-	) external returns (uint256 amountToken, uint256 amountETH);
+	) external returns (uint256 amountToken, uint256 amountAVAX);
 
 	function removeLiquidityWithPermit(
 		address tokenA,
@@ -72,18 +72,18 @@ interface IUniswapV2Router01 {
 		bytes32 s
 	) external returns (uint256 amountA, uint256 amountB);
 
-	function removeLiquidityETHWithPermit(
+	function removeLiquidityAVAXWithPermit(
 		address token,
 		uint256 liquidity,
 		uint256 amountTokenMin,
-		uint256 amountETHMin,
+		uint256 amountAVAXMin,
 		address to,
 		uint256 deadline,
 		bool approveMax,
 		uint8 v,
 		bytes32 r,
 		bytes32 s
-	) external returns (uint256 amountToken, uint256 amountETH);
+	) external returns (uint256 amountToken, uint256 amountAVAX);
 
 	function swapExactTokensForTokens(
 		uint256 amountIn,
@@ -101,14 +101,14 @@ interface IUniswapV2Router01 {
 		uint256 deadline
 	) external returns (uint256[] memory amounts);
 
-	function swapExactETHForTokens(
+	function swapExactAVAXForTokens(
 		uint256 amountOutMin,
 		address[] calldata path,
 		address to,
 		uint256 deadline
 	) external payable returns (uint256[] memory amounts);
 
-	function swapTokensForExactETH(
+	function swapTokensForExactAVAX(
 		uint256 amountOut,
 		uint256 amountInMax,
 		address[] calldata path,
@@ -116,7 +116,7 @@ interface IUniswapV2Router01 {
 		uint256 deadline
 	) external returns (uint256[] memory amounts);
 
-	function swapExactTokensForETH(
+	function swapExactTokensForAVAX(
 		uint256 amountIn,
 		uint256 amountOutMin,
 		address[] calldata path,
@@ -124,7 +124,7 @@ interface IUniswapV2Router01 {
 		uint256 deadline
 	) external returns (uint256[] memory amounts);
 
-	function swapETHForExactTokens(
+	function swapAVAXForExactTokens(
 		uint256 amountOut,
 		address[] calldata path,
 		address to,

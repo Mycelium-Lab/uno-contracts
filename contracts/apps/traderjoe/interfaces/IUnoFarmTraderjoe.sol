@@ -23,15 +23,7 @@ interface IUnoFarmTraderjoe {
 
 	function initialize(address _lpStakingPool, address _assetRouter) external;
 
-	function deposit(
-		uint256 amountA,
-		uint256 amountB,
-		uint256 amountAMin,
-		uint256 amountBMin,
-		uint256 amountLP,
-		address origin,
-		address recipient
-	) external returns (uint256 sentA, uint256 sentB, uint256 liquidity);
+	function deposit(uint256 amount, address recipient) external;
 
 	function withdraw(
 		uint256 amount,

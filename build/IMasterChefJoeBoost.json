@@ -81,7 +81,7 @@
       "type": "function"
     }
   ],
-  "metadata": "{\"compiler\":{\"version\":\"0.8.10+commit.fc410830\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"pid\",\"type\":\"uint256\"}],\"name\":\"poolInfo\",\"outputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"lpToken\",\"type\":\"address\"},{\"internalType\":\"uint96\",\"name\":\"allocPoint\",\"type\":\"uint96\"},{\"internalType\":\"uint256\",\"name\":\"accJoePerShare\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"accJoePerFactorPerShare\",\"type\":\"uint256\"},{\"internalType\":\"uint64\",\"name\":\"lastRewardTimestamp\",\"type\":\"uint64\"},{\"internalType\":\"address\",\"name\":\"rewarder\",\"type\":\"address\"},{\"internalType\":\"uint32\",\"name\":\"veJoeShareBp\",\"type\":\"uint32\"},{\"internalType\":\"uint256\",\"name\":\"totalFactor\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"totalLpSupply\",\"type\":\"uint256\"}],\"internalType\":\"struct IMasterChefJoeBoost.PoolInfo\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"poolLength\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"project:/contracts/interfaces/IMasterChefJoeBoost.sol\":\"IMasterChefJoeBoost\"},\"evmVersion\":\"london\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[]},\"sources\":{\"project:/contracts/interfaces/IMasterChefJoeBoost.sol\":{\"keccak256\":\"0x1a6878fcceb3ed33f49d3a484268452cc2aa910e2c488853daea68c3adfa0a73\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://c258f34730e557cbce3ceccfbf1c45727e9bbfc47b030ed79f85599152d32448\",\"dweb:/ipfs/QmNk4cGkaPcSe1UKRVj1EBNL6G8o5ctQkuupX5vQq8Re4K\"]}},\"version\":1}",
+  "metadata": "{\"compiler\":{\"version\":\"0.8.10+commit.fc410830\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"pid\",\"type\":\"uint256\"}],\"name\":\"poolInfo\",\"outputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"lpToken\",\"type\":\"address\"},{\"internalType\":\"uint96\",\"name\":\"allocPoint\",\"type\":\"uint96\"},{\"internalType\":\"uint256\",\"name\":\"accJoePerShare\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"accJoePerFactorPerShare\",\"type\":\"uint256\"},{\"internalType\":\"uint64\",\"name\":\"lastRewardTimestamp\",\"type\":\"uint64\"},{\"internalType\":\"address\",\"name\":\"rewarder\",\"type\":\"address\"},{\"internalType\":\"uint32\",\"name\":\"veJoeShareBp\",\"type\":\"uint32\"},{\"internalType\":\"uint256\",\"name\":\"totalFactor\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"totalLpSupply\",\"type\":\"uint256\"}],\"internalType\":\"struct IMasterChefJoeBoost.PoolInfo\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"poolLength\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"project:/contracts/interfaces/IMasterChefJoeBoost.sol\":\"IMasterChefJoeBoost\"},\"evmVersion\":\"london\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[]},\"sources\":{\"project:/contracts/interfaces/IMasterChefJoeBoost.sol\":{\"keccak256\":\"0x505315721e9e9a859147beaa53e691fb5e4bd3effe422419928ea70e0a9d028a\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://20803750c885eee35f34722b0c02e3df36e3d8973c7ee8f785764f6eb0be999b\",\"dweb:/ipfs/QmXkvgypQspc1TuBRanpPfXfGkr78UC9eEaQy9NLsFKa2f\"]}},\"version\":1}",
   "bytecode": "0x",
   "deployedBytecode": "0x",
   "immutableReferences": {},
@@ -89,37 +89,37 @@
   "deployedGeneratedSources": [],
   "sourceMap": "",
   "deployedSourceMap": "",
-  "source": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.10;\npragma experimental ABIEncoderV2;\n\ninterface IMasterChefJoeBoost {\n\tstruct PoolInfo {\n\t\t// Address are stored in 160 bits, so we store allocPoint in 96 bits to\n\t\t// optimize storage (160 + 96 = 256)\n\t\taddress lpToken;\n\t\tuint96 allocPoint;\n\t\tuint256 accJoePerShare;\n\t\tuint256 accJoePerFactorPerShare;\n\t\t// Address are stored in 160 bits, so we store lastRewardTimestamp in 64 bits and\n\t\t// veJoeShareBp in 32 bits to optimize storage (160 + 64 + 32 = 256)\n\t\tuint64 lastRewardTimestamp;\n\t\taddress rewarder;\n\t\t// Share of the reward to distribute to veJoe holders\n\t\tuint32 veJoeShareBp;\n\t\t// The sum of all veJoe held by users participating in this farm\n\t\t// This value is updated when\n\t\t// - A user enter/leaves a farm\n\t\t// - A user claims veJOE\n\t\t// - A user unstakes JOE\n\t\tuint256 totalFactor;\n\t\t// The total LP supply of the farm\n\t\t// This is the sum of all users boosted amounts in the farm. Updated when\n\t\t// someone deposits or withdraws.\n\t\t// This is used instead of the usual `lpToken.balanceOf(address(this))` for security reasons\n\t\tuint256 totalLpSupply;\n\t}\n\n\tfunction poolInfo(uint256 pid) external view returns (IMasterChefJoeBoost.PoolInfo memory);\n\n\tfunction poolLength() external view returns (uint256);\n}\n",
-  "sourcePath": "/home/ilau/projectWork/uno-contracts/contracts/interfaces/IMasterChefJoeBoost.sol",
+  "source": "// SPDX-License-Identifier: MIT\r\npragma solidity 0.8.10;\r\npragma experimental ABIEncoderV2;\r\n\r\ninterface IMasterChefJoeBoost {\r\n\tstruct PoolInfo {\r\n\t\t// Address are stored in 160 bits, so we store allocPoint in 96 bits to\r\n\t\t// optimize storage (160 + 96 = 256)\r\n\t\taddress lpToken;\r\n\t\tuint96 allocPoint;\r\n\t\tuint256 accJoePerShare;\r\n\t\tuint256 accJoePerFactorPerShare;\r\n\t\t// Address are stored in 160 bits, so we store lastRewardTimestamp in 64 bits and\r\n\t\t// veJoeShareBp in 32 bits to optimize storage (160 + 64 + 32 = 256)\r\n\t\tuint64 lastRewardTimestamp;\r\n\t\taddress rewarder;\r\n\t\t// Share of the reward to distribute to veJoe holders\r\n\t\tuint32 veJoeShareBp;\r\n\t\t// The sum of all veJoe held by users participating in this farm\r\n\t\t// This value is updated when\r\n\t\t// - A user enter/leaves a farm\r\n\t\t// - A user claims veJOE\r\n\t\t// - A user unstakes JOE\r\n\t\tuint256 totalFactor;\r\n\t\t// The total LP supply of the farm\r\n\t\t// This is the sum of all users boosted amounts in the farm. Updated when\r\n\t\t// someone deposits or withdraws.\r\n\t\t// This is used instead of the usual `lpToken.balanceOf(address(this))` for security reasons\r\n\t\tuint256 totalLpSupply;\r\n\t}\r\n\r\n\tfunction poolInfo(uint256 pid) external view returns (IMasterChefJoeBoost.PoolInfo memory);\r\n\r\n\tfunction poolLength() external view returns (uint256);\r\n}\r\n",
+  "sourcePath": "C:\\Users\\jugli\\Desktop\\uno\\uno-contracts-avalanche\\contracts\\interfaces\\IMasterChefJoeBoost.sol",
   "ast": {
     "absolutePath": "project:/contracts/interfaces/IMasterChefJoeBoost.sol",
     "exportedSymbols": {
       "IMasterChefJoeBoost": [
-        6001
+        6628
       ]
     },
-    "id": 6002,
+    "id": 6629,
     "license": "MIT",
     "nodeType": "SourceUnit",
     "nodes": [
       {
-        "id": 5967,
+        "id": 6594,
         "literals": [
           "solidity",
           "0.8",
           ".10"
         ],
         "nodeType": "PragmaDirective",
-        "src": "32:23:30"
+        "src": "33:23:30"
       },
       {
-        "id": 5968,
+        "id": 6595,
         "literals": [
           "experimental",
           "ABIEncoderV2"
         ],
         "nodeType": "PragmaDirective",
-        "src": "56:33:30"
+        "src": "58:33:30"
       },
       {
         "abstract": false,
@@ -128,27 +128,27 @@
         "contractDependencies": [],
         "contractKind": "interface",
         "fullyImplemented": false,
-        "id": 6001,
+        "id": 6628,
         "linearizedBaseContracts": [
-          6001
+          6628
         ],
         "name": "IMasterChefJoeBoost",
-        "nameLocation": "101:19:30",
+        "nameLocation": "105:19:30",
         "nodeType": "ContractDefinition",
         "nodes": [
           {
             "canonicalName": "IMasterChefJoeBoost.PoolInfo",
-            "id": 5987,
+            "id": 6614,
             "members": [
               {
                 "constant": false,
-                "id": 5970,
+                "id": 6597,
                 "mutability": "mutable",
                 "name": "lpToken",
-                "nameLocation": "265:7:30",
+                "nameLocation": "273:7:30",
                 "nodeType": "VariableDeclaration",
-                "scope": 5987,
-                "src": "257:15:30",
+                "scope": 6614,
+                "src": "265:15:30",
                 "stateVariable": false,
                 "storageLocation": "default",
                 "typeDescriptions": {
@@ -156,10 +156,10 @@
                   "typeString": "address"
                 },
                 "typeName": {
-                  "id": 5969,
+                  "id": 6596,
                   "name": "address",
                   "nodeType": "ElementaryTypeName",
-                  "src": "257:7:30",
+                  "src": "265:7:30",
                   "stateMutability": "nonpayable",
                   "typeDescriptions": {
                     "typeIdentifier": "t_address",
@@ -170,13 +170,13 @@
               },
               {
                 "constant": false,
-                "id": 5972,
+                "id": 6599,
                 "mutability": "mutable",
                 "name": "allocPoint",
-                "nameLocation": "283:10:30",
+                "nameLocation": "292:10:30",
                 "nodeType": "VariableDeclaration",
-                "scope": 5987,
-                "src": "276:17:30",
+                "scope": 6614,
+                "src": "285:17:30",
                 "stateVariable": false,
                 "storageLocation": "default",
                 "typeDescriptions": {
@@ -184,10 +184,10 @@
                   "typeString": "uint96"
                 },
                 "typeName": {
-                  "id": 5971,
+                  "id": 6598,
                   "name": "uint96",
                   "nodeType": "ElementaryTypeName",
-                  "src": "276:6:30",
+                  "src": "285:6:30",
                   "typeDescriptions": {
                     "typeIdentifier": "t_uint96",
                     "typeString": "uint96"
@@ -197,13 +197,13 @@
               },
               {
                 "constant": false,
-                "id": 5974,
+                "id": 6601,
                 "mutability": "mutable",
                 "name": "accJoePerShare",
-                "nameLocation": "305:14:30",
+                "nameLocation": "315:14:30",
                 "nodeType": "VariableDeclaration",
-                "scope": 5987,
-                "src": "297:22:30",
+                "scope": 6614,
+                "src": "307:22:30",
                 "stateVariable": false,
                 "storageLocation": "default",
                 "typeDescriptions": {
@@ -211,10 +211,10 @@
                   "typeString": "uint256"
                 },
                 "typeName": {
-                  "id": 5973,
+                  "id": 6600,
                   "name": "uint256",
                   "nodeType": "ElementaryTypeName",
-                  "src": "297:7:30",
+                  "src": "307:7:30",
                   "typeDescriptions": {
                     "typeIdentifier": "t_uint256",
                     "typeString": "uint256"
@@ -224,13 +224,13 @@
               },
               {
                 "constant": false,
-                "id": 5976,
+                "id": 6603,
                 "mutability": "mutable",
                 "name": "accJoePerFactorPerShare",
-                "nameLocation": "331:23:30",
+                "nameLocation": "342:23:30",
                 "nodeType": "VariableDeclaration",
-                "scope": 5987,
-                "src": "323:31:30",
+                "scope": 6614,
+                "src": "334:31:30",
                 "stateVariable": false,
                 "storageLocation": "default",
                 "typeDescriptions": {
@@ -238,10 +238,10 @@
                   "typeString": "uint256"
                 },
                 "typeName": {
-                  "id": 5975,
+                  "id": 6602,
                   "name": "uint256",
                   "nodeType": "ElementaryTypeName",
-                  "src": "323:7:30",
+                  "src": "334:7:30",
                   "typeDescriptions": {
                     "typeIdentifier": "t_uint256",
                     "typeString": "uint256"
@@ -251,13 +251,13 @@
               },
               {
                 "constant": false,
-                "id": 5978,
+                "id": 6605,
                 "mutability": "mutable",
                 "name": "lastRewardTimestamp",
-                "nameLocation": "520:19:30",
+                "nameLocation": "534:19:30",
                 "nodeType": "VariableDeclaration",
-                "scope": 5987,
-                "src": "513:26:30",
+                "scope": 6614,
+                "src": "527:26:30",
                 "stateVariable": false,
                 "storageLocation": "default",
                 "typeDescriptions": {
@@ -265,10 +265,10 @@
                   "typeString": "uint64"
                 },
                 "typeName": {
-                  "id": 5977,
+                  "id": 6604,
                   "name": "uint64",
                   "nodeType": "ElementaryTypeName",
-                  "src": "513:6:30",
+                  "src": "527:6:30",
                   "typeDescriptions": {
                     "typeIdentifier": "t_uint64",
                     "typeString": "uint64"
@@ -278,13 +278,13 @@
               },
               {
                 "constant": false,
-                "id": 5980,
+                "id": 6607,
                 "mutability": "mutable",
                 "name": "rewarder",
-                "nameLocation": "551:8:30",
+                "nameLocation": "566:8:30",
                 "nodeType": "VariableDeclaration",
-                "scope": 5987,
-                "src": "543:16:30",
+                "scope": 6614,
+                "src": "558:16:30",
                 "stateVariable": false,
                 "storageLocation": "default",
                 "typeDescriptions": {
@@ -292,10 +292,10 @@
                   "typeString": "address"
                 },
                 "typeName": {
-                  "id": 5979,
+                  "id": 6606,
                   "name": "address",
                   "nodeType": "ElementaryTypeName",
-                  "src": "543:7:30",
+                  "src": "558:7:30",
                   "stateMutability": "nonpayable",
                   "typeDescriptions": {
                     "typeIdentifier": "t_address",
@@ -306,13 +306,13 @@
               },
               {
                 "constant": false,
-                "id": 5982,
+                "id": 6609,
                 "mutability": "mutable",
                 "name": "veJoeShareBp",
-                "nameLocation": "626:12:30",
+                "nameLocation": "643:12:30",
                 "nodeType": "VariableDeclaration",
-                "scope": 5987,
-                "src": "619:19:30",
+                "scope": 6614,
+                "src": "636:19:30",
                 "stateVariable": false,
                 "storageLocation": "default",
                 "typeDescriptions": {
@@ -320,10 +320,10 @@
                   "typeString": "uint32"
                 },
                 "typeName": {
-                  "id": 5981,
+                  "id": 6608,
                   "name": "uint32",
                   "nodeType": "ElementaryTypeName",
-                  "src": "619:6:30",
+                  "src": "636:6:30",
                   "typeDescriptions": {
                     "typeIdentifier": "t_uint32",
                     "typeString": "uint32"
@@ -333,13 +333,13 @@
               },
               {
                 "constant": false,
-                "id": 5984,
+                "id": 6611,
                 "mutability": "mutable",
                 "name": "totalFactor",
-                "nameLocation": "837:11:30",
+                "nameLocation": "860:11:30",
                 "nodeType": "VariableDeclaration",
-                "scope": 5987,
-                "src": "829:19:30",
+                "scope": 6614,
+                "src": "852:19:30",
                 "stateVariable": false,
                 "storageLocation": "default",
                 "typeDescriptions": {
@@ -347,10 +347,10 @@
                   "typeString": "uint256"
                 },
                 "typeName": {
-                  "id": 5983,
+                  "id": 6610,
                   "name": "uint256",
                   "nodeType": "ElementaryTypeName",
-                  "src": "829:7:30",
+                  "src": "852:7:30",
                   "typeDescriptions": {
                     "typeIdentifier": "t_uint256",
                     "typeString": "uint256"
@@ -360,13 +360,13 @@
               },
               {
                 "constant": false,
-                "id": 5986,
+                "id": 6613,
                 "mutability": "mutable",
                 "name": "totalLpSupply",
-                "nameLocation": "1104:13:30",
+                "nameLocation": "1132:13:30",
                 "nodeType": "VariableDeclaration",
-                "scope": 5987,
-                "src": "1096:21:30",
+                "scope": 6614,
+                "src": "1124:21:30",
                 "stateVariable": false,
                 "storageLocation": "default",
                 "typeDescriptions": {
@@ -374,10 +374,10 @@
                   "typeString": "uint256"
                 },
                 "typeName": {
-                  "id": 5985,
+                  "id": 6612,
                   "name": "uint256",
                   "nodeType": "ElementaryTypeName",
-                  "src": "1096:7:30",
+                  "src": "1124:7:30",
                   "typeDescriptions": {
                     "typeIdentifier": "t_uint256",
                     "typeString": "uint256"
@@ -387,34 +387,34 @@
               }
             ],
             "name": "PoolInfo",
-            "nameLocation": "131:8:30",
+            "nameLocation": "136:8:30",
             "nodeType": "StructDefinition",
-            "scope": 6001,
-            "src": "124:997:30",
+            "scope": 6628,
+            "src": "129:1021:30",
             "visibility": "public"
           },
           {
             "functionSelector": "1526fe27",
-            "id": 5995,
+            "id": 6622,
             "implemented": false,
             "kind": "function",
             "modifiers": [],
             "name": "poolInfo",
-            "nameLocation": "1133:8:30",
+            "nameLocation": "1164:8:30",
             "nodeType": "FunctionDefinition",
             "parameters": {
-              "id": 5990,
+              "id": 6617,
               "nodeType": "ParameterList",
               "parameters": [
                 {
                   "constant": false,
-                  "id": 5989,
+                  "id": 6616,
                   "mutability": "mutable",
                   "name": "pid",
-                  "nameLocation": "1150:3:30",
+                  "nameLocation": "1181:3:30",
                   "nodeType": "VariableDeclaration",
-                  "scope": 5995,
-                  "src": "1142:11:30",
+                  "scope": 6622,
+                  "src": "1173:11:30",
                   "stateVariable": false,
                   "storageLocation": "default",
                   "typeDescriptions": {
@@ -422,10 +422,10 @@
                     "typeString": "uint256"
                   },
                   "typeName": {
-                    "id": 5988,
+                    "id": 6615,
                     "name": "uint256",
                     "nodeType": "ElementaryTypeName",
-                    "src": "1142:7:30",
+                    "src": "1173:7:30",
                     "typeDescriptions": {
                       "typeIdentifier": "t_uint256",
                       "typeString": "uint256"
@@ -434,83 +434,83 @@
                   "visibility": "internal"
                 }
               ],
-              "src": "1141:13:30"
+              "src": "1172:13:30"
             },
             "returnParameters": {
-              "id": 5994,
+              "id": 6621,
               "nodeType": "ParameterList",
               "parameters": [
                 {
                   "constant": false,
-                  "id": 5993,
+                  "id": 6620,
                   "mutability": "mutable",
                   "name": "",
                   "nameLocation": "-1:-1:-1",
                   "nodeType": "VariableDeclaration",
-                  "scope": 5995,
-                  "src": "1178:35:30",
+                  "scope": 6622,
+                  "src": "1209:35:30",
                   "stateVariable": false,
                   "storageLocation": "memory",
                   "typeDescriptions": {
-                    "typeIdentifier": "t_struct$_PoolInfo_$5987_memory_ptr",
+                    "typeIdentifier": "t_struct$_PoolInfo_$6614_memory_ptr",
                     "typeString": "struct IMasterChefJoeBoost.PoolInfo"
                   },
                   "typeName": {
-                    "id": 5992,
+                    "id": 6619,
                     "nodeType": "UserDefinedTypeName",
                     "pathNode": {
-                      "id": 5991,
+                      "id": 6618,
                       "name": "IMasterChefJoeBoost.PoolInfo",
                       "nodeType": "IdentifierPath",
-                      "referencedDeclaration": 5987,
-                      "src": "1178:28:30"
+                      "referencedDeclaration": 6614,
+                      "src": "1209:28:30"
                     },
-                    "referencedDeclaration": 5987,
-                    "src": "1178:28:30",
+                    "referencedDeclaration": 6614,
+                    "src": "1209:28:30",
                     "typeDescriptions": {
-                      "typeIdentifier": "t_struct$_PoolInfo_$5987_storage_ptr",
+                      "typeIdentifier": "t_struct$_PoolInfo_$6614_storage_ptr",
                       "typeString": "struct IMasterChefJoeBoost.PoolInfo"
                     }
                   },
                   "visibility": "internal"
                 }
               ],
-              "src": "1177:37:30"
+              "src": "1208:37:30"
             },
-            "scope": 6001,
-            "src": "1124:91:30",
+            "scope": 6628,
+            "src": "1155:91:30",
             "stateMutability": "view",
             "virtual": false,
             "visibility": "external"
           },
           {
             "functionSelector": "081e3eda",
-            "id": 6000,
+            "id": 6627,
             "implemented": false,
             "kind": "function",
             "modifiers": [],
             "name": "poolLength",
-            "nameLocation": "1227:10:30",
+            "nameLocation": "1260:10:30",
             "nodeType": "FunctionDefinition",
             "parameters": {
-              "id": 5996,
+              "id": 6623,
               "nodeType": "ParameterList",
               "parameters": [],
-              "src": "1237:2:30"
+              "src": "1270:2:30"
             },
             "returnParameters": {
-              "id": 5999,
+              "id": 6626,
               "nodeType": "ParameterList",
               "parameters": [
                 {
                   "constant": false,
-                  "id": 5998,
+                  "id": 6625,
                   "mutability": "mutable",
                   "name": "",
                   "nameLocation": "-1:-1:-1",
                   "nodeType": "VariableDeclaration",
-                  "scope": 6000,
-                  "src": "1263:7:30",
+                  "scope": 6627,
+                  "src": "1296:7:30",
                   "stateVariable": false,
                   "storageLocation": "default",
                   "typeDescriptions": {
@@ -518,10 +518,10 @@
                     "typeString": "uint256"
                   },
                   "typeName": {
-                    "id": 5997,
+                    "id": 6624,
                     "name": "uint256",
                     "nodeType": "ElementaryTypeName",
-                    "src": "1263:7:30",
+                    "src": "1296:7:30",
                     "typeDescriptions": {
                       "typeIdentifier": "t_uint256",
                       "typeString": "uint256"
@@ -530,21 +530,21 @@
                   "visibility": "internal"
                 }
               ],
-              "src": "1262:9:30"
+              "src": "1295:9:30"
             },
-            "scope": 6001,
-            "src": "1218:54:30",
+            "scope": 6628,
+            "src": "1251:54:30",
             "stateMutability": "view",
             "virtual": false,
             "visibility": "external"
           }
         ],
-        "scope": 6002,
-        "src": "91:1183:30",
+        "scope": 6629,
+        "src": "95:1213:30",
         "usedErrors": []
       }
     ],
-    "src": "32:1243:30"
+    "src": "33:1277:30"
   },
   "compiler": {
     "name": "solc",
@@ -552,7 +552,7 @@
   },
   "networks": {},
   "schemaVersion": "3.4.10",
-  "updatedAt": "2022-12-07T17:55:36.341Z",
+  "updatedAt": "2022-12-21T17:15:55.219Z",
   "devdoc": {
     "kind": "dev",
     "methods": {},

@@ -234,7 +234,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
             })
             it('prevents function calls', async () => {
                 await expectRevert(
-                    assetRouter.deposit(pool, 0, 0, 0, 0, 0, account1, {
+                    assetRouter.deposit(pool, 0, 0, 0, 0, account1, {
                         from: account1
                     }),
                     'Pausable: paused'
@@ -280,10 +280,10 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
             it('allows function calls', async () => {
                 // Pausable: paused check passes. revert for a different reason
                 await expectRevert(
-                    assetRouter.deposit(pool, 0, 0, 0, 0, 0, account1, {
+                    assetRouter.deposit(pool, 0, 0, 0, 0, account1, {
                         from: account1
                     }),
-                    'NO_LIQUIDITY_PROVIDED'
+                    'NO_TOKENS_SENT'
                 )
                 await expectRevert(
                     assetRouter.distribute(
@@ -318,10 +318,10 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
         describe('reverts', () => {
             it('reverts if total amount provided is zero', async () => {
                 await expectRevert(
-                    assetRouter.deposit(pool, 0, 0, 0, 0, 0, account1, {
+                    assetRouter.deposit(pool, 0, 0, 0, 0, account1, {
                         from: account1
                     }),
-                    'NO_LIQUIDITY_PROVIDED'
+                    'NO_TOKENS_SENT'
                 )
             })
         })
@@ -331,12 +331,8 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
                 await stakingToken.approve(assetRouter.address, amounts[0], {
                     from: account1
                 })
-                receipt = await assetRouter.deposit(
+                receipt = await assetRouter.depositLP(
                     pool,
-                    0,
-                    0,
-                    0,
-                    0,
                     amounts[0],
                     account1,
                     { from: account1 }
@@ -387,12 +383,8 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
                 await stakingToken.approve(assetRouter.address, amounts[1], {
                     from: account1
                 })
-                receipt = await assetRouter.deposit(
+                receipt = await assetRouter.depositLP(
                     pool,
-                    0,
-                    0,
-                    0,
-                    0,
                     amounts[1],
                     account1,
                     { from: account1 }
@@ -440,12 +432,8 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
                 await stakingToken.approve(assetRouter.address, amounts[2], {
                     from: account2
                 })
-                receipt = await assetRouter.deposit(
+                receipt = await assetRouter.depositLP(
                     pool,
-                    0,
-                    0,
-                    0,
-                    0,
                     amounts[2],
                     account2,
                     { from: account2 }
@@ -502,12 +490,8 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
                 await stakingToken.approve(assetRouter.address, amounts[3], {
                     from: account1
                 })
-                receipt = await assetRouter.deposit(
+                receipt = await assetRouter.depositLP(
                     pool,
-                    0,
-                    0,
-                    0,
-                    0,
                     amounts[3],
                     account2,
                     { from: account1 }
@@ -633,7 +617,6 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
                         new BN(1),
                         amountA,
                         0,
-                        0,
                         account1,
                         { from: account1 }
                     ),
@@ -646,7 +629,6 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
                         amountB,
                         0,
                         amountB,
-                        0,
                         account1,
                         { from: account1 }
                     ),
@@ -658,7 +640,6 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
                     pool,
                     amountA,
                     amountB,
-                    0,
                     0,
                     0,
                     account1,
@@ -1166,12 +1147,8 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
                 await stakingToken.approve(assetRouter.address, balance1, {
                     from: account1
                 })
-                await assetRouter.deposit(
+                await assetRouter.depositLP(
                     pool,
-                    0,
-                    0,
-                    0,
-                    0,
                     balance1,
                     account1,
                     { from: account1 }
@@ -1181,12 +1158,8 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
                 await stakingToken.approve(assetRouter.address, balance2, {
                     from: account2
                 })
-                await assetRouter.deposit(
+                await assetRouter.depositLP(
                     pool,
-                    0,
-                    0,
-                    0,
-                    0,
                     balance2,
                     account2,
                     { from: account2 }

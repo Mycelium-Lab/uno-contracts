@@ -103,11 +103,6 @@ contract('UnoFarmTraderjoe', (accounts) => {
             await expectRevert(
                 implementation.deposit(
                     0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    accounts[0],
                     accounts[0],
                     { from: accounts[1] }
                 ),
@@ -149,11 +144,6 @@ contract('UnoFarmTraderjoe', (accounts) => {
             await expectRevert(
                 implementation.deposit(
                     0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    accounts[0],
                     accounts[0],
                     { from: assetRouter }
                 ),
