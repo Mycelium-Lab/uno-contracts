@@ -1,6 +1,12 @@
 const AutoStrategy = artifacts.require('UnoAutoStrategy')
-const { promises: fs } = require('fs')
+const fs = require('fs/promises')
 const path = require('path')
+
+require('dotenv').config()
+const ethers = require('ethers')
+const { AdminClient } = require('defender-admin-client')
+
+const client = new AdminClient({ apiKey: process.env.DEFENDER_ACCOUNT, apiSecret: process.env.DEFENDER_PASSWORD })
 
 async function readAddress(app) {
     const data = await fs.readFile(path.resolve(__dirname, './addresses/addresses.json'))
