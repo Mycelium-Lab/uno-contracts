@@ -18,7 +18,7 @@ async function readAddress(app) {
 }
 
 module.exports = async (deployer, network) => {
-    if (network !== 'polygon') return
+    if (network !== 'avalanche') return
 
     const multisig = await readAddress('multisig')
     const timelockAddress = await readAddress('timelock')
