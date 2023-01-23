@@ -38,7 +38,7 @@ module.exports = async (deployer, network) => {
         await autoStrategyFactory.approveAssetRouter(AssetRouterApeswap.address)
     }
 
-    const AssetRouterMeshswap = await readAddress('apeswap-router')
+    const AssetRouterMeshswap = await readAddress('meshswap-router')
     const meshswapRouterApproved = await autoStrategyFactory.assetRouterApproved(AssetRouterMeshswap)
     if (!meshswapRouterApproved) {
         await autoStrategyFactory.approveAssetRouter(AssetRouterMeshswap.address)

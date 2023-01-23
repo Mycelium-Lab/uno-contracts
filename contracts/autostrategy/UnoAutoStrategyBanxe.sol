@@ -1,195 +1,280 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
+import "../interfaces/IOdosRouter.sol";
 import "../interfaces/IUnoAssetRouter.sol";   
+import "../interfaces/IUnoAutoStrategyBanxeFactory.sol";
 import '@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol';
-import '@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol';
-import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 
-contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable, UUPSUpgradeable {
+contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
     /**
      * @dev PoolInfo:
      * {assetRouter} - UnoAssetRouter contract.
      * {pool} - Pool address. 
+     * {tokenA} - Pool's first token address.
+     * {tokenB} - Pool's second token address.
      */
+    struct _PoolInfo {
+        address pool;
+        IUnoAssetRouter assetRouter;
+    }
+
     struct PoolInfo {
         address pool;
         IUnoAssetRouter assetRouter;
+        IERC20Upgradeable tokenA;
+        IERC20Upgradeable tokenB;
+    }
+
+    /**
+     * @dev MoveLiquidityInfo:
+     * {leftoverA} - TokenA leftovers after MoveLiquidity() call.
+     * {leftoverB} - TokenB leftovers after MoveLiquidity() call. 
+     * {totalSupply} - totalSupply after MoveLiquidity() call.
+     * {block} - MoveLiquidity() call block.
+     */
+    struct MoveLiquidityInfo {
+        uint256 leftoverA;
+        uint256 leftoverB;
+        uint256 totalSupply;
+        uint256 block;
     }
     
     /**
      * @dev Contract Variables:
-     * {banxe} - Banxe account that can make deposits to this autostrat.
+     * {OdosRouter} - Contract that executes swaps.
+
      * {poolID} - Current pool the strategy uses ({pools} index).
      * {pools} - Pools this strategy can use and move liquidity to.
 
-     * {tokenA} - Pool's first token address.
-     * {tokenB} - Pool's second token address.
-
      * {reserveLP} - LP token reserve.
-     * {MINIMUM_LIQUIDITY} - Ameliorates rounding errors.
+     * {lastMoveInfo} - Info on last MoveLiquidity() block.
+     * {blockedLiquidty} - User's blocked LP tokens. Prevents user from stealing leftover tokens by depositing and exiting before moveLiquidity() has been called.
+     * {leftoversCollected} - Flag that prevents leftover token collection if they were already collected this MoveLiquidity() cycle.
 
      * {accessManager} - Role manager contract.
+     * {factory} - The address of AutoStrategyFactory this contract was deployed by.
+
+     * {MINIMUM_LIQUIDITY} - Ameliorates rounding errors.
      */
 
-    address public banxe;
+    IOdosRouter private constant OdosRouter = IOdosRouter(0xa32EE1C40594249eb3183c10792BcF573D4Da47C);
 
     uint256 public poolID;
     PoolInfo[] public pools;
 
-    IERC20Upgradeable public tokenA;
-    IERC20Upgradeable public tokenB;
-
     uint256 private reserveLP;
-    uint256 private constant MINIMUM_LIQUIDITY = 10**3;
+    MoveLiquidityInfo private lastMoveInfo;
+    mapping(address => mapping(uint256 => uint256)) private blockedLiquidty;
+    mapping(address => mapping(uint256 => bool)) private leftoversCollected;
 
     IUnoAccessManager public accessManager;
+    IUnoAutoStrategyBanxeFactory public factory;
+
+    uint256 private constant MINIMUM_LIQUIDITY = 10**3;
     bytes32 private constant LIQUIDITY_MANAGER_ROLE = keccak256('LIQUIDITY_MANAGER_ROLE');
-    bytes32 private constant PAUSER_ROLE = keccak256('PAUSER_ROLE');
-    bytes32 private ADMIN_ROLE;
 
     event Deposit(uint256 indexed poolID, address indexed from, address indexed recipient, uint256 amountA, uint256 amountB);
     event Withdraw(uint256 indexed poolID, address indexed from, address indexed recipient, uint256 amountA, uint256 amountB);
     event MoveLiquidity(uint256 indexed previousPoolID, uint256 indexed nextPoolID);
-    event BanxeTransferred(address indexed previousBanxe, address indexed newBanxe);
 
-    modifier onlyRole(bytes32 role){
-        require(accessManager.hasRole(role, msg.sender), 'CALLER_NOT_AUTHORIZED');
+    modifier whenNotPaused(){
+        require(factory.paused() == false, 'PAUSABLE: PAUSED');
         _;
     }
 
     modifier onlyBanxe(){
-        require(msg.sender == banxe, 'CALLER_NOT_BANXE');
+        require(msg.sender == factory.banxe(), 'CALLER_NOT_BANXE');
         _;
     }
 
     // ============ Methods ============
-
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        _disableInitializers();
-    }
-
-    function initialize(PoolInfo[] calldata poolInfos, IUnoAccessManager _accessManager, address _banxe) external initializer {
+    function initialize(_PoolInfo[] calldata poolInfos, IUnoAccessManager _accessManager) external initializer {
         require ((poolInfos.length >= 2) && (poolInfos.length <= 50), 'BAD_POOL_COUNT');
 
         __ERC20_init("UNO-Banxe-AutoStrategy", "UNO-BANXE-LP");
         __ReentrancyGuard_init();
-        __Pausable_init();
-
-        address[] memory poolTokens = poolInfos[0].assetRouter.getTokens(poolInfos[0].pool);
-        tokenA = IERC20Upgradeable(poolTokens[0]);
-        tokenB = IERC20Upgradeable(poolTokens[1]);
         
         for (uint256 i = 0; i < poolInfos.length; i++) {
-            PoolInfo memory poolInfo = poolInfos[i];
-            if(i != 0){
-                address[] memory _tokens = poolInfo.assetRouter.getTokens(poolInfo.pool);
-                require(((_tokens[0] == address(tokenA)) && (_tokens[1] == address(tokenB))) || ((_tokens[0] == address(tokenB)) && (_tokens[1] == address(tokenA))), 'WRONG_POOL_TOKENS');
-            }
-            pools.push(poolInfo);
+            address[] memory _tokens = IUnoAssetRouter(poolInfos[i].assetRouter).getTokens(poolInfos[i].pool);
+            PoolInfo memory pool = PoolInfo({
+                pool: poolInfos[i].pool,
+                assetRouter: poolInfos[i].assetRouter,
+                tokenA: IERC20Upgradeable(_tokens[0]),
+                tokenB: IERC20Upgradeable(_tokens[1])
+            });
+            pools.push(pool);
 
-            tokenA.approve(address(poolInfo.assetRouter), type(uint256).max);
-            tokenB.approve(address(poolInfo.assetRouter), type(uint256).max);
+            if (pool.tokenA.allowance(address(this), address(pool.assetRouter)) == 0) {
+                pool.tokenA.approve(address(OdosRouter), type(uint256).max);
+                pool.tokenA.approve(address(pool.assetRouter), type(uint256).max);
+            }
+            if (pool.tokenB.allowance(address(this), address(pool.assetRouter)) == 0) {
+                pool.tokenB.approve(address(OdosRouter), type(uint256).max);
+                pool.tokenB.approve(address(pool.assetRouter), type(uint256).max);
+            }
         }
 
         accessManager = _accessManager;
-        ADMIN_ROLE = accessManager.ADMIN_ROLE();
-
-        banxe = _banxe;
+        lastMoveInfo.block = block.number;
+        factory = IUnoAutoStrategyBanxeFactory(msg.sender);
     }
 
     /**
      * @dev Deposits tokens in the pools[poolID] pool. Mints tokens representing user share. Emits {Deposit} event.
+     * @param pid - Current poolID. Throws revert if moveLiquidity() has been called before the transaction has been mined.
      * @param amountA - Token A amount to deposit.
      * @param amountB  - Token B amount to deposit.
      * @param amountAMin - Bounds the extent to which the B/A price can go up before the transaction reverts.
      * @param amountBMin - Bounds the extent to which the A/B price can go up before the transaction reverts.
+     * @param recipient - Address which will receive the deposit.
      
      * @return sentA - Deposited token A amount.
      * @return sentB - Deposited token B amount.
      * @return liquidity - Total liquidity minted for the {recipient}.
      */
-    function deposit(uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin, address recipient) onlyBanxe whenNotPaused nonReentrant external returns (uint256 sentA, uint256 sentB, uint256 liquidity) {
-        tokenA.safeTransferFrom(msg.sender, address(this), amountA);
-        tokenB.safeTransferFrom(msg.sender, address(this), amountB);
+    function deposit(uint256 pid, uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin, address recipient) onlyBanxe whenNotPaused nonReentrant external returns (uint256 sentA, uint256 sentB, uint256 liquidity) {
+        require (pid == poolID, 'BAD_POOL_ID');
+        PoolInfo memory pool = pools[poolID];
 
-        (sentA, sentB,) = _deposit(amountA, amountB, amountAMin, amountBMin);
+        pool.tokenA.safeTransferFrom(msg.sender, address(this), amountA);
+        pool.tokenB.safeTransferFrom(msg.sender, address(this), amountB);
+
+        (sentA, sentB,) = pool.assetRouter.deposit(pool.pool, amountA, amountB, amountAMin, amountBMin, address(this));
         liquidity = mint(recipient);
 
-        tokenA.safeTransfer(msg.sender, amountA - sentA);
-        tokenB.safeTransfer(msg.sender, amountB - sentB);
+        pool.tokenA.safeTransfer(msg.sender, amountA - sentA);
+        pool.tokenB.safeTransfer(msg.sender, amountB - sentB);
 
         emit Deposit(poolID, msg.sender, recipient, sentA, sentB); 
     }
 
     /**
      * @dev Withdraws tokens from the {pools[poolID]} pool and sends them to the recipient. Burns tokens representing user share. Emits {Withdraw} event.
+     * @param pid - Current poolID. Throws revert if moveLiquidity() has been called before the transaction has been mined.
      * @param liquidity - Liquidity to burn from this user.
      * @param amountAMin - The minimum amount of tokenA that must be received from the pool for the transaction not to revert.
      * @param amountBMin - The minimum amount of tokenB that must be received from the pool for the transaction not to revert.
+     * @param recipient - Address which will receive withdrawn tokens.
      
      * @return amountA - Token A amount sent to the {recipient}.
      * @return amountB - Token B amount sent to the {recipient}.
      */
-    function withdraw(uint256 liquidity, uint256 amountAMin, uint256 amountBMin, address recipient) whenNotPaused nonReentrant external returns (uint256 amountA, uint256 amountB) {
+    function withdraw(uint256 pid, uint256 liquidity, uint256 amountAMin, uint256 amountBMin, address recipient) whenNotPaused nonReentrant external returns (uint256 amountA, uint256 amountB) {
+        require (pid == poolID, 'BAD_POOL_ID');
+        PoolInfo memory pool = pools[poolID];
+
+        (uint256 leftoverA, uint256 leftoverB) = collectLeftovers(recipient);
+
         uint256 amountLP = burn(liquidity);
-        (amountA, amountB) = _withdraw(amountLP, amountAMin, amountBMin, recipient);
+        (amountA, amountB) = pool.assetRouter.withdraw(pool.pool, amountLP, amountAMin, amountBMin, false, recipient);
 
-        uint256 leftoverA = tokenA.balanceOf(address(this));
-        if(leftoverA > 0){
-            amountA += leftoverA;
-            tokenA.safeTransfer(recipient, leftoverA);
-        }
-
-        uint256 leftoverB = tokenA.balanceOf(address(this));
-        if(leftoverB > 0){
-            amountB += leftoverB;
-            tokenB.safeTransfer(recipient, leftoverB);
-        }
+        amountA += leftoverA;
+        amountB += leftoverB;
 
         emit Withdraw(poolID, msg.sender, recipient, amountA, amountB);
     }
 
     /**
+     * @dev Collects leftover tokens left from moveLiquidity() function.
+     * @param recipient - Address which will receive leftover tokens.
+     
+     * @return leftoverA - Token A amount sent to the {recipient}.
+     * @return leftoverB - Token B amount sent to the {recipient}.
+     */
+    function collectLeftovers(address recipient) internal returns (uint256 leftoverA, uint256 leftoverB){
+        if(!leftoversCollected[msg.sender][lastMoveInfo.block]){
+            if(lastMoveInfo.totalSupply != 0){
+                PoolInfo memory pool = pools[poolID];
+                leftoverA = (balanceOf(msg.sender) - blockedLiquidty[msg.sender][lastMoveInfo.block]) * lastMoveInfo.leftoverA / lastMoveInfo.totalSupply;
+                leftoverB = (balanceOf(msg.sender) - blockedLiquidty[msg.sender][lastMoveInfo.block]) * lastMoveInfo.leftoverB / lastMoveInfo.totalSupply;
+
+                if(leftoverA > 0){
+                    pool.tokenA.safeTransfer(recipient, leftoverA);
+                }
+                if(leftoverB > 0){
+                    pool.tokenB.safeTransfer(recipient, leftoverB);
+                }
+            }
+
+            leftoversCollected[msg.sender][lastMoveInfo.block] = true;
+        }
+    }
+
+    /**
      * @dev Moves liquidity from {pools[poolID]} to {pools[_poolID]}. Emits {MoveLiquidity} event.
      * @param _poolID - Pool ID to move liquidity to.
+     * @param swapAData - Data for tokenA swap.
+     * @param swapBData - Data for tokenB swap.
      * @param amountAMin - The minimum amount of tokenA that must be deposited in {pools[_poolID]} for the transaction not to revert.
      * @param amountBMin - The minimum amount of tokenB that must be deposited in {pools[_poolID]} for the transaction not to revert.
      *
      * Note: This function can only be called by LiquidityManager.
      */
-    function moveLiquidity(uint256 _poolID, uint256 amountAMin, uint256 amountBMin) whenNotPaused nonReentrant external {
+    function moveLiquidity(uint256 _poolID, bytes calldata swapAData, bytes calldata swapBData, uint256 amountAMin, uint256 amountBMin) whenNotPaused nonReentrant external {
         require(accessManager.hasRole(LIQUIDITY_MANAGER_ROLE, msg.sender), 'CALLER_NOT_LIQUIDITY_MANAGER');
         require(totalSupply() != 0, 'NO_LIQUIDITY');
+        require(lastMoveInfo.block != block.number, 'CANT_CALL_ON_THE_SAME_BLOCK');
         require((_poolID < pools.length) && (_poolID != poolID), 'BAD_POOL_ID');
 
-        PoolInfo memory pool = pools[poolID];
-        (uint256 _totalDeposits,,) = pool.assetRouter.userStake(address(this), pool.pool);
-        _withdraw(_totalDeposits, amountAMin, amountBMin, address(this));
+        PoolInfo memory currentPool = pools[poolID];
+        PoolInfo memory newPool = pools[_poolID];
+
+        (uint256 _totalDeposits,,) = currentPool.assetRouter.userStake(address(this), currentPool.pool);
+        currentPool.assetRouter.withdraw(currentPool.pool, _totalDeposits, 0, 0, false, address(this));
+
+        uint256 tokenABalance = currentPool.tokenA.balanceOf(address(this));
+        uint256 tokenBBalance = currentPool.tokenB.balanceOf(address(this));
+
+        if(currentPool.tokenA != newPool.tokenA){
+            (
+                IOdosRouter.inputToken[] memory inputs, 
+                IOdosRouter.outputToken[] memory outputs, 
+                ,
+                uint256 valueOutMin,
+                address executor,
+                bytes memory pathDefinition
+            ) = abi.decode(swapAData[4:], (IOdosRouter.inputToken[],IOdosRouter.outputToken[],uint256,uint256,address,bytes));
+
+            require((inputs.length == 1) && (outputs.length == 1), 'BAD_SWAP_A_TOKENS_LENGTH');
+            require(inputs[0].tokenAddress == address(currentPool.tokenA), 'BAD_SWAP_A_INPUT_TOKEN');
+            require(outputs[0].tokenAddress == address(newPool.tokenA), 'BAD_SWAP_A_OUTPUT_TOKEN');
+
+            inputs[0].amountIn = tokenABalance;
+            OdosRouter.swap(inputs, outputs, type(uint256).max, valueOutMin, executor, pathDefinition);
+        }
+
+        if(currentPool.tokenB != newPool.tokenB){
+            (
+                IOdosRouter.inputToken[] memory inputs,
+                IOdosRouter.outputToken[] memory outputs,
+                ,
+                uint256 valueOutMin,
+                address executor,
+                bytes memory pathDefinition
+            ) = abi.decode(swapBData[4:], (IOdosRouter.inputToken[],IOdosRouter.outputToken[],uint256,uint256,address,bytes));
+
+            require((inputs.length == 1) && (outputs.length == 1), 'BAD_SWAP_B_TOKENS_LENGTH');
+            require(inputs[0].tokenAddress == address(currentPool.tokenB), 'BAD_SWAP_B_INPUT_TOKEN');
+            require(outputs[0].tokenAddress == address(newPool.tokenB), 'BAD_SWAP_B_OUTPUT_TOKEN');
+
+            inputs[0].amountIn = tokenBBalance;
+            OdosRouter.swap(inputs, outputs, type(uint256).max, valueOutMin, executor, pathDefinition);
+        }
+        
+        (,,reserveLP) = newPool.assetRouter.deposit(newPool.pool, newPool.tokenA.balanceOf(address(this)), newPool.tokenB.balanceOf(address(this)), amountAMin, amountBMin, address(this));
+       
+        lastMoveInfo = MoveLiquidityInfo({
+            leftoverA: newPool.tokenA.balanceOf(address(this)),
+            leftoverB: newPool.tokenB.balanceOf(address(this)),
+            totalSupply: totalSupply(),
+            block: block.number
+        });
 
         emit MoveLiquidity(poolID, _poolID); 
         poolID = _poolID;
-        (,,reserveLP) = _deposit(tokenA.balanceOf(address(this)), tokenB.balanceOf(address(this)), amountAMin, amountBMin);
-    }
-
-    /**
-     * @dev Adds new pool to the strat.
-     * @param poolInfo - New pool info to add.
-
-     * Note: This function can only be called by Admin.
-     */
-    function addPool(PoolInfo calldata poolInfo) external onlyRole(ADMIN_ROLE) {
-        address[] memory _tokens = poolInfo.assetRouter.getTokens(poolInfo.pool);
-        require(((_tokens[0] == address(tokenA)) && (_tokens[1] == address(tokenB))) || ((_tokens[0] == address(tokenB)) && (_tokens[1] == address(tokenA))), 'WRONG_POOL_TOKENS');
-        
-        pools.push(poolInfo);
-        require(pools.length <= 50, "TOO_MANY_POOLS");
-
-        tokenA.approve(address(poolInfo.assetRouter), type(uint256).max);
-        tokenB.approve(address(poolInfo.assetRouter), type(uint256).max);
     }
 
     /**
@@ -201,24 +286,17 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
      */
     function userStake(address _address) external view returns (uint256 stakeA, uint256 stakeB) {
         PoolInfo memory pool = pools[poolID];
-
-        uint256 balanceA;
-        uint256 balanceB;
-        address[] memory _tokens = pool.assetRouter.getTokens(pool.pool);
-        if(_tokens[0] == address(tokenA)){
-            (, balanceA, balanceB) = pool.assetRouter.userStake(address(this), pool.pool);
-        } else {
-            (, balanceB, balanceA) = pool.assetRouter.userStake(address(this), pool.pool);
-        }
+        (, uint256 balanceA, uint256 balanceB) = pool.assetRouter.userStake(address(this), pool.pool);
 
         uint256 _balance = balanceOf(_address);
         if(_balance != 0){
             uint256 _totalSupply = totalSupply();
-            uint256 leftoverA = tokenA.balanceOf(address(this));
-            uint256 leftoverB = tokenB.balanceOf(address(this));
-
-            stakeA = _balance * balanceA / _totalSupply + leftoverA;
-            stakeB = _balance * balanceB / _totalSupply + leftoverB;
+            stakeA = _balance * balanceA / _totalSupply; 
+            stakeB = _balance * balanceB / _totalSupply; 
+            if((!leftoversCollected[msg.sender][lastMoveInfo.block]) && (lastMoveInfo.totalSupply != 0)){
+                stakeA += (_balance - blockedLiquidty[_address][lastMoveInfo.block]) * lastMoveInfo.leftoverA / lastMoveInfo.totalSupply;
+                stakeB += (_balance - blockedLiquidty[_address][lastMoveInfo.block]) * lastMoveInfo.leftoverB / lastMoveInfo.totalSupply;
+            }
         }
     }
         
@@ -229,17 +307,11 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
      */     
     function totalDeposits() external view returns(uint256 totalDepositsA, uint256 totalDepositsB){
         PoolInfo memory pool = pools[poolID];
-
-        address[] memory _tokens = pool.assetRouter.getTokens(pool.pool);
-        if(_tokens[0] == address(tokenA)){
-            (, totalDepositsA, totalDepositsB) = pool.assetRouter.userStake(address(this), pool.pool);
-        } else {
-            (, totalDepositsB, totalDepositsA) = pool.assetRouter.userStake(address(this), pool.pool);
-        }
+        (, totalDepositsA, totalDepositsB) = pool.assetRouter.userStake(address(this), pool.pool);
 
         // Add leftover tokens.
-        totalDepositsA += tokenA.balanceOf(address(this));
-        totalDepositsB += tokenB.balanceOf(address(this));
+        totalDepositsA += pool.tokenA.balanceOf(address(this));
+        totalDepositsB += pool.tokenB.balanceOf(address(this));
     }
 
     /**
@@ -253,7 +325,8 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
      * @dev Returns pair of tokens currently in use. 
      */
     function tokens() external view returns(address, address){
-        return (address(tokenA), address(tokenB));
+        PoolInfo memory pool = pools[poolID];
+        return (address(pool.tokenA), address(pool.tokenB));
     }
 
     function mint(address to) internal returns (uint256 liquidity){
@@ -286,47 +359,16 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
         reserveLP = balanceLP - amountLP;
     }
 
-    function _deposit(uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin) internal returns (uint256 sentA, uint256 sentB, uint256 liquidity){
-        PoolInfo memory pool = pools[poolID];
-        address[] memory _tokens = pool.assetRouter.getTokens(pool.pool);
-        if(_tokens[0] == address(tokenA)){
-            (sentA, sentB, liquidity) = pool.assetRouter.deposit(pool.pool, amountA, amountB, amountAMin, amountBMin, address(this));
+    function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual override {
+        super._beforeTokenTransfer(from, to, amount);
+
+        // Decrease blockedLiquidty from {from} address, but no less then 0.
+        if(amount > blockedLiquidty[from][lastMoveInfo.block]){
+            blockedLiquidty[from][lastMoveInfo.block] = 0;
         } else {
-            (sentB, sentA, liquidity) = pool.assetRouter.deposit(pool.pool, amountB, amountA, amountBMin, amountAMin, address(this));
+            blockedLiquidty[from][lastMoveInfo.block] -= amount;
         }
-    }
-
-    function _withdraw(uint256 amountLP, uint256 amountAMin, uint256 amountBMin, address recipient) internal returns (uint256 amountA, uint256 amountB){
-        PoolInfo memory pool = pools[poolID];
-        address[] memory _tokens = pool.assetRouter.getTokens(pool.pool);
-        if(_tokens[0] == address(tokenA)){
-            (amountA, amountB) = pool.assetRouter.withdraw(pool.pool, amountLP, amountAMin, amountBMin, false, recipient);
-        } else {
-            (amountB, amountA) = pool.assetRouter.withdraw(pool.pool, amountLP, amountBMin, amountAMin, false, recipient);
-        }
-    }
-
-    /**
-     * @dev Transfers banxe rights of the contract to a new account (`_banxe`).
-     * @param _banxe - Address to transfer banxe rights to.
-
-     * Note: This function can only be called by Banxe.
-     */
-    function transferBanxe(address _banxe) external onlyBanxe {
-        require(_banxe != address(0), "TRANSFER_TO_ZERO_ADDRESS");
-        emit BanxeTransferred(banxe, _banxe);
-        banxe = _banxe;
-    }
-
-    function pause() external onlyRole(PAUSER_ROLE) {
-        _pause();
-    }
-
-    function unpause() external onlyRole(PAUSER_ROLE) {
-        _unpause();
-    }
-
-    function _authorizeUpgrade(address) internal override onlyRole(ADMIN_ROLE) {
-
+        // Block {to} address from withdrawing their share of leftover tokens immediately.
+        blockedLiquidty[to][lastMoveInfo.block] += amount;
     }
 }
