@@ -4,7 +4,7 @@ const AutoStrategyFactory = artifacts.require('UnoAutoStrategyBanxeFactory')
 const fs = require('fs/promises')
 const path = require('path')
 
-const banxe = '0x57154597a53bb06a8707eefa8177c630c589fb0c'
+const banxe = '0xEa6E311c2365F67218EFdf19C6f24296cdBF0058'
 
 async function readAddress(app) {
     const data = await fs.readFile(path.resolve(__dirname, './addresses/addresses.json'))
