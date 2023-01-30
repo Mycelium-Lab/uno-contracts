@@ -74,12 +74,15 @@ contract('UnoAutoStrategyBanxe', (accounts) => {
         await FarmFactory.new(farmImplementationSushiswap.address, accessManager.address, assetRouterSushiswap.address)
 
         const autoStrategyImplementation = await AutoStrategy.new()
-        autoStrategyFactory = await AutoStrategyFactory.new(autoStrategyImplementation.address, accessManager.address, [assetRouterQuickswap.address, assetRouterSushiswap.address], banxe)
+        autoStrategyFactory = await AutoStrategyFactory.new(autoStrategyImplementation.address, accessManager.address, [assetRouterQuickswap.address, assetRouterSushiswap.address])
 
-        await autoStrategyFactory.createStrategy([
-            { pool: pool1, assetRouter: assetRouterQuickswap.address },
-            { pool: pool2, assetRouter: assetRouterSushiswap.address }
-        ])
+        await autoStrategyFactory.createStrategy(
+            [
+                { pool: pool1, assetRouter: assetRouterQuickswap.address },
+                { pool: pool2, assetRouter: assetRouterSushiswap.address }
+            ],
+            banxe
+        )
 
         autoStrategy = await AutoStrategy.at(await autoStrategyFactory.autoStrategies(0))
 
@@ -94,6 +97,7 @@ contract('UnoAutoStrategyBanxe', (accounts) => {
                         { pool: pool2, assetRouter: assetRouterSushiswap.address }
                     ],
                     accessManager.address,
+                    banxe,
                     {
                         from: banxe
                     }
@@ -811,7 +815,7 @@ contract('UnoAutoStrategyBanxe', (accounts) => {
     describe('Banxe role transfer', () => {
         it('reverts transferBanxe if called not by a banxe', async () => {
             await expectRevert(
-                autoStrategyFactory.transferBanxe(account1, {
+                autoStrategy.transferBanxe(account1, {
                     from: account1
                 }),
                 'CALLER_NOT_BANXE'
@@ -819,14 +823,14 @@ contract('UnoAutoStrategyBanxe', (accounts) => {
         })
         it('reverts moveLiquidity if paused', async () => {
             await expectRevert(
-                autoStrategyFactory.transferBanxe(constants.ZERO_ADDRESS, {
+                autoStrategy.transferBanxe(constants.ZERO_ADDRESS, {
                     from: banxe
                 }),
                 'TRANSFER_TO_ZERO_ADDRESS'
             )
         })
         it('transfers banxe', async () => {
-            const receipt = await autoStrategyFactory.transferBanxe(account1, {
+            const receipt = await autoStrategy.transferBanxe(account1, {
                 from: banxe
             })
             expectEvent(receipt, 'BanxeTransferred', {
@@ -834,7 +838,7 @@ contract('UnoAutoStrategyBanxe', (accounts) => {
                 newBanxe: account1
             })
 
-            const _banxe = await autoStrategyFactory.banxe()
+            const _banxe = await autoStrategy.banxe()
 
             assert.equal(
                 _banxe,

@@ -2,7 +2,7 @@
 pragma solidity 0.8.10;
 import "../interfaces/IOdosRouter.sol";
 import "../interfaces/IUnoAssetRouter.sol";   
-import "../interfaces/IUnoAutoStrategyBanxeFactory.sol";
+import "../interfaces/IUnoAutoStrategyFactory.sol";
 import '@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol';
@@ -44,6 +44,7 @@ contract UnoAutoStrategyBanxeV2 is Initializable, ERC20Upgradeable, ReentrancyGu
     
     /**
      * @dev Contract Variables:
+     * banxe - Banxe account that can make deposits to autostrats.
      * {OdosRouter} - Contract that executes swaps.
 
      * {poolID} - Current pool the strategy uses ({pools} index).
@@ -60,6 +61,7 @@ contract UnoAutoStrategyBanxeV2 is Initializable, ERC20Upgradeable, ReentrancyGu
      * {MINIMUM_LIQUIDITY} - Ameliorates rounding errors.
      */
 
+    address public banxe;
     IOdosRouter private constant OdosRouter = IOdosRouter(0xa32EE1C40594249eb3183c10792BcF573D4Da47C);
 
     uint256 public poolID;
@@ -71,7 +73,7 @@ contract UnoAutoStrategyBanxeV2 is Initializable, ERC20Upgradeable, ReentrancyGu
     mapping(address => mapping(uint256 => bool)) private leftoversCollected;
 
     IUnoAccessManager public accessManager;
-    IUnoAutoStrategyBanxeFactory public factory;
+    IUnoAutoStrategyFactory public factory;
 
     uint256 private constant MINIMUM_LIQUIDITY = 10**3;
     bytes32 private constant LIQUIDITY_MANAGER_ROLE = keccak256('LIQUIDITY_MANAGER_ROLE');
@@ -81,6 +83,7 @@ contract UnoAutoStrategyBanxeV2 is Initializable, ERC20Upgradeable, ReentrancyGu
     event Deposit(uint256 indexed poolID, address indexed from, address indexed recipient, uint256 amountA, uint256 amountB);
     event Withdraw(uint256 indexed poolID, address indexed from, address indexed recipient, uint256 amountA, uint256 amountB);
     event MoveLiquidity(uint256 indexed previousPoolID, uint256 indexed nextPoolID);
+    event BanxeTransferred(address indexed previousBanxe, address indexed newBanxe);
 
     modifier whenNotPaused(){
         require(factory.paused() == false, 'PAUSABLE: PAUSED');
@@ -88,12 +91,13 @@ contract UnoAutoStrategyBanxeV2 is Initializable, ERC20Upgradeable, ReentrancyGu
     }
 
     modifier onlyBanxe(){
-        require(msg.sender == factory.banxe(), 'CALLER_NOT_BANXE');
+        require(msg.sender == banxe, "CALLER_NOT_BANXE");
         _;
     }
 
     // ============ Methods ============
-    function initialize(_PoolInfo[] calldata poolInfos, IUnoAccessManager _accessManager) external initializer {
+    function initialize(_PoolInfo[] calldata poolInfos, IUnoAccessManager _accessManager, address _banxe) external initializer {
+        require (_banxe != address(0), "BAD_BANXE_ADDRESS");
         require ((poolInfos.length >= 2) && (poolInfos.length <= 50), 'BAD_POOL_COUNT');
 
         __ERC20_init("UNO-Banxe-AutoStrategy", "UNO-BANXE-LP");
@@ -119,9 +123,12 @@ contract UnoAutoStrategyBanxeV2 is Initializable, ERC20Upgradeable, ReentrancyGu
             }
         }
 
+        banxe = _banxe;
+        emit BanxeTransferred(address(0), _banxe);
+
         accessManager = _accessManager;
         lastMoveInfo.block = block.number;
-        factory = IUnoAutoStrategyBanxeFactory(msg.sender);
+        factory = IUnoAutoStrategyFactory(msg.sender);
     }
 
     /**
@@ -372,5 +379,17 @@ contract UnoAutoStrategyBanxeV2 is Initializable, ERC20Upgradeable, ReentrancyGu
         }
         // Block {to} address from withdrawing their share of leftover tokens immediately.
         blockedLiquidty[to][lastMoveInfo.block] += amount;
+    }
+
+    /**
+     * @dev Transfers banxe rights of the contract to a new account (`_banxe`).
+     * @param _banxe - Address to transfer banxe rights to.
+
+     * Note: This function can only be called by Banxe.
+     */
+    function transferBanxe(address _banxe) external onlyBanxe {
+        require(_banxe != address(0), "TRANSFER_TO_ZERO_ADDRESS");
+        emit BanxeTransferred(banxe, _banxe);
+        banxe = _banxe;
     }
 }

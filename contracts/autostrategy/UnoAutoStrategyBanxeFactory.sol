@@ -19,7 +19,6 @@ contract UnoAutoStrategyBanxeFactory is Pausable {
 
     /**
      * @dev Contract Variables:
-     * banxe - Banxe account that can make deposits to autostrats.
      * assetRouterApproved - Approved UnoAssetRouter contracts.
      
      * accessManager - Role manager contract.
@@ -27,7 +26,6 @@ contract UnoAutoStrategyBanxeFactory is Pausable {
      * autoStrategies - List of deployed AutoStrategy contracts.
      */
 
-    address public banxe;
     mapping(address => bool) public assetRouterApproved;
 
     IUnoAccessManager public immutable accessManager;
@@ -40,7 +38,6 @@ contract UnoAutoStrategyBanxeFactory is Pausable {
     event AutoStrategyDeployed(address indexed autoStrategy);
     event AssetRouterApproved(address indexed assetRouter);
     event AssetRouterRevoked(address indexed assetRouter);
-    event BanxeTransferred(address indexed previousBanxe, address indexed newBanxe);
 
     modifier onlyRole(bytes32 role){
         require(accessManager.hasRole(role, msg.sender), 'CALLER_NOT_AUTHORIZED');
@@ -49,10 +46,9 @@ contract UnoAutoStrategyBanxeFactory is Pausable {
 
     // ============ Methods ============
 
-    constructor (address _implementation, address _accessManager, address[] memory approvedAssetRouters, address _banxe) {
+    constructor (address _implementation, address _accessManager, address[] memory approvedAssetRouters) {
         require (_implementation != address(0), 'BAD_IMPLEMENTATION');
         require (_accessManager != address(0), 'BAD_ACCESS_MANAGER');
-        require (_banxe != address(0), "BAD_BANXE_ADDRESS");
 
         autoStrategyBeacon = address(new UpgradeableBeacon(_implementation));
         accessManager = IUnoAccessManager(_accessManager);
@@ -61,9 +57,6 @@ contract UnoAutoStrategyBanxeFactory is Pausable {
             assetRouterApproved[approvedAssetRouters[i]] = true;
             emit AssetRouterApproved(approvedAssetRouters[i]);
         }
-
-        banxe = _banxe;
-        emit BanxeTransferred(address(0), _banxe);
         
         ADMIN_ROLE = accessManager.ADMIN_ROLE();
     }
@@ -71,13 +64,14 @@ contract UnoAutoStrategyBanxeFactory is Pausable {
     /**
      * @dev Checks if provided assetRouters are approved for use, then deploys new AutoStrategy contract.
      * @param poolInfos - An array of (assetRouter - pool) pairs. AssetRouter needs to be approved for PoolInfo to be valid. poolInfos.length must be >= 2.
+     * @param banxe -Address for banxe to use.
      * @return autoStrategy - Deployed Auto Strategy contract address.
      */  
-    function createStrategy(PoolInfo[] calldata poolInfos) whenNotPaused external returns (address) {
+    function createStrategy(PoolInfo[] calldata poolInfos, address banxe) whenNotPaused external returns (address) {
         for (uint256 i = 0; i < poolInfos.length; i++) {
             require(assetRouterApproved[poolInfos[i].assetRouter] == true, 'ASSET_ROUTER_NOT_APPROVED');
         }
-        address autoStrategy = _createStrategy(poolInfos);
+        address autoStrategy = _createStrategy(poolInfos, banxe);
         autoStrategies.push(autoStrategy);
         return autoStrategy;
     }
@@ -119,13 +113,14 @@ contract UnoAutoStrategyBanxeFactory is Pausable {
     /**
      * @dev Deploys new AutoStrategy contract and calls initialize() on it. Emits {AutoStrategyDeployed} event.
      */
-    function _createStrategy(PoolInfo[] calldata poolInfos) internal returns (address) {
+    function _createStrategy(PoolInfo[] calldata poolInfos, address banxe) internal returns (address) {
         BeaconProxy proxy = new BeaconProxy(
             autoStrategyBeacon,
             abi.encodeWithSelector(
-                bytes4(keccak256('initialize((address,address)[],address)')),
+                bytes4(keccak256('initialize((address,address)[],address,address)')),
                 poolInfos,
-                accessManager
+                accessManager,
+                banxe
             )
         );
         emit AutoStrategyDeployed(address(proxy));
@@ -142,18 +137,5 @@ contract UnoAutoStrategyBanxeFactory is Pausable {
 
     function unpause() external onlyRole(PAUSER_ROLE) {
         _unpause();
-    }
-
-    /**
-     * @dev Transfers banxe rights of the contract to a new account (`_banxe`).
-     * @param _banxe - Address to transfer banxe rights to.
-
-     * Note: This function can only be called by Banxe.
-     */
-    function transferBanxe(address _banxe) external {
-        require(msg.sender == banxe, "CALLER_NOT_BANXE");
-        require(_banxe != address(0), "TRANSFER_TO_ZERO_ADDRESS");
-        emit BanxeTransferred(banxe, _banxe);
-        banxe = _banxe;
     }
 }

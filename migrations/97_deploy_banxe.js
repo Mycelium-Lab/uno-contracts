@@ -38,8 +38,7 @@ module.exports = async (deployer, network, accounts) => {
         AutoStrategyFactory,
         AutoStrategy.address,
         AccessManager.address,
-        [AssetRouterQuickswap, AssetRouterQuickswapDual, AssetRouterSushiswap, AssetRouterApeswap, AssetRouterMeshswap],
-        banxe
+        [AssetRouterQuickswap, AssetRouterQuickswapDual, AssetRouterSushiswap, AssetRouterApeswap, AssetRouterMeshswap]
     )
 
     await addAddress('access-manager', AccessManager.address)
@@ -60,8 +59,10 @@ module.exports = async (deployer, network, accounts) => {
     ]
 
     const autoStrategyFactory = await AutoStrategyFactory.deployed()
-    await autoStrategyFactory.createStrategy(first_strat)
-    await autoStrategyFactory.createStrategy(second_strat)
+    await autoStrategyFactory.createStrategy(first_strat, banxe)
+    await autoStrategyFactory.createStrategy(first_strat, banxe)
+    await autoStrategyFactory.createStrategy(second_strat, banxe)
+    await autoStrategyFactory.createStrategy(second_strat, banxe)
 
     console.log('Deployed', AutoStrategyFactory.address)
 }
