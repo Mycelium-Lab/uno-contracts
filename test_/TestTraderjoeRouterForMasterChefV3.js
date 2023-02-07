@@ -705,7 +705,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
         describe('reverts', () => {
             it('reverts if the stake is zero', async () => {
                 await expectRevert(
-                    assetRouter.withdraw(pool, new BN(1), 0, 0, true, admin, {
+                    assetRouter.withdrawLP(pool, new BN(1), admin, {
                         from: admin
                     }),
                     'INSUFFICIENT_BALANCE'
@@ -713,12 +713,9 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
             })
             it('reverts if the withdraw amount requested is more than user stake', async () => {
                 await expectRevert(
-                    assetRouter.withdraw(
+                    assetRouter.withdrawLP(
                         pool,
                         constants.MAX_UINT256,
-                        0,
-                        0,
-                        true,
                         account1,
                         { from: account1 }
                     ),
@@ -727,7 +724,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
             })
             it('reverts if amount provided is 0', async () => {
                 await expectRevert(
-                    assetRouter.withdraw(pool, 0, 0, 0, true, account1, {
+                    assetRouter.withdrawLP(pool, 0, account1, {
                         from: account1
                     }),
                     'INSUFFICIENT_AMOUNT'
@@ -755,21 +752,15 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
                     pool
                 ))
 
-                receipt1 = await assetRouter.withdraw(
+                receipt1 = await assetRouter.withdrawLP(
                     pool,
                     amounts[0],
-                    0,
-                    0,
-                    true,
                     account1,
                     { from: account1 }
                 )
-                receipt2 = await assetRouter.withdraw(
+                receipt2 = await assetRouter.withdrawLP(
                     pool,
                     amounts[2],
-                    0,
-                    0,
-                    true,
                     account2,
                     { from: account2 }
                 )
@@ -852,12 +843,9 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
                     pool
                 ))
 
-                receipt = await assetRouter.withdraw(
+                receipt = await assetRouter.withdrawLP(
                     pool,
                     amounts[1],
-                    0,
-                    0,
-                    true,
                     account2,
                     { from: account1 }
                 )
@@ -931,7 +919,6 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
                     stakeLP1,
                     0,
                     0,
-                    false,
                     account1,
                     { from: account1 }
                 )
@@ -1008,7 +995,6 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
                     stakeLP2,
                     0,
                     0,
-                    false,
                     account1,
                     { from: account2 }
                 )
@@ -1460,12 +1446,9 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
         describe('withdraws', () => {
             it('withdraws all tokens for account1', async () => {
                 let { stakeLP } = await assetRouter.userStake(account1, pool)
-                await assetRouter.withdraw(
+                await assetRouter.withdrawLP(
                     pool,
                     stakeLP,
-                    0,
-                    0,
-                    true,
                     account1,
                     { from: account1 }
                 );
@@ -1474,12 +1457,9 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
             })
             it('withdraws tokens for account2', async () => {
                 let { stakeLP } = await assetRouter.userStake(account2, pool)
-                await assetRouter.withdraw(
+                await assetRouter.withdrawLP(
                     pool,
                     stakeLP,
-                    0,
-                    0,
-                    true,
                     account2,
                     { from: account2 }
                 );

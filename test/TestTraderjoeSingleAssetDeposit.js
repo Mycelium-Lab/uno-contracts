@@ -14,8 +14,6 @@ const Farm = artifacts.require('UnoFarmTraderjoe')
 const AssetRouter = artifacts.require('UnoAssetRouterTraderjoe')
 
 const pool = '0xf4003F4efBE8691B60249E6afbD307aBE7758adb' // wAVAX-USDC
-// 0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7
-// 0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E
 const masterJoeAddress = '0x4483f0b6e2F5486D06958C20f8C39A7aBe87bf8F'
 
 const DAIHolder = '0xd699571A57D3Efe7c50369Fb5350448FA1ad246E'// has to be unlocked and hold 0xd586E7F844cEa2F87f50152665BCbc2C279D8d70

@@ -163,7 +163,7 @@ contract UnoFarmTraderjoe is Initializable, ReentrancyGuardUpgradeable {
 
 	/**
 	 * @dev Function that makes the deposits.
-	 * Deposits provided tokens in the Liquidity Pool, then stakes generated LP tokens in the {MasterChef}.
+	 * Stakes {amount} of LP tokens from this contract's balance in the {MasterChef}.
 	 */
 	function deposit(uint256 amount, address recipient) external nonReentrant onlyAssetRouter{
 		require(amount > 0, "NO_LIQUIDITY_PROVIDED");
@@ -180,12 +180,9 @@ contract UnoFarmTraderjoe is Initializable, ReentrancyGuardUpgradeable {
 	 */
 	function withdraw(
 		uint256 amount,
-		uint256 amountAMin,
-		uint256 amountBMin,
-		bool withdrawLP,
 		address origin,
 		address recipient
-	) external nonReentrant onlyAssetRouter returns (uint256 amountA, uint256 amountB) {
+	) external nonReentrant onlyAssetRouter {
 		require(amount > 0, "INSUFFICIENT_AMOUNT");
 
 		_updateDeposit(origin);
@@ -202,11 +199,7 @@ contract UnoFarmTraderjoe is Initializable, ReentrancyGuardUpgradeable {
 		}
 
 		MasterChef.withdraw(pid, amount);
-		if (withdrawLP) {
-			IERC20Upgradeable(lpPair).safeTransfer(recipient, amount);
-			return (0, 0);
-		}
-		(amountA, amountB) = traderjoeRouter.removeLiquidity(tokenA, tokenB, amount, amountAMin, amountBMin, recipient, block.timestamp);
+		IERC20Upgradeable(lpPair).safeTransfer(recipient, amount);
 	}
 
 	/**
