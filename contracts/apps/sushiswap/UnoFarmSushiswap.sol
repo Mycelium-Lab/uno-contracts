@@ -155,7 +155,7 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
 
     /**
      * @dev Function that makes the deposits.
-     * Deposits provided tokens in the Liquidity Pool, then stakes generated LP tokens in the {MiniChef}.
+     * Stakes {amount} of LP tokens from this contract's balance in the {MiniChef}.
      */
     function deposit(uint256 amount, address recipient) external nonReentrant onlyAssetRouter{
         require(amount > 0, 'NO_LIQUIDITY_PROVIDED');
@@ -166,11 +166,11 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
             
         MiniChef.deposit(pid, amount, address(this));
     }
-    
+
     /**
      * @dev Withdraws funds from {origin} and sends them to the {recipient}.
      */
-    function withdraw(uint256 amount, uint256 amountAMin, uint256 amountBMin, bool withdrawLP, address origin, address recipient) external nonReentrant onlyAssetRouter returns(uint256 amountA, uint256 amountB){
+    function withdraw(uint256 amount, address origin, address recipient) external nonReentrant onlyAssetRouter{
         require(amount > 0, 'INSUFFICIENT_AMOUNT');
 
         _updateDeposit(origin);
@@ -186,12 +186,7 @@ contract UnoFarmSushiswap is Initializable, ReentrancyGuardUpgradeable {
             user.reward -= amount;
         }
 
-        MiniChef.withdraw(pid, amount, address(this));
-        if(withdrawLP){
-            IERC20Upgradeable(lpPair).safeTransfer(recipient, amount);
-            return (0, 0);
-        }
-        (amountA, amountB) = sushiswapRouter.removeLiquidity(tokenA, tokenB, amount, amountAMin, amountBMin, recipient, block.timestamp);
+        MiniChef.withdraw(pid, amount, recipient);
     }
 
     /**

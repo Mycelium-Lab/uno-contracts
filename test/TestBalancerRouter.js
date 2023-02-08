@@ -485,25 +485,25 @@ contract('UnoAssetRouterBalancer', (accounts) => {
         describe('reverts', () => {
             it('reverts if the pool doesnt exist', async () => {
                 await expectRevert(
-                    assetRouter.withdraw(pool2, web3.eth.abi.encodeParameter('uint256', 1), zeroAmounts, true, account1, { from: account1 }),
+                    assetRouter.withdrawLP(pool2, 1, account1, { from: account1 }),
                     'FARM_NOT_EXISTS'
                 )
             })
             it('reverts if the stake is zero', async () => {
                 await expectRevert(
-                    assetRouter.withdraw(pool, web3.eth.abi.encodeParameter('uint256', 1), zeroAmounts, true, admin, { from: admin }),
+                    assetRouter.withdrawLP(pool, 1, admin, { from: admin }),
                     'INSUFFICIENT_BALANCE'
                 )
             })
             it('reverts if the withdraw amount requested is more than user stake', async () => {
                 await expectRevert(
-                    assetRouter.withdraw(pool, web3.eth.abi.encodeParameter('uint256', constants.MAX_UINT256), zeroAmounts, true, account1, { from: account1 }),
+                    assetRouter.withdrawLP(pool, constants.MAX_UINT256, account1, { from: account1 }),
                     'INSUFFICIENT_BALANCE'
                 )
             })
             it('reverts if amount provided is 0', async () => {
                 await expectRevert(
-                    assetRouter.withdraw(pool, web3.eth.abi.encodeParameter('uint256', 0), zeroAmounts, true, account1, { from: account1 }),
+                    assetRouter.withdrawLP(pool, 0, account1, { from: account1 }),
                     'INSUFFICIENT_AMOUNT'
                 )
             })
@@ -524,8 +524,8 @@ contract('UnoAssetRouterBalancer', (accounts) => {
                 stake1before = await assetRouter.userStake(account1, pool)
                 stake2before = await assetRouter.userStake(account2, pool)
 
-                receipt1 = await assetRouter.withdraw(pool, web3.eth.abi.encodeParameter('uint256', amounts[0]), zeroAmounts, true, account1, { from: account1 })
-                receipt2 = await assetRouter.withdraw(pool, web3.eth.abi.encodeParameter('uint256', amounts[2]), zeroAmounts, true, account2, { from: account2 })
+                receipt1 = await assetRouter.withdrawLP(pool, amounts[0], account1, { from: account1 })
+                receipt2 = await assetRouter.withdrawLP(pool, amounts[2], account2, { from: account2 })
             })
             it('fires events', async () => {
                 expectEvent(receipt1, 'Withdraw', {
@@ -595,7 +595,7 @@ contract('UnoAssetRouterBalancer', (accounts) => {
                 stake1before = await assetRouter.userStake(account1, pool)
                 stake2before = await assetRouter.userStake(account2, pool)
 
-                receipt = await assetRouter.withdraw(pool, web3.eth.abi.encodeParameter('uint256', amounts[1]), zeroAmounts, true, account2, { from: account1 })
+                receipt = await assetRouter.withdrawLP(pool, amounts[1], account2, { from: account1 })
             })
             it('fires events', async () => {
                 expectEvent(receipt, 'Withdraw', {
@@ -652,7 +652,7 @@ contract('UnoAssetRouterBalancer', (accounts) => {
 
                 // Proportional Exit
                 const userData = web3.eth.abi.encodeParameters(['uint256', 'uint256'], ['1', stakeLP1.toString()])
-                receipt = await assetRouter.withdraw(pool, userData, zeroAmounts, false, account1, { from: account1 })
+                receipt = await assetRouter.withdraw(pool, userData, zeroAmounts, account1, { from: account1 })
             })
             it('fires events', async () => {
                 expectEvent(receipt, 'Withdraw', {
@@ -702,7 +702,7 @@ contract('UnoAssetRouterBalancer', (accounts) => {
 
                 // Proportional Exit
                 const userData = web3.eth.abi.encodeParameters(['uint256', 'uint256'], ['1', stakeLP2.toString()])
-                receipt = await assetRouter.withdraw(pool, userData, zeroAmounts, false, account1, { from: account2 })
+                receipt = await assetRouter.withdraw(pool, userData, zeroAmounts, account1, { from: account2 })
             })
             it('fires events', async () => {
                 expectEvent(receipt, 'Withdraw', {
@@ -922,7 +922,7 @@ contract('UnoAssetRouterBalancer', (accounts) => {
         describe('withdraws', () => {
             it('withdraws all tokens for account1', async () => {
                 let stakeLP = await assetRouter.userStake(account1, pool)
-                await assetRouter.withdraw(pool, web3.eth.abi.encodeParameter('uint256', stakeLP), zeroAmounts, true, account1, { from: account1 })
+                await assetRouter.withdrawLP(pool, stakeLP, account1, { from: account1 })
 
                 stakeLP = await assetRouter.userStake(account1, pool)
                 assert.equal(
@@ -933,7 +933,7 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             })
             it('withdraws tokens for account2', async () => {
                 let stakeLP = await assetRouter.userStake(account2, pool)
-                await assetRouter.withdraw(pool, web3.eth.abi.encodeParameter('uint256', stakeLP), zeroAmounts, true, account2, { from: account2 })
+                await assetRouter.withdrawLP(pool, stakeLP, account2, { from: account2 })
 
                 stakeLP = await assetRouter.userStake(account2, pool)
                 assert.equal(

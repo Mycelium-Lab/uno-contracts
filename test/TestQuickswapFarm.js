@@ -85,7 +85,7 @@ contract('UnoFarmQuickswap', (accounts) => {
                 'CALLER_NOT_ASSET_ROUTER'
             )
             await expectRevert(
-                implementation.withdraw(0, 0, 0, false, accounts[0], accounts[0], { from: accounts[1] }),
+                implementation.withdraw(0, accounts[0], accounts[0], { from: accounts[1] }),
                 'CALLER_NOT_ASSET_ROUTER'
             )
             await expectRevert(
@@ -106,7 +106,7 @@ contract('UnoFarmQuickswap', (accounts) => {
                 'NO_LIQUIDITY_PROVIDED'
             )
             await expectRevert(
-                implementation.withdraw(0, 0, 0, false, accounts[0], accounts[0], { from: assetRouter }),
+                implementation.withdraw(0, accounts[0], accounts[0], { from: assetRouter }),
                 'INSUFFICIENT_AMOUNT'
             )
             await expectRevert(

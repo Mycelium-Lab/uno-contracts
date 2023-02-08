@@ -2,7 +2,6 @@ const {
     expectRevert, expectEvent, BN, constants
 } = require('@openzeppelin/test-helpers')
 const { deployProxy } = require('@openzeppelin/truffle-upgrades')
-const fetch = require('node-fetch')
 
 const DAIHolder = '0x06959153B974D0D5fDfd87D561db6d8d4FA0bb0B'// has to be unlocked and hold 0xf28164A485B0B2C90639E47b0f377b4a438a16B1
 
@@ -27,27 +26,6 @@ approxeq = (bn1, bn2, epsilon, message) => {
     const amountDelta = bn1.sub(bn2).add(epsilon)
     assert.ok(!amountDelta.isNeg(), message)
 }
-
-apiRequestUrl = (queryParams) => {
-    const baseApiRequestURL = 'https://api.1inch.io/v5.0/137/swap'
-    return `${baseApiRequestURL}?${(new URLSearchParams(queryParams)).toString()}`
-}
-
-fetchData = async (queryParams) => fetch(apiRequestUrl(queryParams)).then((res) => res.json()).then((res) => res.tx.data)
-
-swapParams = (
-    fromTokenAddress,
-    toTokenAddress,
-    amount,
-    fromAddress
-) => ({
-    fromTokenAddress,
-    toTokenAddress,
-    amount,
-    fromAddress,
-    slippage: 1,
-    disableEstimate: true
-})
 
 contract('UnoAssetRouterBalancerSingleAssetDeposit', (accounts) => {
     const admin = accounts[0]
@@ -138,7 +116,7 @@ contract('UnoAssetRouterBalancerSingleAssetDeposit', (accounts) => {
                 totalDepositsLPBefore = await assetRouter.totalDeposits(pool)
             })
             it('fires events', async () => {
-                const receipt = await assetRouter.depositSingleAsset(pool, DAIToken.address, DAIAmount, tokensData, tokens, 0, DAIHolder, { from: DAIHolder })
+                const receipt = await assetRouter.depositSingleAsset(pool, DAIToken.address, DAIAmount, tokensData, 0, DAIHolder, { from: DAIHolder })
 
                 expectEvent(receipt, 'Deposit', { lpPool: pool, sender: DAIHolder, recipient: DAIHolder })
             })
@@ -190,7 +168,7 @@ contract('UnoAssetRouterBalancerSingleAssetDeposit', (accounts) => {
             })
             it('fires events', async () => {
                 ethBalanceBefore = new BN(await web3.eth.getBalance(DAIHolder))
-                const receipt = await assetRouter.depositSingleETH(pool, tokensData, tokens, 0, DAIHolder, { from: DAIHolder, value: amountETH })
+                const receipt = await assetRouter.depositSingleETH(pool, tokensData, 0, DAIHolder, { from: DAIHolder, value: amountETH })
 
                 const gasUsed = new BN(receipt.receipt.gasUsed)
                 const effectiveGasPrice = new BN(receipt.receipt.effectiveGasPrice)

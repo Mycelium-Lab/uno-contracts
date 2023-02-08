@@ -137,7 +137,7 @@ contract UnoFarmMeshswap is Initializable, ReentrancyGuardUpgradeable {
 
 	/**
 	 * @dev Function that makes the deposits.
-	 * Deposits provided tokens in the Liquidity Pool, then stakes generated LP tokens in the {MasterApe}.
+	 * Stakes {amount} of LP tokens from this contract's balance .
 	 */
 	function deposit(uint256 amount, address recipient) external nonReentrant onlyAssetRouter{
         require(amount > 0, 'NO_LIQUIDITY_PROVIDED');
@@ -148,43 +148,32 @@ contract UnoFarmMeshswap is Initializable, ReentrancyGuardUpgradeable {
 	}
 
 	/**
-	 * @dev Withdraws funds from {origin} and sends them to the {recipient}.
-	 */
-	function withdraw(
-		uint256 amount,
-		uint256 amountAMin,
-		uint256 amountBMin,
-		bool withdrawLP,
-		address origin,
-		address recipient
-	) external nonReentrant onlyAssetRouter returns (uint256 amountA, uint256 amountB) {
-		require(amount > 0, "INSUFFICIENT_AMOUNT");
+     * @dev Withdraws funds from {origin} and sends them to the {recipient}.
+     */
+    function withdraw(uint256 amount, address origin, address recipient) external nonReentrant onlyAssetRouter{
+        require(amount > 0, 'INSUFFICIENT_AMOUNT');
 
-		_updateDeposit(origin);
-		UserInfo storage user = userInfo[origin];
-		// Subtract amount from user.reward first, then subtract remainder from user.stake.
-		if (amount > user.reward) {
-			uint256 balance = user.stake + user.reward;
-			require(amount <= balance, "INSUFFICIENT_BALANCE");
-			user.stake = balance - amount;
-			totalDeposits = totalDeposits + user.reward - amount;
-			user.reward = 0;
-		} else {
-			user.reward -= amount;
-		}
+        _updateDeposit(origin);
+        UserInfo storage user = userInfo[origin];
+        // Subtract amount from user.reward first, then subtract remainder from user.stake.
+        if(amount > user.reward){
+            uint256 balance = user.stake + user.reward;
+            require(amount <= balance, 'INSUFFICIENT_BALANCE');
+            user.stake = balance - amount;
+            totalDeposits = totalDeposits + user.reward - amount;
+            user.reward = 0;
+        } else {
+            user.reward -= amount;
+        }
 
-		if (withdrawLP) {
-			IERC20Upgradeable(lpPair).safeTransfer(recipient, amount);
-			return (0, 0);
-		}
-		(amountA, amountB) = MeshswapRouter.removeLiquidity(tokenA, tokenB, amount, amountAMin, amountBMin, recipient, block.timestamp);
-	}
+		IERC20Upgradeable(lpPair).safeTransfer(recipient, amount);
+    }
 
 	/**
 	 * @dev Core function of the strat, in charge of updating, collecting and re-investing rewards.
-	 * 1. It claims rewards from the {MasterApe}.
+	 * 1. It claims rewards from the {IExchangeMeshwap}.
 	 * 2. It swaps {rewardToken} token for {tokenA} & {tokenB}.
-	 * 3. It deposits new LP tokens back to the {MasterApe}.
+	 * 3. It deposits new LP tokens back to the {IExchangeMeshwap}.
 	 */
 	function distribute(
 		SwapInfo[2] calldata swapInfos,

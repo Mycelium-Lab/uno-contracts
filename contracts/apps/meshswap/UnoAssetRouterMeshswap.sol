@@ -161,12 +161,12 @@ contract UnoAssetRouterMeshswap is Initializable, PausableUpgradeable, UUPSUpgra
         address tokenB = farm.tokenB();
 
         if (tokenA != token) {
-            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[0]);
+            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[0], tokenA);
             amount -= spentAmount;
             amountA = returnAmount;
         }
         if (tokenB != token) {
-            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[1]);
+            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[1], tokenB);
             amount -= spentAmount;
             amountB = returnAmount;
         }
@@ -190,7 +190,7 @@ contract UnoAssetRouterMeshswap is Initializable, PausableUpgradeable, UUPSUpgra
     /**
      * @dev Deposits single MATIC in the given pool. Creates new Farm contract if there isn't one deployed for the {lpPair}, swaps MATIC for pool tokens and deposits them. Emits a {Deposit} event.
      * @param lpPair - Address of the pool to deposit tokens in.
-     * @param swapData - Parameter with which 1inch router is being called with.
+     * @param swapData - Parameter with which 1inch router is being called with. NOTE: Use WMATIC as toToken.
      * @param amountAMin - Bounds the extent to which the B/A price can go up before the transaction reverts.
      * @param amountBMin - Bounds the extent to which the A/B price can go up before the transaction reverts.
      * @param recipient - Address which will receive the deposit.
@@ -216,12 +216,12 @@ contract UnoAssetRouterMeshswap is Initializable, PausableUpgradeable, UUPSUpgra
         address tokenB = farm.tokenB();
 
         if (tokenA != WMATIC) {
-            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[0]);
+            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[0], tokenA);
             amount -= spentAmount;
             amountA = returnAmount;
         }
         if (tokenB != WMATIC) {
-            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[1]);
+            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[1], tokenB);
             amount -= spentAmount;
             amountB = returnAmount;
         }
@@ -263,24 +263,25 @@ contract UnoAssetRouterMeshswap is Initializable, PausableUpgradeable, UUPSUpgra
     }
 
 	/** 
-     * @dev Withdraws tokens from the given pool. Emits a {Withdraw} event.
+     * @dev Withdraws a pair of tokens from the given pool. Emits a {Withdraw} event.
      * @param lpPair - LP pool to withdraw from.
      * @param amount - LP amount to withdraw. 
      * @param amountAMin - The minimum amount of tokenA that must be received for the transaction not to revert.
      * @param amountBMin - The minimum amount of tokenB that must be received for the transaction not to revert.
-     * @param withdrawLP - True: Withdraw in LP tokens, False: Withdraw in normal tokens.
      * @param recipient - The address which will receive tokens.
 
-     * @return amountA - Token A amount sent to the {recipient}, 0 if withdrawLP == false.
-     * @return amountB - Token B amount sent to the {recipient}, 0 if withdrawLP == false.
+     * @return amountA - Token A amount sent to the {recipient}
+     * @return amountB - Token B amount sent to the {recipient}
      */
-	function withdraw(address lpPair, uint256 amount, uint256 amountAMin, uint256 amountBMin, bool withdrawLP, address recipient) external returns (uint256 amountA, uint256 amountB) {
-		Farm farm = Farm(farmFactory.Farms(lpPair));
-		require(farm != Farm(address(0)), "FARM_NOT_EXISTS");
+    function withdraw(address lpPair, uint256 amount, uint256 amountAMin, uint256 amountBMin, address recipient) external returns(uint256 amountA, uint256 amountB){
+        Farm farm = Farm(farmFactory.Farms(lpPair));
+        require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
 
-		(amountA, amountB) = farm.withdraw(amount, amountAMin, amountBMin, withdrawLP, msg.sender, recipient);
-		emit Withdraw(lpPair, msg.sender, recipient, amount);
-	}
+        farm.withdraw(amount, msg.sender, address(this));
+        (amountA, amountB) = _removeLiquidity(lpPair, farm.tokenA(), farm.tokenB(), amount, amountAMin, amountBMin, recipient);
+        
+        emit Withdraw(lpPair, msg.sender, recipient, amount);  
+    }
 
 	/** 
      * @dev Autoconverts WMATIC into MATIC and withdraws tokens from the pool. Emits a {Withdraw} event.
@@ -293,27 +294,140 @@ contract UnoAssetRouterMeshswap is Initializable, PausableUpgradeable, UUPSUpgra
      * @return amountToken - Token amount sent to the {recipient}.
      * @return amountETH - MATIC amount sent to the {recipient}.
      */
-	function withdrawETH(address lpPair, uint256 amount, uint256 amountTokenMin, uint256 amountETHMin, address recipient) external returns (uint256 amountToken, uint256 amountETH) {
-		Farm farm = Farm(farmFactory.Farms(lpPair));
-		require(farm != Farm(address(0)), "FARM_NOT_EXISTS");
+    function withdrawETH(address lpPair, uint256 amount, uint256 amountTokenMin, uint256 amountETHMin, address recipient) external returns(uint256 amountToken, uint256 amountETH){
+        Farm farm = Farm(farmFactory.Farms(lpPair));
+        require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
 
-		address tokenA = farm.tokenA();
-		address tokenB = farm.tokenB();
+        address tokenA = farm.tokenA();
+        address tokenB = farm.tokenB();
 
-		if (tokenA == WMATIC) {
-			(amountETH, amountToken) = farm.withdraw(amount, amountETHMin, amountTokenMin, false, msg.sender, address(this));
-			IERC20Upgradeable(tokenB).safeTransfer(recipient, amountToken);
-		} else if (tokenB == WMATIC) {
-			(amountToken, amountETH) = farm.withdraw(amount, amountTokenMin, amountETHMin, false, msg.sender, address(this));
-			IERC20Upgradeable(tokenA).safeTransfer(recipient, amountToken);
-		} else {
-			revert("NOT_WMATIC_POOL");
-		}
+        farm.withdraw(amount, msg.sender, address(this));
+        if (tokenA == WMATIC) {
+            (amountToken, amountETH) = _removeLiquidityETH(lpPair, tokenB, amount, amountTokenMin, amountETHMin, recipient);
+        } else if (tokenB == WMATIC) {
+            (amountToken, amountETH) = _removeLiquidityETH(lpPair, tokenA, amount, amountTokenMin, amountETHMin, recipient);
+        } else {
+            revert("NOT_WMATIC_POOL");
+        }
 
-		IWMATIC(WMATIC).withdraw(amountETH);
-		payable(recipient).transfer(amountETH);
-		emit Withdraw(lpPair, msg.sender, recipient, amount);
-	}
+        emit Withdraw(lpPair, msg.sender, recipient, amount);
+    }
+
+    /**
+     * @dev Withdraws single token from the given pool. Emits a {Withdraw} event. Note: If there are any tokens left to be withdrawn after swaps they will be sent to the {{recipient}} in a respective token (not in {token}).
+     * @param lpPair - LP pool to withdraw from.
+     * @param amount - LP amount to withdraw. 
+     * @param token  - Address of a token to exit the pool with.
+     * @param swapData - Parameter with which 1inch router is being called with.
+     * @param recipient - Address which will receive the deposit.
+     
+     * @return amountToken - {token} amount sent to the {recipient}.
+     * @return amountA - Token A dust sent to the {recipient}.
+     * @return amountB - Token B dust sent to the {recipient}.
+     */
+    function withdrawSingleAsset(address lpPair, uint256 amount, address token, bytes[2] calldata swapData, address recipient) external returns(uint256 amountToken, uint256 amountA, uint256 amountB){
+        Farm farm = Farm(farmFactory.Farms(lpPair));
+        require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
+
+        farm.withdraw(amount, msg.sender, address(this));
+
+        address tokenA = farm.tokenA();
+        address tokenB = farm.tokenB();
+        (amountA, amountB) = _removeLiquidity(lpPair, tokenA, tokenB, amount, 0, 0, address(this));
+
+        if (tokenA != token) {
+            IERC20Upgradeable(tokenA).approve(OneInchRouter, amountA);
+            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[0], token);
+            amountToken += returnAmount;
+
+            amountA = amountA - spentAmount;
+            IERC20Upgradeable(tokenA).safeTransfer(recipient, amountA);
+        } else {
+            amountToken += amountA;
+            amountA = 0;
+        }
+
+        if (tokenB != token) {
+            IERC20Upgradeable(tokenB).approve(OneInchRouter, amountB);
+            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[1], token);
+            amountToken += returnAmount;
+
+            amountB = amountB - spentAmount;
+            IERC20Upgradeable(tokenB).safeTransfer(recipient, amountB);
+        } else {
+            amountToken += amountB;
+            amountB = 0;
+        }
+
+        IERC20Upgradeable(token).safeTransfer(recipient, amountToken);
+
+        emit Withdraw(lpPair, msg.sender, recipient, amount);
+    }
+     
+    /**
+     * @dev Withdraws single MATIC from the given pool. Emits a {Withdraw} event. Note: If there are any tokens left to be withdrawn after swaps they will be sent to the {{recipient}} in a respective token (not in MATIC).
+     * @param lpPair - LP pool to withdraw from.
+     * @param amount - LP amount to withdraw. 
+     * @param swapData - Parameter with which 1inch router is being called with.
+     * @param recipient - Address which will receive the deposit.
+     
+     * @return amountETH - MATIC amount sent to the {recipient}.
+     * @return amountA - Token A dust sent to the {recipient}.
+     * @return amountB - Token B dust sent to the {recipient}.
+     */
+    function withdrawSingleETH(address lpPair,  uint256 amount, bytes[2] calldata swapData, address recipient) external returns(uint256 amountETH, uint256 amountA, uint256 amountB){
+        Farm farm = Farm(farmFactory.Farms(lpPair));
+        require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
+
+        farm.withdraw(amount, msg.sender, address(this));
+
+        address tokenA = farm.tokenA();
+        address tokenB = farm.tokenB();
+        (amountA, amountB) = _removeLiquidity(lpPair, tokenA, tokenB, amount, 0, 0, address(this));
+
+        if (tokenA != WMATIC) {
+            IERC20Upgradeable(tokenA).approve(OneInchRouter, amountA);
+            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[0], WMATIC);
+            amountETH += returnAmount;
+
+            amountA = amountA - spentAmount;
+            IERC20Upgradeable(tokenA).safeTransfer(recipient, amountA);
+        } else {
+            amountETH += amountA;
+            amountA = 0;
+        }
+
+        if (tokenB != WMATIC) {
+            IERC20Upgradeable(tokenB).approve(OneInchRouter, amountB);
+            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[1], WMATIC);
+            amountETH += returnAmount;
+
+            amountB = amountB - spentAmount;
+            IERC20Upgradeable(tokenB).safeTransfer(recipient, amountB);
+        } else {
+            amountETH += amountB;
+            amountB = 0;
+        }
+
+        IWMATIC(WMATIC).withdraw(amountETH);
+        payable(recipient).transfer(amountETH);
+
+        emit Withdraw(lpPair, msg.sender, recipient, amount);
+    }
+
+    /** 
+     * @dev Withdraws LP tokens from the given pool. Emits a {Withdraw} event.
+     * @param lpPair - LP pool to withdraw from.
+     * @param amount - LP amount to withdraw. 
+     * @param recipient - The address which will receive tokens.
+     */ 
+    function withdrawLP(address lpPair, uint256 amount, address recipient) external {
+        Farm farm = Farm(farmFactory.Farms(lpPair));
+        require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
+        
+        farm.withdraw(amount, msg.sender, recipient);
+        emit Withdraw(lpPair, msg.sender, recipient, amount);  
+    }
 
 	/**
 	 * @dev Distributes tokens between users.
@@ -424,14 +538,50 @@ contract UnoAssetRouterMeshswap is Initializable, PausableUpgradeable, UUPSUpgra
         IERC20Upgradeable(token).safeTransfer(msg.sender, amount - sentToken);
         payable(msg.sender).transfer(msg.value - sentETH);
     }
+    
+    /**
+     * @dev Withdraws assets from router.
+     */ 
+    function _removeLiquidity(
+        address lpPair,
+        address tokenA,
+        address tokenB, 
+        uint256 amount, 
+        uint256 amountAMin, 
+        uint256 amountBMin, 
+        address recipient
+    ) internal returns(uint256 amountA, uint256 amountB){
+        IERC20Upgradeable(lpPair).approve(address(MeshswapRouter), amount);
+        (amountA, amountB) = MeshswapRouter.removeLiquidity(tokenA, tokenB, amount, amountAMin, amountBMin, recipient, block.timestamp);
+    }
 
-	/**
+    /**
+     * @dev Withdraws assets from router.
+     */ 
+    function _removeLiquidityETH(
+        address lpPair,
+        address token,
+        uint256 amount, 
+        uint256 amountTokenMin, 
+        uint256 amountETHMin, 
+        address recipient
+    ) internal returns(uint256 amountToken, uint256 amountETH){
+        IERC20Upgradeable(lpPair).approve(address(MeshswapRouter), amount);
+        (amountToken, amountETH) = MeshswapRouter.removeLiquidityETH(token, amount, amountTokenMin, amountETHMin, recipient, block.timestamp);
+    }
+
+    /**
      * @dev Swaps assets using 1inch exchange.
      */  
-    function _swap(bytes calldata swapData) internal returns(uint256 returnAmount, uint256 spentAmount){
+    function _swap(bytes calldata swapData, address toToken) internal returns(uint256 returnAmount, uint256 spentAmount){
+        uint256 balanceBefore = IERC20Upgradeable(toToken).balanceOf(address(this));
         (bool success, bytes memory data) = OneInchRouter.call(swapData);
         require(success, "SWAP_NOT_SUCCESSFUL");
+
         (returnAmount, spentAmount) = abi.decode(data, (uint256, uint256));
+        //checks if all {{toToken}}s from swap were transfered to this address
+        uint256 balanceAfter = IERC20Upgradeable(toToken).balanceOf(address(this));
+        require(balanceAfter - balanceBefore == returnAmount, "BAD_RETURN_AMOUNT");
     }
 
 	/**

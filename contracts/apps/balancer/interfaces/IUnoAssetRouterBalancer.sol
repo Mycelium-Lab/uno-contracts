@@ -24,12 +24,15 @@ interface IUnoAssetRouterBalancer {
 
     function deposit(address lpPool, uint256[] memory amounts, address[] calldata tokens, uint256 minAmountLP, address recipient) external returns(uint256 liquidity);
     function depositETH(address lpPool, uint256[] memory amounts, address[] calldata tokens, uint256 minAmountLP, address recipient) external payable returns(uint256 liquidity);
-    function depositSingleAsset(address lpPool, address token, uint256 amount, bytes[] calldata swapData, address[] calldata tokens, uint256 minAmountLP, address recipient) external returns(uint256 sent, uint256 liquidity);
-    function depositSingleETH(address lpPool, bytes[] calldata swapData, address[] calldata tokens, uint256 minAmountLP, address recipient) external payable returns(uint256 sentETH, uint256 liquidity);
+    function depositSingleAsset(address lpPool, address token, uint256 amount, bytes[] calldata swapData, uint256 minAmountLP, address recipient) external returns(uint256 sent, uint256 liquidity);
+    function depositSingleETH(address lpPool, bytes[] calldata swapData, uint256 minAmountLP, address recipient) external payable returns(uint256 sentETH, uint256 liquidity);
     function depositLP(address lpPool, uint256 amount, address recipient) external;
 
-    function withdraw(address lpPool, bytes calldata userData, uint256[] calldata minAmountsOut, bool withdrawLP, address recipient) external returns(uint256[] memory amounts, uint256 liquidity);
+    function withdraw(address lpPool, bytes calldata userData, uint256[] calldata minAmountsOut, address recipient) external returns(uint256[] memory amounts, uint256 liquidity);
     function withdrawETH(address lpPool, bytes calldata userData, uint256[] calldata minAmountsOut, address recipient) external returns(uint256[] memory amounts, uint256 liquidity);
+    function withdrawSingleAsset(address lpPool, address token, bytes calldata userData, bytes[] calldata swapData, address recipient) external returns(uint256 amountToken, uint256[] memory amounts, uint256 liquidity);
+    function withdrawSingleETH(address lpPool, bytes calldata userData, bytes[] calldata swapData, address recipient) external returns(uint256 amountETH, uint256[] memory amounts, uint256 liquidity);
+    function withdrawLP(address lpPool, uint256 amount, address recipient) external;
 
     function distribute(
       address lpPool,

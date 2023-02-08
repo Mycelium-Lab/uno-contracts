@@ -165,7 +165,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         (uint256 leftoverA, uint256 leftoverB) = collectLeftovers(recipient);
 
         uint256 amountLP = burn(liquidity);
-        (amountA, amountB) = pool.assetRouter.withdraw(pool.pool, amountLP, amountAMin, amountBMin, false, recipient);
+        (amountA, amountB) = pool.assetRouter.withdraw(pool.pool, amountLP, amountAMin, amountBMin, recipient);
 
         amountA += leftoverA;
         amountB += leftoverB;
@@ -219,7 +219,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         PoolInfo memory newPool = pools[_poolID];
 
         (uint256 _totalDeposits,,) = currentPool.assetRouter.userStake(address(this), currentPool.pool);
-        currentPool.assetRouter.withdraw(currentPool.pool, _totalDeposits, 0, 0, false, address(this));
+        currentPool.assetRouter.withdraw(currentPool.pool, _totalDeposits, 0, 0, address(this));
 
         uint256 tokenABalance = currentPool.tokenA.balanceOf(address(this));
         uint256 tokenBBalance = currentPool.tokenB.balanceOf(address(this));

@@ -540,25 +540,25 @@ contract('UnoAssetRouterSushiswap', (accounts) => {
         describe('reverts', () => {
             it('reverts if the pool doesnt exist', async () => {
                 await expectRevert(
-                    assetRouter.withdraw(pool2, amounts[0], 0, 0, true, account1, { from: account1 }),
+                    assetRouter.withdrawLP(pool2, amounts[0], account1, { from: account1 }),
                     'FARM_NOT_EXISTS'
                 )
             })
             it('reverts if the stake is zero', async () => {
                 await expectRevert(
-                    assetRouter.withdraw(pool, new BN(1), 0, 0, true, admin, { from: admin }),
+                    assetRouter.withdrawLP(pool, new BN(1), admin, { from: admin }),
                     'INSUFFICIENT_BALANCE'
                 )
             })
             it('reverts if the withdraw amount requested is more than user stake', async () => {
                 await expectRevert(
-                    assetRouter.withdraw(pool, constants.MAX_UINT256, 0, 0, true, account1, { from: account1 }),
+                    assetRouter.withdrawLP(pool, constants.MAX_UINT256, account1, { from: account1 }),
                     'INSUFFICIENT_BALANCE'
                 )
             })
             it('reverts if amount provided is 0', async () => {
                 await expectRevert(
-                    assetRouter.withdraw(pool, 0, 0, 0, true, account1, { from: account1 }),
+                    assetRouter.withdrawLP(pool, 0, account1, { from: account1 }),
                     'INSUFFICIENT_AMOUNT'
                 )
             })
@@ -578,8 +578,8 @@ contract('UnoAssetRouterSushiswap', (accounts) => {
                 ({ stakeLP: stake1before } = await assetRouter.userStake(account1, pool));
                 ({ stakeLP: stake2before } = await assetRouter.userStake(account2, pool))
 
-                receipt1 = await assetRouter.withdraw(pool, amounts[0], 0, 0, true, account1, { from: account1 })
-                receipt2 = await assetRouter.withdraw(pool, amounts[2], 0, 0, true, account2, { from: account2 })
+                receipt1 = await assetRouter.withdrawLP(pool, amounts[0], account1, { from: account1 })
+                receipt2 = await assetRouter.withdrawLP(pool, amounts[2], account2, { from: account2 })
             })
             it('fires events', async () => {
                 expectEvent(receipt1, 'Withdraw', {
@@ -648,7 +648,7 @@ contract('UnoAssetRouterSushiswap', (accounts) => {
                 ({ stakeLP: stake1before } = await assetRouter.userStake(account1, pool));
                 ({ stakeLP: stake2before } = await assetRouter.userStake(account2, pool))
 
-                receipt = await assetRouter.withdraw(pool, amounts[1], 0, 0, true, account2, { from: account1 })
+                receipt = await assetRouter.withdrawLP(pool, amounts[1], account2, { from: account1 })
             })
             it('fires events', async () => {
                 expectEvent(receipt, 'Withdraw', {
@@ -705,7 +705,7 @@ contract('UnoAssetRouterSushiswap', (accounts) => {
 
                 ({ stakeLP: stakeLP1, stakeA: stakeA1, stakeB: stakeB1 } = await assetRouter.userStake(account1, pool));
                 ({ stakeLP: stakeLP2, stakeA: stakeA2, stakeB: stakeB2 } = await assetRouter.userStake(account2, pool))
-                receipt = await assetRouter.withdraw(pool, stakeLP1, 0, 0, false, account1, { from: account1 })
+                receipt = await assetRouter.withdraw(pool, stakeLP1, 0, 0, account1, { from: account1 })
             })
             it('fires events', async () => {
                 expectEvent(receipt, 'Withdraw', {
@@ -783,7 +783,7 @@ contract('UnoAssetRouterSushiswap', (accounts) => {
 
                 ({ stakeLP: stakeLP1, stakeA: stakeA1, stakeB: stakeB1 } = await assetRouter.userStake(account1, pool));
                 ({ stakeLP: stakeLP2, stakeA: stakeA2, stakeB: stakeB2 } = await assetRouter.userStake(account2, pool))
-                receipt = await assetRouter.withdraw(pool, stakeLP2, 0, 0, false, account1, { from: account2 })
+                receipt = await assetRouter.withdraw(pool, stakeLP2, 0, 0, account1, { from: account2 })
             })
             it('fires events', async () => {
                 expectEvent(receipt, 'Withdraw', {
@@ -1526,7 +1526,7 @@ contract('UnoAssetRouterSushiswap', (accounts) => {
         describe('withdraws', () => {
             it('withdraws all tokens for account1', async () => {
                 let { stakeLP } = await assetRouter.userStake(account1, pool)
-                await assetRouter.withdraw(pool, stakeLP, 0, 0, true, account1, { from: account1 });
+                await assetRouter.withdrawLP(pool, stakeLP, account1, { from: account1 });
 
                 ({ stakeLP } = await assetRouter.userStake(account1, pool))
                 assert.equal(
@@ -1537,7 +1537,7 @@ contract('UnoAssetRouterSushiswap', (accounts) => {
             })
             it('withdraws tokens for account2', async () => {
                 let { stakeLP } = await assetRouter.userStake(account2, pool)
-                await assetRouter.withdraw(pool, stakeLP, 0, 0, true, account2, { from: account2 });
+                await assetRouter.withdrawLP(pool, stakeLP, account2, { from: account2 });
 
                 ({ stakeLP } = await assetRouter.userStake(account2, pool))
                 assert.equal(stakeLP.toString(), '0', 'acount2 stake not 0')

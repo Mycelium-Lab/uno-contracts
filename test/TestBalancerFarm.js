@@ -82,7 +82,11 @@ contract('UnoFarmBalancer', (accounts) => {
                 'CALLER_NOT_ASSET_ROUTER'
             )
             await expectRevert(
-                implementation.withdraw(web3.eth.abi.encodeParameter('uint256', '0'), [], false, accounts[0], accounts[0], { from: accounts[1] }),
+                implementation.withdraw(0, accounts[0], accounts[0], { from: accounts[1] }),
+                'CALLER_NOT_ASSET_ROUTER'
+            )
+            await expectRevert(
+                implementation.withdrawTokens(web3.eth.abi.encodeParameter('uint256', '0'), [], accounts[0], accounts[0], { from: accounts[1] }),
                 'CALLER_NOT_ASSET_ROUTER'
             )
             await expectRevert(
@@ -98,8 +102,12 @@ contract('UnoFarmBalancer', (accounts) => {
                 'NO_LIQUIDITY_PROVIDED'
             )
             await expectRevert(
-                implementation.withdraw(web3.eth.abi.encodeParameter('uint256', '0'), [], true, accounts[0], accounts[0], { from: assetRouter }),
+                implementation.withdraw(0, accounts[0], accounts[0], { from: assetRouter }),
                 'INSUFFICIENT_AMOUNT'
+            )
+            await expectRevert(
+                implementation.withdrawTokens(web3.eth.abi.encodeParameter('uint256', '0'), [], accounts[0], accounts[0], { from: assetRouter }),
+                'MIN_AMOUNTS_OUT_BAD_LENGTH'
             )
             await expectRevert(
                 implementation.distribute([{ swaps: [], assets: [], limits: [] }], [{ swaps: [], assets: [], limits: [] }], { feeTo: accounts[1], fee: 0 }, { from: assetRouter }),

@@ -150,7 +150,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
 
     /**
      * @dev Function that makes the deposits.
-     * Deposits {amounts} of {tokens} from this contract's balance to the {Vault}.
+     * Deposits {amount} of LP tokens from this contract's balance to the {Vault}.
      */
     function deposit(uint256 amount, address recipient) external nonReentrant onlyAssetRouter{
         require (amount > 0, 'NO_LIQUIDITY_PROVIDED');
@@ -165,36 +165,36 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
     /**
      * @dev Withdraws funds from {origin} and sends them to the {recipient}.
      */
-    function withdraw(bytes calldata userData, uint256[] calldata minAmountsOut, bool withdrawLP, address origin, address recipient) external nonReentrant onlyAssetRouter returns(uint256[] memory amounts, uint256 liquidity){
-        (IERC20[] memory tokens, , ) = Vault.getPoolTokens(poolId);
-        if(withdrawLP){
-            (liquidity) = abi.decode(userData, (uint256));
-            require(liquidity > 0, 'INSUFFICIENT_AMOUNT');
-            _onWithdrawUpdate(liquidity, origin);
-
-            gauge.withdraw(liquidity);
-            IERC20Upgradeable(lpPool).safeTransfer(recipient, liquidity);
-            amounts = new uint256[](tokens.length);
-        } else {
-            require (minAmountsOut.length == tokens.length, 'MIN_AMOUNTS_OUT_BAD_LENGTH');
-            (amounts, liquidity) = _exitPool(userData, minAmountsOut, tokens, recipient);
-            require(liquidity > 0, 'INSUFFICIENT_AMOUNT');
-            _onWithdrawUpdate(liquidity, origin);
-        }
+    function withdraw(uint256 amount, address origin, address recipient) external nonReentrant onlyAssetRouter{
+        _onWithdrawUpdate(amount, origin);
+        gauge.withdraw(amount);
+        IERC20Upgradeable(lpPool).safeTransfer(recipient, amount);
     }
 
-    function _onWithdrawUpdate(uint256 liquidity, address origin) internal{
+    /**
+     * @dev Withdraws tokens from {origin} and sends them to the {recipient}. Saves gas compared to doing it in asset router.
+     */
+    function withdrawTokens(bytes calldata userData, uint256[] calldata minAmountsOut, address origin, address recipient) external nonReentrant onlyAssetRouter returns(uint256[] memory amounts, uint256 liquidity){
+        (IERC20[] memory tokens, , ) = Vault.getPoolTokens(poolId);
+        require (minAmountsOut.length == tokens.length, 'MIN_AMOUNTS_OUT_BAD_LENGTH');
+        (amounts, liquidity) = _exitPool(userData, minAmountsOut, tokens, recipient);
+        _onWithdrawUpdate(liquidity, origin);
+    }
+
+    function _onWithdrawUpdate(uint256 amount, address origin) internal{
+        require(amount > 0, 'INSUFFICIENT_AMOUNT');
+
         _updateDeposit(origin);
         UserInfo storage user = userInfo[origin];
         // Subtract amount from user.reward first, then subtract remainder from user.stake.
-        if(liquidity > user.reward){
+        if(amount > user.reward){
             uint256 balance = user.stake + user.reward;
-            require(liquidity <= balance, 'INSUFFICIENT_BALANCE');
-            user.stake = balance - liquidity;
-            totalDeposits = totalDeposits + user.reward - liquidity;
+            require(amount <= balance, 'INSUFFICIENT_BALANCE');
+            user.stake = balance - amount;
+            totalDeposits = totalDeposits + user.reward - amount;
             user.reward = 0;
         } else {
-            user.reward -= liquidity;
+            user.reward -= amount;
         }
     }
 

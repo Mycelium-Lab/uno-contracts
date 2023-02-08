@@ -22,7 +22,8 @@ interface IUnoFarmBalancer {
     function initialize( address _lpPool, address _assetRouter) external;
 
     function deposit(uint256 amount, address recipient) external;
-    function withdraw(bytes calldata userData, uint256[] calldata minAmountsOut, bool withdrawLP, address origin, address recipient) external returns(uint256[] memory amounts, uint256 liquidity);
+    function withdraw(uint256 amount, address origin, address recipient) external;
+    function withdrawTokens(bytes calldata userData, uint256[] calldata minAmountsOut, address origin, address recipient) external returns(uint256[] memory amounts, uint256 liquidity);
 
     function distribute(
         SwapInfo[] calldata swapInfos,
