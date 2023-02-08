@@ -4,18 +4,18 @@ const {
 
 const IUniswapV2Pair = artifacts.require('IUniswapV2Pair')
 
-const Farm = artifacts.require('UnoFarmPancakeswap')
-const IMasterChef = artifacts.require('IMasterChef')
+const Farm = artifacts.require('UnoFarmApeswap')
+const IMasterApe = artifacts.require('IMasterApe')
 
-const pool = '0x58F876857a02D6762E0101bb5C46A8c1ED44Dc16' // busd wbnb
-const masterChefAddress = '0xa5f8C5Dbd5F286960b9d90548680aE5ebFf07652'
+const pool = '0x51e6D27FA57373d8d4C256231241053a70Cb1d93' // busd wbnb
+const masterApeAddress = '0x5c8D727b265DBAfaba67E050f2f739cAeEB4A6F9'
 
-contract('UnoFarmPancakeswap', (accounts) => {
+contract('UnoFarmApeswap', (accounts) => {
     const assetRouter = accounts[0]
 
     let implementation
     let stakingToken
-    let masterChef
+    let masterApe
     let pid
     let rewardToken
 
@@ -26,11 +26,11 @@ contract('UnoFarmPancakeswap', (accounts) => {
 
         receipt = await implementation.initialize(pool, assetRouter, { from: accounts[0] })
 
-        masterChef = await IMasterChef.at(masterChefAddress)
-        const poolLength = await masterChef.poolLength()
+        masterApe = await IMasterApe.at(masterApeAddress)
+        const poolLength = await masterApe.poolLength()
 
         for (let i = 0; i < poolLength.toNumber(); i++) {
-            const lpToken = await masterChef.lpToken(i)
+            const lpToken = (await masterApe.poolInfo(i)).lpToken
             if (lpToken.toString() === pool) {
                 pid = i
                 break
@@ -38,7 +38,7 @@ contract('UnoFarmPancakeswap', (accounts) => {
         }
 
         stakingToken = await IUniswapV2Pair.at(pool)
-        rewardToken = await masterChef.CAKE()
+        rewardToken = await masterApe.cake()
     })
 
     describe('Emits initialize event', () => {
@@ -107,7 +107,7 @@ contract('UnoFarmPancakeswap', (accounts) => {
                 'CALLER_NOT_ASSET_ROUTER'
             )
             await expectRevert(
-                implementation.withdraw(0, 0, 0, false, accounts[0], accounts[0], { from: accounts[1] }),
+                implementation.withdraw(0, accounts[0], accounts[0], { from: accounts[1] }),
                 'CALLER_NOT_ASSET_ROUTER'
             )
             await expectRevert(
@@ -128,7 +128,7 @@ contract('UnoFarmPancakeswap', (accounts) => {
                 'NO_LIQUIDITY_PROVIDED'
             )
             await expectRevert(
-                implementation.withdraw(0, 0, 0, false, accounts[0], accounts[0], { from: assetRouter }),
+                implementation.withdraw(0, accounts[0], accounts[0], { from: assetRouter }),
                 'INSUFFICIENT_AMOUNT'
             )
             await expectRevert(
