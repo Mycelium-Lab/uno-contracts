@@ -19,7 +19,7 @@ module.exports = {
                 pollingInterval: 30000
             }),
             network_id: 1313161554,
-            gas: 4500000,
+            gas: 7500000,
             gasPrice: 70000000,
             addressIndex: 0
         },

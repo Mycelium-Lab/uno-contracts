@@ -23,13 +23,7 @@ interface IUnoFarmTrisolarisStable {
     function initialize(address _swap, address _assetRouter) external;
 
     function deposit(uint256 amount, address recipient) external;
-    function withdraw(
-        uint256 amount,
-        uint256[] memory minAmounts,
-        bool withdrawLP,
-        address origin,
-        address recipient
-    ) external returns (uint256[] memory amounts);
+    function withdraw(uint256 amount, address origin, address recipient) external;
 
     function distribute(
         SwapInfo[] calldata rewardSwapInfos,

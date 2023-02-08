@@ -28,9 +28,12 @@ interface IUnoAssetRouterTrisolarisStandard {
     function depositSingleETH(address lpPair, bytes[2] calldata swapData, uint256 amountAMin, uint256 amountBMin, address recipient) external payable returns(uint256 sentETH, uint256 liquidity);
     function depositLP(address lpPair, uint256 amount, address recipient) external;
 
-    function withdraw(address lpPair, uint256 amount, uint256 amountAMin, uint256 amountBMin, bool withdrawLP, address recipient) external returns(uint256 amountA, uint256 amountB);
+    function withdraw(address lpPair, uint256 amount, uint256 amountAMin, uint256 amountBMin, address recipient) external returns(uint256 amountA, uint256 amountB);
     function withdrawETH(address lpPair, uint256 amount, uint256 amountTokenMin, uint256 amountETHMin, address recipient) external returns(uint256 amountToken, uint256 amountETH);
-
+    function withdrawSingleAsset(address lpPair, uint256 amount, address token, bytes[2] calldata swapData, address recipient) external returns(uint256 amountToken, uint256 amountA, uint256 amountB);
+    function withdrawSingleETH(address lpPair,  uint256 amount, bytes[2] calldata swapData, address recipient) external returns(uint256 amountETH, uint256 amountA, uint256 amountB);
+    function withdrawLP(address lpPair, uint256 amount, address recipient) external;
+    
     function distribute(
         address lpPair,
         Farm.SwapInfo[4] calldata swapInfos,

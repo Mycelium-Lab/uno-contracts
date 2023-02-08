@@ -168,7 +168,7 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
                 tokenIndex = int(i);
                 continue;
             }
-            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[i]);
+            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[i], address(tokens[i]));
             amounts[i] = returnAmount;
             amount -= spentAmount;
         }
@@ -220,7 +220,7 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
                 wethIndex = int(i);
                 continue;
             }
-            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[i]);
+            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[i], address(tokens[i]));
             if (returnAmount > 0) {
                 amounts[i] = returnAmount;
             }
@@ -266,7 +266,6 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
      * @param swap - Address of the Swap contract.
      * @param amount - Amounts of LP tokens to withdraw.
      * @param minAmounts - Minimum amounts of tokens sent to {recipient}.
-     * @param withdrawLP - Whether to withdraw or not to withdraw the deposits in LP tokens.
      * @param recipient - The address which will receive tokens.
 
      * @return amounts - Token amounts sent to {recipient}, an array of zeros if withdrawLP == false.
@@ -275,13 +274,14 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
         address swap,
         uint256 amount,
         uint256[] calldata minAmounts,
-        bool withdrawLP,
         address recipient
     ) external returns (uint256[] memory amounts) {
         Farm farm = Farm(farmFactory.Farms(swap));
         require(farm != Farm(address(0)), "FARM_NOT_EXISTS");
 
-        amounts = farm.withdraw(amount, minAmounts, withdrawLP, msg.sender, recipient);
+        farm.withdraw(amount, msg.sender, address(this));
+        amounts = _removeLiquidity(swap, amount, _convertToAddressArray(getTokens(swap)), minAmounts, recipient, farm);
+
         emit Withdraw(swap, msg.sender, recipient, amount);
     }
 
@@ -289,25 +289,123 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
      * @dev Autoconverts WETH into ETH and withdraws tokens from the given pool. 
      * @param swap - LP pool to withdraw from.
      * @param amount - LP amount to withdraw. 
-     * @param minAmountsOut - Minimum token amounts the user will receive.
+     * @param minAmounts - Minimum token amounts the user will receive.
      * @param recipient - The address which will receive tokens.
 
      * @return amounts - Token amounts sent to the {recipient}
      */ 
-    function withdrawETH(address swap, uint256 amount, uint256[] calldata minAmountsOut, address recipient) external returns(uint256[] memory amounts){ 
+    function withdrawETH(address swap, uint256 amount, uint256[] calldata minAmounts, address recipient) external returns(uint256[] memory amounts){ 
         Farm farm = Farm(farmFactory.Farms(swap));
         require(farm != Farm(address(0)), "FARM_NOT_EXISTS");
 
-        amounts = farm.withdraw(amount, minAmountsOut, false, msg.sender, address(this));
-        for (uint256 i = 0; i < amounts.length; i++) {
-            address token = farm.tokens(i);
-            if (token != WETH) {
-                IERC20Upgradeable(token).safeTransfer(recipient, amounts[i]);
+        address[] memory tokens = _convertToAddressArray(getTokens(swap));
+        farm.withdraw(amount, msg.sender, address(this));
+        amounts = _removeLiquidity(swap, amount, tokens, minAmounts, address(this), farm);
+
+        for (uint256 i = 0; i < tokens.length; i++) {
+            if (tokens[i] != WETH) {
+                IERC20Upgradeable(tokens[i]).safeTransfer(recipient, amounts[i]);
                 continue;
             }
             IWETH(WETH).withdraw(amounts[i]);
             payable(recipient).transfer(amounts[i]);
         } 
+        emit Withdraw(swap, msg.sender, recipient, amount);  
+    }
+
+    /**
+     * @dev Withdraws single token from the given pool. Emits a {Withdraw} event. Note: If there are any tokens left to be withdrawn after swaps they will be sent to the {{recipient}} in a respective token (not in {token}).
+     * @param swap - LP pool to withdraw from.
+     * @param amount - LP amount to withdraw. 
+     * @param token  - Address of a token to exit the pool with.
+     * @param swapData - Parameters with which 1inch router is being called with.
+     * @param recipient - Address which will receive the deposit.
+     
+     * @return amountToken - {token} amount sent to the {recipient}.
+     * @return amounts - Dust amounts sent to the {recipient}.
+     */
+    function withdrawSingleAsset(address swap, uint256 amount, address token, bytes[] calldata swapData, address recipient) external returns(uint256 amountToken, uint256[] memory amounts){
+        Farm farm = Farm(farmFactory.Farms(swap));
+        require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
+
+        address[] memory tokens = _convertToAddressArray(getTokens(swap));
+        require (swapData.length == tokens.length, 'INPUT_PARAMS_LENGTHS_NOT_MATCH');
+
+        amounts = new uint256[](tokens.length);
+        farm.withdraw(amount, msg.sender, address(this));
+        amounts = _removeLiquidity(swap, amount, tokens, amounts, address(this), farm);
+
+        for (uint256 i = 0; i < tokens.length; i++) {
+            if (tokens[i] == token) {
+                amountToken += amounts[i];
+                amounts[i] = 0;
+                continue;
+            }
+            IERC20(tokens[i]).approve(OneInchRouter, amounts[i]);
+            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[i], token);
+            amountToken += returnAmount;
+            // Dust
+            amounts[i] -= spentAmount;
+            IERC20Upgradeable(tokens[i]).safeTransfer(recipient, amounts[i]);
+        }
+        
+        IERC20Upgradeable(token).safeTransfer(recipient, amountToken);
+
+        emit Withdraw(swap, msg.sender, recipient, amount);
+    }
+     
+    /**
+     * @dev Withdraws single ETH from the given pool. Emits a {Withdraw} event. Note: If there are any tokens left to be withdrawn after swaps they will be sent to the {{recipient}} in a respective token (not in ETH).
+     * @param swap - LP pool to withdraw from.
+     * @param amount - LP amount to withdraw. 
+     * @param swapData - Parameters with which 1inch router is being called with.
+     * @param recipient - Address which will receive the deposit.
+     
+     * @return amountETH - ETH amount sent to the {recipient}.
+     * @return amounts - Dust amounts sent to the {recipient}.
+     */
+    function withdrawSingleETH(address swap, uint256 amount, bytes[] calldata swapData, address recipient) external returns(uint256 amountETH, uint256[] memory amounts){
+        Farm farm = Farm(farmFactory.Farms(swap));
+        require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
+
+        address[] memory tokens = _convertToAddressArray(getTokens(swap));
+        require (swapData.length == tokens.length, 'INPUT_PARAMS_LENGTHS_NOT_MATCH');
+
+        amounts = new uint256[](tokens.length);
+        farm.withdraw(amount, msg.sender, address(this));
+        amounts = _removeLiquidity(swap, amount, tokens, amounts, address(this), farm);
+
+        for (uint256 i = 0; i < tokens.length; i++) {
+            if (tokens[i] == WETH) {
+                amountETH += amounts[i];
+                amounts[i] = 0;
+                continue;
+            }
+            IERC20(tokens[i]).approve(OneInchRouter, amounts[i]);
+            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[i], WETH);
+            amountETH += returnAmount;
+            // Dust
+            amounts[i] -= spentAmount;
+            IERC20Upgradeable(tokens[i]).safeTransfer(recipient, amounts[i]);
+        }
+
+        IWETH(WETH).withdraw(amountETH);
+        payable(recipient).transfer(amountETH);
+
+        emit Withdraw(swap, msg.sender, recipient, amount);
+    }
+
+    /** 
+     * @dev Withdraws LP tokens from the given pool. Emits a {Withdraw} event.
+     * @param swap - LP pool to withdraw from.
+     * @param amount - LP amount to withdraw. 
+     * @param recipient - The address which will receive tokens.
+     */ 
+    function withdrawLP(address swap, uint256 amount, address recipient) external {
+        Farm farm = Farm(farmFactory.Farms(swap));
+        require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
+        
+        farm.withdraw(amount, msg.sender, recipient);
         emit Withdraw(swap, msg.sender, recipient, amount);  
     }
 
@@ -384,7 +482,7 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
                 if(!joinPool){
                     joinPool = true;
                 }
-                tokens[i].approve(address(swap), amounts[i]);
+                tokens[i].approve(swap, amounts[i]);
             }
         }
         require (joinPool, 'NO_LIQUIDITY_PROVIDED');
@@ -393,12 +491,44 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
     }
 
     /**
+     * @dev Withdraws assets from router.
+     */ 
+    function _removeLiquidity(
+        address swap,
+        uint256 amount, 
+        address[] memory tokens,
+        uint256[] memory minAmounts,
+        address recipient,
+        Farm farm
+    ) internal returns(uint256[] memory amounts){
+        require(minAmounts.length == tokens.length, "BAD_MIN_AMOUNTS_LENGTH");
+
+        IERC20(farm.lpPair()).approve(swap, amount);
+        amounts = ISwap(swap).removeLiquidity(amount, minAmounts, block.timestamp);
+        for (uint256 i = 0; i < tokens.length; i++) {
+            IERC20Upgradeable(tokens[i]).safeTransfer(recipient, amounts[i]);
+        }
+    }
+
+    /**
      * @dev Swaps assets using 1inch exchange.
      */  
-    function _swap(bytes calldata swapData) internal returns(uint256 returnAmount, uint256 spentAmount){
+    function _swap(bytes calldata swapData, address toToken) internal returns(uint256 returnAmount, uint256 spentAmount){
+        uint256 balanceBefore = IERC20Upgradeable(toToken).balanceOf(address(this));
         (bool success, bytes memory data) = OneInchRouter.call(swapData);
         require(success, "SWAP_NOT_SUCCESSFUL");
+
         (returnAmount, spentAmount) = abi.decode(data, (uint256, uint256));
+        //checks if all {{toToken}}s from swap were transfered to this address
+        uint256 balanceAfter = IERC20Upgradeable(toToken).balanceOf(address(this));
+        require(balanceAfter - balanceBefore == returnAmount, "BAD_RETURN_AMOUNT");
+    }
+
+    function _convertToAddressArray(IERC20[] memory tokenArray) internal pure returns (address[] memory addresses) {
+        addresses = new address[](tokenArray.length);
+        for (uint256 i = 0; i < tokenArray.length; i++) {
+            addresses[i] = address(tokenArray[i]);
+        }
     }
 
     /**

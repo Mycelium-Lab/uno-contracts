@@ -127,8 +127,6 @@ contract('Test UnoFarmTrisolarisStable initialization', (accounts) => {
             await expectRevert(
                 implementation.withdraw(
                     0,
-                    [0, 0, 0],
-                    false,
                     constants.ZERO_ADDRESS,
                     constants.ZERO_ADDRESS,
                     {
@@ -158,8 +156,6 @@ contract('Test UnoFarmTrisolarisStable initialization', (accounts) => {
             await expectRevert(
                 implementation.withdraw(
                     0,
-                    [0, 0, 0],
-                    false,
                     constants.ZERO_ADDRESS,
                     constants.ZERO_ADDRESS,
                     { from: assetRouter }

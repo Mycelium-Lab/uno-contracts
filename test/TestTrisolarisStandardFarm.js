@@ -149,9 +149,6 @@ contract('Test UnoFarmTrisolarisStandard initialization', (accounts) => {
             await expectRevert(
                 implementation.withdraw(
                     0,
-                    0,
-                    0,
-                    false,
                     constants.ZERO_ADDRESS,
                     constants.ZERO_ADDRESS,
                     {
@@ -177,7 +174,7 @@ contract('Test UnoFarmTrisolarisStandard initialization', (accounts) => {
                 'NO_LIQUIDITY_PROVIDED'
             )
             await expectRevert(
-                implementation.withdraw(0, 0, 0, false, accounts[0], accounts[0], { from: assetRouter }),
+                implementation.withdraw(0, accounts[0], accounts[0], { from: assetRouter }),
                 'INSUFFICIENT_AMOUNT'
             )
             await expectRevert(

@@ -585,29 +585,28 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
         describe('reverts', () => {
             it('reverts if the pool doesnt exist', async () => {
                 await expectRevert(
-                    assetRouter.withdraw(swap2Address, 0, [0, 0, 0], true, account1, {
+                    assetRouter.withdrawLP(swap2Address, 0, account1, {
                         from: account1
                     }),
                     'FARM_NOT_EXISTS'
                 )
             })
             it('reverts if the stake is zero', async () => {
-                await expectRevert.unspecified(
-                    assetRouter.withdraw(
+                await expectRevert(
+                    assetRouter.withdrawLP(
                         swapAddress,
                         constants.MAX_UINT256,
-                        [0, 0, 0],
-                        true,
                         account1,
                         {
                             from: account1
                         }
-                    )
+                    ),
+                    'INSUFFICIENT_BALANCE'
                 )
             })
             it('reverts if amount provided is 0', async () => {
                 await expectRevert(
-                    assetRouter.withdraw(swapAddress, 0, [0, 0, 0], true, account1, {
+                    assetRouter.withdrawLP(swapAddress, 0, account1, {
                         from: account1
                     }),
                     'INSUFFICIENT_AMOUNT'
@@ -635,21 +634,17 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
                 stake1before = await assetRouter.userStake(account1, swapAddress)
                 stake2before = await assetRouter.userStake(account2, swapAddress)
 
-                receipt1 = await assetRouter.withdraw(
+                receipt1 = await assetRouter.withdrawLP(
                     swapAddress,
                     amounts[0],
-                    [0, 0, 0],
-                    true,
                     account1,
                     {
                         from: account1
                     }
                 )
-                receipt2 = await assetRouter.withdraw(
+                receipt2 = await assetRouter.withdrawLP(
                     swapAddress,
                     amounts[2],
-                    [0, 0, 0],
-                    true,
                     account2,
                     {
                         from: account2
@@ -726,11 +721,9 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
                 stake1before = await assetRouter.userStake(account1, swapAddress)
                 stake2before = await assetRouter.userStake(account2, swapAddress)
 
-                receipt = await assetRouter.withdraw(
+                receipt = await assetRouter.withdrawLP(
                     swapAddress,
                     amounts[1],
-                    [0, 0, 0],
-                    true,
                     account2,
                     {
                         from: account1
@@ -806,7 +799,6 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
                     swapAddress,
                     stakeLP1,
                     [0, 0, 0],
-                    false,
                     account1,
                     {
                         from: account1
@@ -874,7 +866,6 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
                     swapAddress,
                     stakeLP2,
                     [0, 0, 0],
-                    false,
                     account1,
                     {
                         from: account2
@@ -2195,7 +2186,7 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
             it('withdraws all tokens for account1', async () => {
                 let stakeLP = await assetRouter.userStake(account1, swapAddress)
 
-                await assetRouter.withdraw(swapAddress, stakeLP, [0, 0, 0], true, account1, {
+                await assetRouter.withdrawLP(swapAddress, stakeLP, account1, {
                     from: account1
                 })
 
@@ -2205,7 +2196,7 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
             it('withdraws tokens for account2', async () => {
                 let stakeLP = await assetRouter.userStake(account2, swapAddress)
 
-                await assetRouter.withdraw(swapAddress, stakeLP, [0, 0, 0], true, account2, {
+                await assetRouter.withdrawLP(swapAddress, stakeLP, account2, {
                     from: account2
                 })
 
@@ -2216,11 +2207,9 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
                 let stakeLP = await assetRouter.userStake(accountNormalTokens, swapAddress)
 
                 if (stakeLP > 0) {
-                    await assetRouter.withdraw(
+                    await assetRouter.withdrawLP(
                         swapAddress,
                         stakeLP,
-                        [0, 0, 0],
-                        true,
                         accountNormalTokens,
                         {
                             from: accountNormalTokens

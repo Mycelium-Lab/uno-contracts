@@ -28,8 +28,11 @@ interface IUnoAssetRouterTrisolarisStable {
     function depositSingleETH(address swap, bytes[] calldata swapData, uint256 minAmountLP, address recipient) external payable returns(uint256 sentETH, uint256 liquidity);
     function depositLP(address swap, uint256 amount, address recipient) external;
 
-    function withdraw(address swap, uint256 amount, uint256[] calldata minAmounts, bool withdrawLP, address recipient) external returns (uint256[] memory amounts);
-    function withdrawETH(address swap, uint256 amount, uint256[] calldata minAmountsOut, address recipient) external returns(uint256[] memory amounts);
+    function withdraw(address swap, uint256 amount, uint256[] calldata minAmounts, address recipient) external returns (uint256[] memory amounts);
+    function withdrawETH(address swap, uint256 amount, uint256[] calldata minAmounts, address recipient) external returns(uint256[] memory amounts);
+    function withdrawSingleAsset(address swap, uint256 amount, address token, bytes[] calldata swapData, address recipient) external returns(uint256 amountToken, uint256[] memory amounts);
+    function withdrawSingleETH(address swap, uint256 amount, bytes[] calldata swapData, address recipient) external returns(uint256 amountETH, uint256[] memory amounts);
+    function withdrawLP(address swap, uint256 amount, address recipient) external;
 
     function distribute(
         address swap,
