@@ -6,7 +6,11 @@
 
 `aurora` - core UNO contracts on Aurora
 
-Please note that both branches include identical core contracts except for the `/contracts/apps` directory where specific (app / farm - related) contracts for Polygon and Aurora are located, the `/test` directory and the configs.
+`bsc` - core UNO contracts on Binance Smart Chain
+
+`avalanche` - core UNO contracts on Avalanche
+
+Please note that all branches include identical core contracts except for the `/contracts/apps` directory where specific (app / farm - related) contracts are located, the `/test` directory and the configs.
 
 Branch `polygon+` also includes the autostrategies contracts located in the `/contracts/autostrategy` directory.
 
