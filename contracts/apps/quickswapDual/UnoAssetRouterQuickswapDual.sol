@@ -344,7 +344,9 @@ contract UnoAssetRouterQuickswapDual is Initializable, PausableUpgradeable, UUPS
             amountToken += returnAmount;
 
             amountA = amountA - spentAmount;
-            IERC20Upgradeable(tokenA).safeTransfer(recipient, amountA);
+            if(amountA > 0){
+                IERC20Upgradeable(tokenA).safeTransfer(recipient, amountA);
+            }
         } else {
             amountToken += amountA;
             amountA = 0;
@@ -356,7 +358,9 @@ contract UnoAssetRouterQuickswapDual is Initializable, PausableUpgradeable, UUPS
             amountToken += returnAmount;
 
             amountB = amountB - spentAmount;
-            IERC20Upgradeable(tokenB).safeTransfer(recipient, amountB);
+            if(amountB > 0){
+                IERC20Upgradeable(tokenB).safeTransfer(recipient, amountB);
+            }
         } else {
             amountToken += amountB;
             amountB = 0;
@@ -394,7 +398,9 @@ contract UnoAssetRouterQuickswapDual is Initializable, PausableUpgradeable, UUPS
             amountETH += returnAmount;
 
             amountA = amountA - spentAmount;
-            IERC20Upgradeable(tokenA).safeTransfer(recipient, amountA);
+            if(amountA > 0){
+                IERC20Upgradeable(tokenA).safeTransfer(recipient, amountA);
+            }
         } else {
             amountETH += amountA;
             amountA = 0;
@@ -406,7 +412,9 @@ contract UnoAssetRouterQuickswapDual is Initializable, PausableUpgradeable, UUPS
             amountETH += returnAmount;
 
             amountB = amountB - spentAmount;
-            IERC20Upgradeable(tokenB).safeTransfer(recipient, amountB);
+            if(amountB > 0){
+                IERC20Upgradeable(tokenB).safeTransfer(recipient, amountB);
+            }
         } else {
             amountETH += amountB;
             amountB = 0;
@@ -519,8 +527,12 @@ contract UnoAssetRouterQuickswapDual is Initializable, PausableUpgradeable, UUPS
 
         (sentA, sentB, liquidity) = QuickswapRouter.addLiquidity(tokenA, tokenB, amountA, amountB, amountAMin, amountBMin, farm, block.timestamp);
         // Refund dust
-        IERC20Upgradeable(tokenA).safeTransfer(msg.sender, amountA - sentA);
-		IERC20Upgradeable(tokenB).safeTransfer(msg.sender, amountB - sentB);
+        if(amountA > sentA){
+            IERC20Upgradeable(tokenA).safeTransfer(msg.sender, amountA - sentA);
+        }
+        if(amountB > sentB){
+		    IERC20Upgradeable(tokenB).safeTransfer(msg.sender, amountB - sentB);
+        }
     }
 
     /**
@@ -537,8 +549,12 @@ contract UnoAssetRouterQuickswapDual is Initializable, PausableUpgradeable, UUPS
 
         (sentToken, sentETH, liquidity) = QuickswapRouter.addLiquidityETH{value: msg.value}(token, amount, amountTokenMin, amountETHMin, farm, block.timestamp);
         // Refund dust
-        IERC20Upgradeable(token).safeTransfer(msg.sender, amount - sentToken);
-        payable(msg.sender).transfer(msg.value - sentETH);
+        if(amount > sentToken){
+            IERC20Upgradeable(token).safeTransfer(msg.sender, amount - sentToken);
+        }
+        if(msg.value > sentETH){
+            payable(msg.sender).transfer(msg.value - sentETH);
+        }
     }
 
     /**
