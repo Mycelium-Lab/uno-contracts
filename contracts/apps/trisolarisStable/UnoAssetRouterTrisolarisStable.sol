@@ -346,7 +346,9 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
             amountToken += returnAmount;
             // Dust
             amounts[i] -= spentAmount;
-            IERC20Upgradeable(tokens[i]).safeTransfer(recipient, amounts[i]);
+            if(amounts[i] > 0){
+                IERC20Upgradeable(tokens[i]).safeTransfer(recipient, amounts[i]);
+            }
         }
         
         IERC20Upgradeable(token).safeTransfer(recipient, amountToken);
@@ -386,7 +388,9 @@ contract UnoAssetRouterTrisolarisStable is Initializable, PausableUpgradeable, U
             amountETH += returnAmount;
             // Dust
             amounts[i] -= spentAmount;
-            IERC20Upgradeable(tokens[i]).safeTransfer(recipient, amounts[i]);
+            if(amounts[i] > 0){
+                IERC20Upgradeable(tokens[i]).safeTransfer(recipient, amounts[i]);
+            }
         }
 
         IWETH(WETH).withdraw(amountETH);
