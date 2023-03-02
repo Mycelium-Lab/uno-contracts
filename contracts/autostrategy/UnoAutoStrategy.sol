@@ -155,7 +155,6 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         emit Deposit(poolID, msg.sender, recipient, amountLP); 
     }
 
-    uint256 public _sentETH;
     /**
      * @dev Deposits tokens in the pools[poolID] pool. Mints tokens representing user share. Emits {Deposit} event.
      * @param pid - Current poolID. Throws revert if moveLiquidity() has been called before the transaction has been mined.

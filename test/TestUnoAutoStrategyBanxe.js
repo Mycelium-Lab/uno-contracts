@@ -202,9 +202,7 @@ contract('UnoAutoStrategyBanxe', (accounts) => {
                 expectEvent(receipt, 'Deposit', {
                     poolID: id,
                     from: banxe,
-                    recipient: banxe,
-                    amountA: sentA,
-                    amountB: sentB
+                    recipient: banxe
                 })
             })
             it('mints tokens', async () => {
@@ -288,9 +286,7 @@ contract('UnoAutoStrategyBanxe', (accounts) => {
                 expectEvent(receipt, 'Deposit', {
                     poolID: id,
                     from: banxe,
-                    recipient: account1,
-                    amountA: sentA,
-                    amountB: sentB
+                    recipient: account1
                 })
             })
             it('mints tokens', async () => {
@@ -393,9 +389,7 @@ contract('UnoAutoStrategyBanxe', (accounts) => {
                 expectEvent(receipt, 'Withdraw', {
                     poolID: id,
                     from: banxe,
-                    recipient: banxe,
-                    amountA: withdrawnA,
-                    amountB: withdrawnB
+                    recipient: banxe
                 })
             })
             it('burns tokens', async () => {
@@ -471,9 +465,7 @@ contract('UnoAutoStrategyBanxe', (accounts) => {
                 expectEvent(receipt, 'Withdraw', {
                     poolID: id,
                     from: account1,
-                    recipient: banxe,
-                    amountA: withdrawnA,
-                    amountB: withdrawnB
+                    recipient: banxe
                 })
             })
             it('burns tokens', async () => {
