@@ -341,7 +341,9 @@ contract UnoAssetRouterPancakeswap is Initializable, PausableUpgradeable, UUPSUp
             amountToken += returnAmount;
 
             amountA = amountA - spentAmount;
-            IBEP20(tokenA).safeTransfer(recipient, amountA);
+            if(amountA > 0){
+                IBEP20(tokenA).safeTransfer(recipient, amountA);
+            }
         } else {
             amountToken += amountA;
             amountA = 0;
@@ -353,7 +355,9 @@ contract UnoAssetRouterPancakeswap is Initializable, PausableUpgradeable, UUPSUp
             amountToken += returnAmount;
 
             amountB = amountB - spentAmount;
-            IBEP20(tokenB).safeTransfer(recipient, amountB);
+            if(amountB > 0){
+                IBEP20(tokenB).safeTransfer(recipient, amountB);
+            }
         } else {
             amountToken += amountB;
             amountB = 0;
@@ -391,7 +395,9 @@ contract UnoAssetRouterPancakeswap is Initializable, PausableUpgradeable, UUPSUp
             amountETH += returnAmount;
 
             amountA = amountA - spentAmount;
-            IBEP20(tokenA).safeTransfer(recipient, amountA);
+            if(amountA > 0){
+                IBEP20(tokenA).safeTransfer(recipient, amountA);
+            }
         } else {
             amountETH += amountA;
             amountA = 0;
@@ -403,7 +409,9 @@ contract UnoAssetRouterPancakeswap is Initializable, PausableUpgradeable, UUPSUp
             amountETH += returnAmount;
 
             amountB = amountB - spentAmount;
-            IBEP20(tokenB).safeTransfer(recipient, amountB);
+            if(amountB > 0){
+                IBEP20(tokenB).safeTransfer(recipient, amountB);
+            }
         } else {
             amountETH += amountB;
             amountB = 0;
@@ -513,8 +521,12 @@ contract UnoAssetRouterPancakeswap is Initializable, PausableUpgradeable, UUPSUp
 
         (sentA, sentB, liquidity) = PancakeswapRouter.addLiquidity(tokenA, tokenB, amountA, amountB, amountAMin, amountBMin, farm, block.timestamp);
         // Refund dust
-        IBEP20(tokenA).safeTransfer(msg.sender, amountA - sentA);
-		IBEP20(tokenB).safeTransfer(msg.sender, amountB - sentB);
+        if(amountA > sentA){
+            IBEP20(tokenA).safeTransfer(msg.sender, amountA - sentA);
+        }
+        if(amountB > sentB){
+		    IBEP20(tokenB).safeTransfer(msg.sender, amountB - sentB);
+        }
     }
 
     /**
@@ -531,8 +543,12 @@ contract UnoAssetRouterPancakeswap is Initializable, PausableUpgradeable, UUPSUp
 
         (sentToken, sentETH, liquidity) = PancakeswapRouter.addLiquidityETH{value: msg.value}(token, amount, amountTokenMin, amountETHMin, farm, block.timestamp);
         // Refund dust
-        IBEP20(token).safeTransfer(msg.sender, amount - sentToken);
-        payable(msg.sender).transfer(msg.value - sentETH);
+        if(amount > sentToken){
+            IBEP20(token).safeTransfer(msg.sender, amount - sentToken);
+        }
+        if(msg.value > sentETH){
+            payable(msg.sender).transfer(msg.value - sentETH);
+        }
     }
     
     /**
