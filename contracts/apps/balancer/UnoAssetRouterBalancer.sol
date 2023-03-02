@@ -368,7 +368,9 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
             amountToken += returnAmount;
             // Dust
             amounts[i] -= spentAmount;
-            IERC20Upgradeable(tokens[i]).safeTransfer(recipient, amounts[i]);
+            if(amounts[i] > 0){
+                IERC20Upgradeable(tokens[i]).safeTransfer(recipient, amounts[i]);
+            }
         }
         
         IERC20Upgradeable(token).safeTransfer(recipient, amountToken);
@@ -412,7 +414,9 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
             amountETH += returnAmount;
             // Dust
             amounts[i] -= spentAmount;
-            IERC20Upgradeable(tokens[i]).safeTransfer(recipient, amounts[i]);
+            if(amounts[i] > 0){
+                IERC20Upgradeable(tokens[i]).safeTransfer(recipient, amounts[i]);
+            }
         }
 
         IWMATIC(WMATIC).withdraw(amountETH);

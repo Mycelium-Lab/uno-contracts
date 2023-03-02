@@ -163,6 +163,24 @@ contract('UnoAutoStrategy', (accounts) => {
                     }),
                     'BAD_POOL_ID'
                 )
+                await expectRevert(
+                    autoStrategy.depositETH(poolID.add(new BN(1)), 0, 0, 0, account1, {
+                        from: account1
+                    }),
+                    'BAD_POOL_ID'
+                )
+                await expectRevert(
+                    autoStrategy.depositSingleAsset(poolID.add(new BN(1)), account1, 0, ['0x', '0x'], 0, 0, account1, {
+                        from: account1
+                    }),
+                    'BAD_POOL_ID'
+                )
+                await expectRevert(
+                    autoStrategy.depositSingleETH(poolID.add(new BN(1)), ['0x', '0x'], 0, 0, account1, {
+                        from: account1
+                    }),
+                    'BAD_POOL_ID'
+                )
             })
         })
         describe('deposit tokens', () => {
@@ -402,6 +420,24 @@ contract('UnoAutoStrategy', (accounts) => {
                 const poolID = await autoStrategy.poolID()
                 await expectRevert(
                     autoStrategy.withdraw(poolID.add(new BN(1)), 0, 0, 0, account1, {
+                        from: account1
+                    }),
+                    'BAD_POOL_ID'
+                )
+                await expectRevert(
+                    autoStrategy.withdrawETH(poolID.add(new BN(1)), 0, 0, 0, account1, {
+                        from: account1
+                    }),
+                    'BAD_POOL_ID'
+                )
+                await expectRevert(
+                    autoStrategy.withdrawSingleAsset(poolID.add(new BN(1)), 0, account1, ['0x', '0x'], account1, {
+                        from: account1
+                    }),
+                    'BAD_POOL_ID'
+                )
+                await expectRevert(
+                    autoStrategy.withdrawSingleETH(poolID.add(new BN(1)), 0, ['0x', '0x'], account1, {
                         from: account1
                     }),
                     'BAD_POOL_ID'
