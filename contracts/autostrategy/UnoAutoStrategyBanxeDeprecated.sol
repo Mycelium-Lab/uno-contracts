@@ -135,13 +135,13 @@ contract UnoAutoStrategyBanxeDeprecated is Initializable, ERC20Upgradeable, Reen
         uint256 amountLP = burn(liquidity);
         (amountA, amountB) = _withdraw(amountLP, amountAMin, amountBMin, recipient);
 
-        uint256 leftoverA = tokenA.balanceOf(address(this));
+        uint256 leftoverA = liquidity * tokenA.balanceOf(address(this)) / totalSupply();
         if(leftoverA > 0){
             amountA += leftoverA;
             tokenA.safeTransfer(recipient, leftoverA);
         }
 
-        uint256 leftoverB = tokenA.balanceOf(address(this));
+        uint256 leftoverB = liquidity * tokenB.balanceOf(address(this)) / totalSupply();
         if(leftoverB > 0){
             amountB += leftoverB;
             tokenB.safeTransfer(recipient, leftoverB);

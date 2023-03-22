@@ -53,7 +53,6 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
      * {reserveLP} - LP token reserve.
      * {lastMoveInfo} - Info on last MoveLiquidity() block.
      * {blockedLiquidty} - User's blocked LP tokens. Prevents user from stealing leftover tokens by depositing and exiting before moveLiquidity() has been called.
-     * {leftoversCollected} - Flag that prevents leftover token collection if they were already collected this MoveLiquidity() cycle.
 
      * {accessManager} - Role manager contract.
      * {factory} - The address of AutoStrategyFactory this contract was deployed by.
@@ -70,7 +69,6 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
     uint256 private reserveLP;
     MoveLiquidityInfo private lastMoveInfo;
     mapping(address => mapping(uint256 => uint256)) private blockedLiquidty;
-    mapping(address => mapping(uint256 => bool)) private leftoversCollected;
 
     IUnoAccessManager public accessManager;
     IUnoAutoStrategyFactory public factory;
@@ -295,7 +293,7 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
         require (pid == poolID, 'BAD_POOL_ID');
         PoolInfo memory pool = pools[poolID];
 
-        (uint256 leftoverA, uint256 leftoverB) = collectLeftovers(recipient);
+        (uint256 leftoverA, uint256 leftoverB) = collectLeftovers(liquidity, recipient);
 
         uint256 amountLP = burn(liquidity);
         (amountA, amountB) = pool.assetRouter.withdraw(pool.pool, amountLP, amountAMin, amountBMin, recipient);
@@ -321,7 +319,7 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
         require (pid == poolID, 'BAD_POOL_ID');
         PoolInfo memory pool = pools[poolID];
 
-        (uint256 leftoverA, uint256 leftoverB) = collectLeftovers(recipient);
+        (uint256 leftoverA, uint256 leftoverB) = collectLeftovers(liquidity, recipient);
 
         uint256 amountLP = burn(liquidity);
         (amountToken, amountETH) = pool.assetRouter.withdrawETH(pool.pool, amountLP, amountTokenMin, amountETHMin, recipient);
@@ -354,7 +352,7 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
         require (pid == poolID, 'BAD_POOL_ID');
         PoolInfo memory pool = pools[poolID];
 
-        (uint256 leftoverA, uint256 leftoverB) = collectLeftovers(recipient);
+        (uint256 leftoverA, uint256 leftoverB) = collectLeftovers(liquidity, recipient);
 
         uint256 amountLP = burn(liquidity);
         (amountToken, amountA, amountB) = pool.assetRouter.withdrawSingleAsset(pool.pool, amountLP, token, swapData, recipient);
@@ -380,7 +378,7 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
         require (pid == poolID, 'BAD_POOL_ID');
         PoolInfo memory pool = pools[poolID];
 
-        (uint256 leftoverA, uint256 leftoverB) = collectLeftovers(recipient);
+        (uint256 leftoverA, uint256 leftoverB) = collectLeftovers(liquidity, recipient);
 
         uint256 amountLP = burn(liquidity);
         (amountETH, amountA, amountB) = pool.assetRouter.withdrawSingleETH(pool.pool, amountLP, swapData, recipient);
@@ -398,22 +396,25 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
      * @return leftoverA - Token A amount sent to the {recipient}.
      * @return leftoverB - Token B amount sent to the {recipient}.
      */
-    function collectLeftovers(address recipient) internal returns (uint256 leftoverA, uint256 leftoverB){
-        if(!leftoversCollected[msg.sender][lastMoveInfo.block]){
-            if(lastMoveInfo.totalSupply != 0){
-                PoolInfo memory pool = pools[poolID];
-                leftoverA = (balanceOf(msg.sender) - blockedLiquidty[msg.sender][lastMoveInfo.block]) * lastMoveInfo.leftoverA / lastMoveInfo.totalSupply;
-                leftoverB = (balanceOf(msg.sender) - blockedLiquidty[msg.sender][lastMoveInfo.block]) * lastMoveInfo.leftoverB / lastMoveInfo.totalSupply;
+    function collectLeftovers(uint256 liquidity, address recipient) internal returns (uint256 leftoverA, uint256 leftoverB){
+        uint256 availiableLiquidity = balanceOf(msg.sender) - blockedLiquidty[msg.sender][lastMoveInfo.block];
+        if(availiableLiquidity == 0){
+            return (0, 0);
+        }
+        if(liquidity > availiableLiquidity){
+            liquidity = availiableLiquidity;
+        }
 
-                if(leftoverA > 0){
-                    pool.tokenA.safeTransfer(recipient, leftoverA);
-                }
-                if(leftoverB > 0){
-                    pool.tokenB.safeTransfer(recipient, leftoverB);
-                }
+        if(lastMoveInfo.totalSupply != 0){
+            PoolInfo memory pool = pools[poolID];
+            leftoverA = liquidity * lastMoveInfo.leftoverA / lastMoveInfo.totalSupply;
+            leftoverB = liquidity * lastMoveInfo.leftoverB / lastMoveInfo.totalSupply;
+            if(leftoverA > 0){
+                pool.tokenA.safeTransfer(recipient, leftoverA);
             }
-
-            leftoversCollected[msg.sender][lastMoveInfo.block] = true;
+            if(leftoverB > 0){
+                pool.tokenB.safeTransfer(recipient, leftoverB);
+            }
         }
     }
 
@@ -507,7 +508,7 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
             uint256 _totalSupply = totalSupply();
             stakeA = _balance * balanceA / _totalSupply; 
             stakeB = _balance * balanceB / _totalSupply; 
-            if((!leftoversCollected[msg.sender][lastMoveInfo.block]) && (lastMoveInfo.totalSupply != 0)){
+            if(lastMoveInfo.totalSupply != 0){
                 stakeA += (_balance - blockedLiquidty[_address][lastMoveInfo.block]) * lastMoveInfo.leftoverA / lastMoveInfo.totalSupply;
                 stakeB += (_balance - blockedLiquidty[_address][lastMoveInfo.block]) * lastMoveInfo.leftoverB / lastMoveInfo.totalSupply;
             }
