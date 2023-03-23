@@ -30,6 +30,10 @@ All contracts are deployed on the BSC Blockchain
 
 0xB3C5c180025065ebdB4d056aFBD602950143d43d
 
+## UnoAutoStrategyFactory
+
+0x9aeb257C2C9B5E0855012083D35428A331e83d6e
+
 ### Apeswap 
 
 #### UnoAssetRouterApeswap
