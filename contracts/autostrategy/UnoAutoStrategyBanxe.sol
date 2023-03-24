@@ -95,6 +95,9 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
     }
 
     // ============ Methods ============
+    
+    receive() external payable {}
+
     function initialize(_PoolInfo[] calldata poolInfos, IUnoAccessManager _accessManager, address _banxe) external initializer {
         require (_banxe != address(0), "BAD_BANXE_ADDRESS");
         require ((poolInfos.length >= 2) && (poolInfos.length <= 50), 'BAD_POOL_COUNT');

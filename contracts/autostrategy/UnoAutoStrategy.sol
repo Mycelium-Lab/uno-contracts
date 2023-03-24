@@ -90,6 +90,8 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
 
     // ============ Methods ============
 
+    receive() external payable {}
+
     function initialize(_PoolInfo[] calldata poolInfos, IUnoAccessManager _accessManager) external initializer {
         require ((poolInfos.length >= 2) && (poolInfos.length <= 50), 'BAD_POOL_COUNT');
 
