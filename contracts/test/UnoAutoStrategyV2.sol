@@ -2,12 +2,12 @@
 pragma solidity 0.8.10;
 import "../interfaces/IOdosRouter.sol";   
 import "../interfaces/IUnoAssetRouter.sol";   
-import "../interfaces/IUnoAutoStrategyFactory.sol";
+import "../interfaces/IUnoAutoStrategyFactory.sol";  
 import '@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol';
 
-contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgradeable {
+contract UnoAutoStrategyV2 is Initializable, ERC20Upgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
     /**
      * @dev PoolInfo:
@@ -75,12 +75,11 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
 
     uint256 private constant MINIMUM_LIQUIDITY = 10**3;
     bytes32 private constant LIQUIDITY_MANAGER_ROLE = keccak256('LIQUIDITY_MANAGER_ROLE');
-    address public constant WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
 
-    // Note: amountLP refers to LP tokens used in farms and staking pools, not UNO-LP this contract is.
-    // To get info for UNO-LP use mint/burn events
-    event Deposit(uint256 indexed poolID, address indexed from, address indexed recipient, uint256 amountLP);
-    event Withdraw(uint256 indexed poolID, address indexed from, address indexed recipient, uint256 amountLP);
+    uint256 public constant version = 2;
+
+    event Deposit(uint256 indexed poolID, address indexed from, address indexed recipient, uint256 amountA, uint256 amountB);
+    event Withdraw(uint256 indexed poolID, address indexed from, address indexed recipient, uint256 amountA, uint256 amountB);
     event MoveLiquidity(uint256 indexed previousPoolID, uint256 indexed nextPoolID);
 
     modifier whenNotPaused(){
@@ -90,8 +89,6 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
 
     // ============ Methods ============
 
-    receive() external payable {}
-
     function initialize(_PoolInfo[] calldata poolInfos, IUnoAccessManager _accessManager) external initializer {
         require ((poolInfos.length >= 2) && (poolInfos.length <= 50), 'BAD_POOL_COUNT');
 
@@ -100,11 +97,13 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         
         for (uint256 i = 0; i < poolInfos.length; i++) {
             address[] memory _tokens = IUnoAssetRouter(poolInfos[i].assetRouter).getTokens(poolInfos[i].pool);
+            address _tokenA = _tokens[0];
+            address _tokenB = _tokens[1];
             PoolInfo memory pool = PoolInfo({
                 pool: poolInfos[i].pool,
                 assetRouter: poolInfos[i].assetRouter,
-                tokenA: IERC20Upgradeable(_tokens[0]),
-                tokenB: IERC20Upgradeable(_tokens[1])
+                tokenA: IERC20Upgradeable(_tokenA),
+                tokenB: IERC20Upgradeable(_tokenB)
             });
             pools.push(pool);
 
@@ -143,132 +142,13 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         pool.tokenA.safeTransferFrom(msg.sender, address(this), amountA);
         pool.tokenB.safeTransferFrom(msg.sender, address(this), amountB);
 
-        uint256 amountLP;
-        (sentA, sentB, amountLP) = pool.assetRouter.deposit(pool.pool, amountA, amountB, amountAMin, amountBMin, address(this));
+        (sentA, sentB,) = pool.assetRouter.deposit(pool.pool, amountA, amountB, amountAMin, amountBMin, address(this));
         liquidity = mint(recipient);
 
-        if(amountA > sentA){
-            pool.tokenA.safeTransfer(msg.sender, amountA - sentA);
-        }
-        if(amountB > sentB){
-            pool.tokenB.safeTransfer(msg.sender, amountB - sentB);
-        }
+        pool.tokenA.safeTransfer(msg.sender, amountA - sentA);
+        pool.tokenB.safeTransfer(msg.sender, amountB - sentB);
 
-        emit Deposit(poolID, msg.sender, recipient, amountLP); 
-    }
-
-    /**
-     * @dev Deposits tokens in the pools[poolID] pool. Mints tokens representing user share. Emits {Deposit} event.
-     * @param pid - Current poolID. Throws revert if moveLiquidity() has been called before the transaction has been mined.
-     * @param amountToken - Token amount to deposit.
-     * @param amountTokenMin - Bounds the extent to which the TOKEN/WBNB price can go up before the transaction reverts.
-     * @param amountETHMin - Bounds the extent to which the WBNB/TOKEN price can go up before the transaction reverts.
-     * @param recipient - Address which will receive the deposit.
-     
-     * @return sentToken - Deposited token amount.
-     * @return sentETH - Deposited ETH amount.
-     * @return liquidity - Total liquidity minted for the {recipient}.
-     */
-    function depositETH(uint256 pid, uint256 amountToken, uint256 amountTokenMin, uint256 amountETHMin, address recipient) whenNotPaused nonReentrant external payable returns (uint256 sentToken, uint256 sentETH, uint256 liquidity) {
-        require (pid == poolID, 'BAD_POOL_ID');
-        PoolInfo memory pool = pools[poolID];
-
-        IERC20Upgradeable token;
-        if (address(pool.tokenA) == WBNB) {
-            token = pool.tokenB;
-        } else if (address(pool.tokenB) == WBNB) {
-            token = pool.tokenA;
-        } else {
-            revert("NOT_WBNB_POOL");
-        }
-        token.safeTransferFrom(msg.sender, address(this), amountToken);
-
-        uint256 amountLP;
-        (sentToken, sentETH, amountLP) = pool.assetRouter.depositETH{value: msg.value}(pool.pool, amountToken, amountTokenMin, amountETHMin, address(this));
-        liquidity = mint(recipient);
-
-        if(amountToken > sentToken){
-            token.safeTransfer(msg.sender, amountToken - sentToken);
-        }
-        if(msg.value > sentETH){
-            payable(msg.sender).transfer(msg.value - sentETH);
-        }
-        emit Deposit(poolID, msg.sender, recipient, amountLP); 
-    }
-
-    /**
-     * @dev Deposits tokens in the pools[poolID] pool. Mints tokens representing user share. Emits {Deposit} event.
-     * @param pid - Current poolID. Throws revert if moveLiquidity() has been called before the transaction has been mined.
-     * @param token - Token to deposit.
-     * @param amount - {token} amount to deposit.
-     * @param swapData - Parameter with which 1inch router is being called with.
-     * @param amountAMin - Bounds the extent to which the B/A price can go up before the transaction reverts.
-     * @param amountBMin - Bounds the extent to which the A/B price can go up before the transaction reverts.
-     * @param recipient - Address which will receive the deposit.
-     
-     * @return sent - Total {token} amount sent to the farm. NOTE: Returns dust left from swap in {token}, but if A/B amounts are not correct also returns dust in pool's tokens.
-     * @return liquidity - Total liquidity minted for the {recipient}.
-     */
-    function depositSingleAsset(uint256 pid, address token, uint256 amount, bytes[2] calldata swapData, uint256 amountAMin, uint256 amountBMin, address recipient) whenNotPaused nonReentrant external returns (uint256 sent, uint256 liquidity) {
-        require (pid == poolID, 'BAD_POOL_ID');
-        PoolInfo memory pool = pools[poolID];
-
-        uint256 balanceA = pool.tokenA.balanceOf(address(this));
-        uint256 balanceB = pool.tokenB.balanceOf(address(this));
-
-        IERC20Upgradeable(token).safeTransferFrom(msg.sender, address(this), amount);
-        IERC20Upgradeable(token).approve(address(pool.assetRouter), amount);
-
-        uint256 amountLP;
-        (sent, amountLP) = pool.assetRouter.depositSingleAsset(pool.pool, token, amount, swapData, amountAMin, amountBMin, address(this));
-        liquidity = mint(recipient);
-
-        IERC20Upgradeable(token).safeTransfer(msg.sender, amount - sent);
-        uint256 _balanceA = pool.tokenA.balanceOf(address(this));
-        uint256 _balanceB = pool.tokenB.balanceOf(address(this));
-        if(_balanceA > balanceA){
-            pool.tokenA.safeTransfer(msg.sender, _balanceA - balanceA);
-        }
-        if(_balanceB > balanceB){
-            pool.tokenB.safeTransfer(msg.sender, _balanceB - balanceB);
-        }
-
-        emit Deposit(poolID, msg.sender, recipient, amountLP);
-    }
-
-    /**
-     * @dev Deposits tokens in the pools[poolID] pool. Mints tokens representing user share. Emits {Deposit} event.
-     * @param pid - Current poolID. Throws revert if moveLiquidity() has been called before the transaction has been mined.
-     * @param swapData - Parameter with which 1inch router is being called with. NOTE: Use WBNB as toToken.
-     * @param amountAMin - Bounds the extent to which the B/A price can go up before the transaction reverts.
-     * @param amountBMin - Bounds the extent to which the A/B price can go up before the transaction reverts.
-     * @param recipient - Address which will receive the deposit.
-     
-     * @return sentETH - Total BNB amount sent to the farm. NOTE: Returns dust left from swap in BNB, but if A/B amount are not correct also returns dust in pool's tokens.
-     * @return liquidity - Total liquidity minted for the {recipient}.
-     */
-    function depositSingleETH(uint256 pid, bytes[2] calldata swapData, uint256 amountAMin, uint256 amountBMin, address recipient) whenNotPaused nonReentrant external payable returns (uint256 sentETH, uint256 liquidity) {
-        require (pid == poolID, 'BAD_POOL_ID');
-        PoolInfo memory pool = pools[poolID];
-
-        uint256 balanceA = pool.tokenA.balanceOf(address(this));
-        uint256 balanceB = pool.tokenB.balanceOf(address(this));
-
-        uint256 amountLP;
-        (sentETH, amountLP) = pool.assetRouter.depositSingleETH{value: msg.value}(pool.pool, swapData, amountAMin, amountBMin, address(this));
-        liquidity = mint(recipient);
-
-        payable(msg.sender).transfer(msg.value - sentETH);
-        uint256 _balanceA = pool.tokenA.balanceOf(address(this));
-        uint256 _balanceB = pool.tokenB.balanceOf(address(this));
-        if(_balanceA > balanceA){
-            pool.tokenA.safeTransfer(msg.sender, _balanceA - balanceA);
-        }
-        if(_balanceB > balanceB){
-            pool.tokenB.safeTransfer(msg.sender, _balanceB - balanceB);
-        }
-
-        emit Deposit(poolID, msg.sender, recipient, amountLP); 
+        emit Deposit(poolID, msg.sender, recipient, sentA, sentB); 
     }
 
     /**
@@ -294,92 +174,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         amountA += leftoverA;
         amountB += leftoverB;
 
-        emit Withdraw(poolID, msg.sender, recipient, amountLP); 
-    }
-
-    /**
-     * @dev Withdraws tokens from the {pools[poolID]} pool and sends them to the recipient. Burns tokens representing user share. Emits {Withdraw} event.
-     * @param pid - Current poolID. Throws revert if moveLiquidity() has been called before the transaction has been mined.
-     * @param liquidity - Liquidity to burn from this user.
-     * @param amountTokenMin - The minimum amount of tokenA that must be received from the pool for the transaction not to revert.
-     * @param amountETHMin - The minimum amount of tokenB that must be received from the pool for the transaction not to revert.
-     * @param recipient - Address which will receive withdrawn tokens.
-     
-     * @return amountToken - Token amount sent to the {recipient}.
-     * @return amountETH - BNB amount sent to the {recipient}.
-     */
-    function withdrawETH(uint256 pid, uint256 liquidity, uint256 amountTokenMin, uint256 amountETHMin, address recipient) whenNotPaused nonReentrant external returns (uint256 amountToken, uint256 amountETH) {
-        require (pid == poolID, 'BAD_POOL_ID');
-        PoolInfo memory pool = pools[poolID];
-
-        (uint256 leftoverA, uint256 leftoverB) = collectLeftovers(recipient);
-
-        uint256 amountLP = burn(liquidity);
-        (amountToken, amountETH) = pool.assetRouter.withdrawETH(pool.pool, amountLP, amountTokenMin, amountETHMin, recipient);
-
-        if (address(pool.tokenA) == WBNB) {
-            amountETH += leftoverA;
-            amountToken += leftoverB;
-        } else if (address(pool.tokenB) == WBNB) {
-            amountToken += leftoverA;
-            amountETH += leftoverB;
-        } else {
-            revert("NOT_WBNB_POOL");
-        }
-        emit Withdraw(poolID, msg.sender, recipient, amountLP); 
-    }
-
-    /**
-     * @dev Withdraws tokens from the {pools[poolID]} pool and sends them to the recipient. Burns tokens representing user share. Emits {Withdraw} event.
-     * @param pid - Current poolID. Throws revert if moveLiquidity() has been called before the transaction has been mined.
-     * @param liquidity - Liquidity to burn from this user.
-     * @param token - Address of a token to exit the pool with.
-     * @param swapData - Parameter with which 1inch router is being called with.
-     * @param recipient - Address which will receive withdrawn tokens.
-     
-     * @return amountToken - {token} amount sent to the {recipient}.
-     * @return amountA - Token A dust sent to the {recipient}.
-     * @return amountB - Token B dust sent to the {recipient}.
-     */
-    function withdrawSingleAsset(uint256 pid, uint256 liquidity, address token, bytes[2] calldata swapData, address recipient) whenNotPaused nonReentrant external returns (uint256 amountToken, uint256 amountA, uint256 amountB) {
-        require (pid == poolID, 'BAD_POOL_ID');
-        PoolInfo memory pool = pools[poolID];
-
-        (uint256 leftoverA, uint256 leftoverB) = collectLeftovers(recipient);
-
-        uint256 amountLP = burn(liquidity);
-        (amountToken, amountA, amountB) = pool.assetRouter.withdrawSingleAsset(pool.pool, amountLP, token, swapData, recipient);
-
-        amountA += leftoverA;
-        amountB += leftoverB;
-
-        emit Withdraw(poolID, msg.sender, recipient, amountLP); 
-    }
-
-    /**
-     * @dev Withdraws tokens from the {pools[poolID]} pool and sends them to the recipient. Burns tokens representing user share. Emits {Withdraw} event.
-     * @param pid - Current poolID. Throws revert if moveLiquidity() has been called before the transaction has been mined.
-     * @param liquidity - Liquidity to burn from this user.
-     * @param swapData - Parameter with which 1inch router is being called with.
-     * @param recipient - Address which will receive withdrawn tokens.
-     
-     * @return amountETH - BNB amount sent to the {recipient}.
-     * @return amountA - Token A dust sent to the {recipient}.
-     * @return amountB - Token B dust sent to the {recipient}.
-     */
-    function withdrawSingleETH(uint256 pid, uint256 liquidity, bytes[2] calldata swapData, address recipient) whenNotPaused nonReentrant external returns (uint256 amountETH, uint256 amountA, uint256 amountB) {
-        require (pid == poolID, 'BAD_POOL_ID');
-        PoolInfo memory pool = pools[poolID];
-
-        (uint256 leftoverA, uint256 leftoverB) = collectLeftovers(recipient);
-
-        uint256 amountLP = burn(liquidity);
-        (amountETH, amountA, amountB) = pool.assetRouter.withdrawSingleETH(pool.pool, amountLP, swapData, recipient);
-
-        amountA += leftoverA;
-        amountB += leftoverB;
-
-        emit Withdraw(poolID, msg.sender, recipient, amountLP); 
+        emit Withdraw(poolID, msg.sender, recipient, amountA, amountB); 
     }
 
     /**
