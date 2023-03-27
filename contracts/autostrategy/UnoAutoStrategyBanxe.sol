@@ -69,6 +69,7 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
     uint256 private reserveLP;
     MoveLiquidityInfo private lastMoveInfo;
     mapping(address => mapping(uint256 => uint256)) private blockedLiquidty;
+    mapping(address => mapping(uint256 => bool)) private leftoversCollected;
 
     IUnoAccessManager public accessManager;
     IUnoAutoStrategyFactory public factory;
