@@ -132,9 +132,6 @@ contract UnoAutoStrategyBanxeDeprecated is Initializable, ERC20Upgradeable, Reen
      * @return amountB - Token B amount sent to the {recipient}.
      */
     function withdraw(uint256 liquidity, uint256 amountAMin, uint256 amountBMin, address recipient) whenNotPaused nonReentrant external returns (uint256 amountA, uint256 amountB) {
-        uint256 amountLP = burn(liquidity);
-        (amountA, amountB) = _withdraw(amountLP, amountAMin, amountBMin, recipient);
-
         uint256 leftoverA = liquidity * tokenA.balanceOf(address(this)) / totalSupply();
         if(leftoverA > 0){
             amountA += leftoverA;
@@ -146,6 +143,9 @@ contract UnoAutoStrategyBanxeDeprecated is Initializable, ERC20Upgradeable, Reen
             amountB += leftoverB;
             tokenB.safeTransfer(recipient, leftoverB);
         }
+        
+        uint256 amountLP = burn(liquidity);
+        (amountA, amountB) = _withdraw(amountLP, amountAMin, amountBMin, recipient);
 
         emit Withdraw(poolID, msg.sender, recipient, amountA, amountB);
     }
