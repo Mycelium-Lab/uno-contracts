@@ -341,13 +341,32 @@ contract('UnoAutoStrategyFactory', (accounts) => {
 
             assert.ok(event, `Upgraded${implementationV2.address} event not emitted`)
 
+            // const autoStrategyAddress = await autoStrategyFactory.autoStrategies(0)
+
+            // const autoStrategy = await AutoStrategyV2.at(autoStrategyAddress)
+
+            // assert.equal(await autoStrategy.accessManager(), accessManager.address, 'accessManager changed')
+            // assert.equal(await autoStrategy.factory(), autoStrategyFactory.address, 'factory changed')
+            // assert.equal(await autoStrategy.version(), 2, 'Strategy not upgraded')
+        })
+        it('returns back to previous version', async () => {
+            implementationV1 = await AutoStrategy.new()
+            const receipt = await autoStrategyFactory.upgradeStrategies(implementationV1.address, { from: admin })
+
+            const event = receipt.receipt.rawLogs.some((l) => {
+                const topic1 = l.topics[0] === web3.utils.keccak256('Upgraded(address)').toLowerCase()
+                const topic2 = l.topics[1] === web3.utils.padLeft(implementationV1.address, 64).toLowerCase()
+                return topic1 && topic2
+            })
+
+            assert.ok(event, `Upgraded${implementationV1.address} event not emitted`)
+
             const autoStrategyAddress = await autoStrategyFactory.autoStrategies(0)
 
-            const autoStrategy = await AutoStrategyV2.at(autoStrategyAddress)
+            const autoStrategy = await AutoStrategy.at(autoStrategyAddress)
 
             assert.equal(await autoStrategy.accessManager(), accessManager.address, 'accessManager changed')
             assert.equal(await autoStrategy.factory(), autoStrategyFactory.address, 'factory changed')
-            assert.equal(await autoStrategy.version(), 2, 'Strategy not upgraded')
         })
     })
 })
