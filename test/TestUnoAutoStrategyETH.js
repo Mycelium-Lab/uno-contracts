@@ -102,6 +102,11 @@ contract('UnoAutoStrategy', (accounts) => {
                 from: account1,
                 recipient: account1
             })
+            expectEvent(receipt, 'DepositPairTokensETH', {
+                poolID: id,
+                amountToken: sentB,
+                amountETH: sentA
+            })
         })
         it('mints tokens', async () => {
             const strategyTokenBalance = await strategyToken.balanceOf(account1)
@@ -176,7 +181,7 @@ contract('UnoAutoStrategy', (accounts) => {
             const tokenABalance = new BN(await web3.eth.getBalance(account1))
             const tokenBBalance = await tokenB.balanceOf(account1)
 
-            sentA = tokenABalance.sub(_tokenABalance).sub(ETHSpentOnGas) // sub gas cost
+            sentA = tokenABalance.sub(_tokenABalance).add(ETHSpentOnGas) // sub gas cost
             sentB = tokenBBalance.sub(_tokenBBalance)
         })
         it('fires events', async () => {
@@ -184,6 +189,12 @@ contract('UnoAutoStrategy', (accounts) => {
                 poolID: id,
                 from: account1,
                 recipient: account1
+            })
+
+            expectEvent(receipt, 'WithdrawPairTokensETH', {
+                poolID: id,
+                amountToken: sentB,
+                amountETH: sentA
             })
         })
         it('burns tokens', async () => {

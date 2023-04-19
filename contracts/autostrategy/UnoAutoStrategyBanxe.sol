@@ -78,10 +78,22 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
     bytes32 private constant LIQUIDITY_MANAGER_ROLE = keccak256('LIQUIDITY_MANAGER_ROLE');
     address public constant WMATIC = 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270;
 
+    event DepositPairTokens(uint256 indexed poolID, uint256 amountA, uint256 amountB);
+    event DepositPairTokensETH(uint256 indexed poolID, uint256 amountToken, uint256 amountETH);
+    event DepositSingleToken(uint256 indexed poolID, address indexed token, uint256 amount);
+    event DepositSingleETH(uint256 indexed poolID, uint256 amountETH);
     // Note: amountLP refers to LP tokens used in farms and staking pools, not UNO-LP this contract is.
     // To get info for UNO-LP use mint/burn events
     event Deposit(uint256 indexed poolID, address indexed from, address indexed recipient, uint256 amountLP);
+
+    event WithdrawPairTokens(uint256 indexed poolID, uint256 amountA, uint256 amountB);
+    event WithdrawPairTokensETH(uint256 indexed poolID, uint256 amountToken, uint256 amountETH);
+    event WithdrawSingleToken(uint256 indexed poolID, address indexed token, uint256 amount, uint256 amountA, uint256 amountB);
+    event WithdrawSingleETH(uint256 indexed poolID, uint256 amountETH, uint256 amountA, uint256 amountB);
+    // Note: amountLP refers to LP tokens used in farms and staking pools, not UNO-LP this contract is.
+    // To get info for UNO-LP use mint/burn events
     event Withdraw(uint256 indexed poolID, address indexed from, address indexed recipient, uint256 amountLP);
+
     event MoveLiquidity(uint256 indexed previousPoolID, uint256 indexed nextPoolID);
     event BanxeTransferred(address indexed previousBanxe, address indexed newBanxe);
 
@@ -165,6 +177,7 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
             pool.tokenB.safeTransfer(msg.sender, amountB - sentB);
         }
 
+        emit DepositPairTokens(poolID, sentA, sentB);
         emit Deposit(poolID, msg.sender, recipient, amountLP); 
     }
 
@@ -204,6 +217,8 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
         if(msg.value > sentETH){
             payable(msg.sender).transfer(msg.value - sentETH);
         }
+
+        emit DepositPairTokensETH(poolID, sentToken, sentETH);
         emit Deposit(poolID, msg.sender, recipient, amountLP); 
     }
 
@@ -244,6 +259,7 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
             pool.tokenB.safeTransfer(msg.sender, _balanceB - balanceB);
         }
 
+        emit DepositSingleToken(poolID, token, sent);
         emit Deposit(poolID, msg.sender, recipient, amountLP);
     }
 
@@ -279,6 +295,7 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
             pool.tokenB.safeTransfer(msg.sender, _balanceB - balanceB);
         }
 
+        emit DepositSingleETH(poolID, sentETH);
         emit Deposit(poolID, msg.sender, recipient, amountLP); 
     }
 
@@ -305,6 +322,7 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
         amountA += leftoverA;
         amountB += leftoverB;
 
+        emit WithdrawPairTokens(poolID, amountA, amountB);
         emit Withdraw(poolID, msg.sender, recipient, amountLP);
     }
 
@@ -337,6 +355,8 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
         } else {
             revert("NOT_WMATIC_POOL");
         }
+        
+        emit WithdrawPairTokensETH(poolID, amountToken, amountETH);
         emit Withdraw(poolID, msg.sender, recipient, amountLP); 
     }
 
@@ -364,6 +384,7 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
         amountA += leftoverA;
         amountB += leftoverB;
 
+        emit WithdrawSingleToken(poolID, token, amountToken, amountA, amountB);
         emit Withdraw(poolID, msg.sender, recipient, amountLP); 
     }
 
@@ -390,6 +411,7 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
         amountA += leftoverA;
         amountB += leftoverB;
 
+        emit WithdrawSingleETH(poolID, amountETH, amountA, amountB);
         emit Withdraw(poolID, msg.sender, recipient, amountLP); 
     }
 

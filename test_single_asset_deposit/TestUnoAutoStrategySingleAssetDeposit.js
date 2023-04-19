@@ -94,6 +94,13 @@ contract('UnoAutoStrategy', (accounts) => {
                     from: DAIHolder,
                     recipient: DAIHolder
                 })
+                const tokenBalanceAfter = await DAIToken.balanceOf(DAIHolder)
+                const tokenDiff = tokenBalanceBefore.sub(tokenBalanceAfter)
+                expectEvent(receipt, 'DepositSingleToken', {
+                    poolID: id,
+                    token: DAIToken.address,
+                    amount: tokenDiff
+                })
             })
             it('withdraws tokens from balance', async () => {
                 const tokenBalanceAfter = await DAIToken.balanceOf(DAIHolder)
@@ -165,6 +172,14 @@ contract('UnoAutoStrategy', (accounts) => {
                 ethSpentOnGas = gasUsed.mul(effectiveGasPrice)
 
                 expectEvent(receipt, 'Deposit', { poolID: id, from: DAIHolder, recipient: DAIHolder })
+
+                const ethBalanceAfter = new BN(await web3.eth.getBalance(DAIHolder))
+                const ethDiff = ethBalanceBefore.sub(ethBalanceAfter).sub(ethSpentOnGas)
+
+                expectEvent(receipt, 'DepositSingleETH', {
+                    poolID: id,
+                    amountETH: ethDiff
+                })
             })
             it('withdraws ETH from balance', async () => {
                 const ethBalanceAfter = new BN(await web3.eth.getBalance(DAIHolder))

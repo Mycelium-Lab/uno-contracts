@@ -82,6 +82,10 @@ contract('UnoAutoStrategySingleAssetWithdraw', (accounts) => {
                 expectEvent(receipt, 'Withdraw', {
                     poolID: id, from: DAIHolder, recipient: DAIHolder
                 })
+                expectEvent(receipt, 'WithdrawSingleToken', {
+                    poolID: id,
+                    token: DAIToken.address
+                })
             })
             it('deposits tokens to balance', async () => {
                 const tokenBalanceAfter = await DAIToken.balanceOf(DAIHolder)
@@ -137,6 +141,9 @@ contract('UnoAutoStrategySingleAssetWithdraw', (accounts) => {
 
                 expectEvent(receipt, 'Withdraw', {
                     poolID: id, from: DAIHolder, recipient: DAIHolder
+                })
+                expectEvent(receipt, 'WithdrawSingleETH', {
+                    poolID: id
                 })
             })
             it('withdraws ETH from balance', async () => {

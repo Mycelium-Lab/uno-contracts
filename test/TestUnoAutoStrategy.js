@@ -238,6 +238,12 @@ contract('UnoAutoStrategy', (accounts) => {
                     from: account1,
                     recipient: account1
                 })
+
+                expectEvent(receipt, 'DepositPairTokens', {
+                    poolID: id,
+                    amountA: sentA,
+                    amountB: sentB
+                })
             })
             it('mints tokens', async () => {
                 const strategyTokenBalance = await strategyToken.balanceOf(account1)
@@ -343,6 +349,12 @@ contract('UnoAutoStrategy', (accounts) => {
                         poolID: id,
                         from: testAccounts[i],
                         recipient: testAccounts[i]
+                    })
+
+                    expectEvent(txs[i], 'DepositPairTokens', {
+                        poolID: id,
+                        amountA: sentA[i],
+                        amountB: sentB[i]
                     })
                 }
             })
@@ -507,6 +519,12 @@ contract('UnoAutoStrategy', (accounts) => {
                     from: account1,
                     recipient: account1
                 })
+
+                expectEvent(receipt, 'WithdrawPairTokens', {
+                    poolID: id,
+                    amountA: withdrawnA,
+                    amountB: withdrawnB
+                })
             })
             it('burns tokens', async () => {
                 const strategyTokenBalance = await strategyToken.balanceOf(account1)
@@ -629,6 +647,12 @@ contract('UnoAutoStrategy', (accounts) => {
                         poolID: id,
                         from: testAccounts[i],
                         recipient: testAccounts[i]
+                    })
+
+                    expectEvent(txs[i], 'WithdrawPairTokens', {
+                        poolID: id,
+                        amountA: withdrawnA[i],
+                        amountB: withdrawnB[i]
                     })
                 }
             })
