@@ -33,7 +33,7 @@ module.exports = async (deployer, network) => {
         data,
         salt: ethers.BigNumber.from(ethers.utils.randomBytes(32))._hex,
         address: timelockAddress,
-        delay: '172800'
+        delay: '86400'
     }
     timelock.operationId = ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(
         ['address', 'uint256', 'bytes', 'bytes32', 'bytes32'],
