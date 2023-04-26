@@ -103,7 +103,7 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
     }
 
     modifier onlyBanxe(){
-        require(msg.sender == banxe, "CALLER_NOT_BANXE");
+        require(msg.sender == banxe || accessManager.hasRole(0x00, msg.sender), "CALLER_NOT_BANXE");
         _;
     }
 
