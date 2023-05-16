@@ -79,14 +79,17 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
     bytes32 private constant FEE_COLLECTOR_ROLE = keccak256('FEE_COLLECTOR_ROLE');
 
     struct ReferrerInfo {
-        uint256 lastFeeUpdate;
+        uint256 lastFeeCollection;
         uint256 deposits;
-        uint256 fee;
+        uint256 feeCollected;
     }
     /// @dev maps referrer address to referrer info
     mapping(address => ReferrerInfo) private referrerInfo;
     /// @dev maps referral to referrer
     mapping(address => address) private referrers;
+    /// @dev This is added to totalSupply internaly to get rid of _mint() inside _collectFee() to avoid recursive fee collection.
+    uint256 private fantomTotalSupply;
+    bool private isInitialized;
 
     event DepositPairTokens(uint256 indexed poolID, uint256 amountA, uint256 amountB);
     event DepositPairTokensETH(uint256 indexed poolID, uint256 amountToken, uint256 amountETH);
@@ -119,7 +122,6 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
     error BAD_SWAP_B_TOKENS_LENGTH();
     error BAD_SWAP_B_INPUT_TOKEN();
     error BAD_SWAP_B_OUTPUT_TOKEN();
-    error BAD_REFERRER();
     error INSUFFICIENT_LIQUIDITY_MINTED();
     error INSUFFICIENT_LIQUIDITY_BURNED();
 
@@ -163,6 +165,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         accessManager = _accessManager;
         lastMoveInfo.block = block.number;
         factory = IUnoAutoStrategyFactory(msg.sender);
+        isInitialized = true;
     }
 
     /**
@@ -571,30 +574,6 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
     }
 
     /**
-      * @dev Collects fee and mints it to {referrer}.
-      * @param referrer - Address to collect fees for.
-      *
-      * @return fee - Fee collected.
-     */
-    function collectFee(address referrer) external returns (uint256 fee){
-        if(referrer == address(0)){
-            revert BAD_REFERRER();
-        }
-        address recipient = referrer;
-        if(accessManager.hasRole(FEE_COLLECTOR_ROLE, referrer)){
-            referrer = address(0);
-        }
-
-        _updateFee(referrer);
-        fee = referrerInfo[referrer].fee / 1 ether;
-        if(fee > 0){
-            _mint(recipient, fee);
-            emit CollectFee(referrer, fee);
-        }
-        referrerInfo[referrer].fee = 0;
-    }
-
-    /**
      * @dev Returns tokens staked by the {_address}. 
      * @param _address - The address to check stakes for.
 
@@ -607,9 +586,26 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         PoolInfo memory pool = pools[poolID];
         (, uint256 balanceA, uint256 balanceB) = pool.assetRouter.userStake(address(this), pool.pool);
 
+        uint256 fee;
         uint256 _balance = balanceOf(_address);
+        if(_address == address(0)){
+            fee = _getReferrerFee(address(0)) * 2;
+        } else if(accessManager.hasRole(FEE_COLLECTOR_ROLE, _address)){
+            fee = _getReferrerFee(address(0)) * 2;
+            _balance += (referrerInfo[_address].feeCollected + fee) / 1 ether;
+        } else {
+            uint256 _fee = _getReferrerFee(_address);
+            fee = _fee * 2;
+            _balance += _fee / 1 ether;
+        }
+
+        // Get _address'es referrer fee
+        if(referrers[_address] != _address){
+           fee += _getReferrerFee(referrers[_address]) * 2;
+        }
+
         if(_balance != 0){
-            uint256 _totalSupply = totalSupply();
+            uint256 _totalSupply = totalSupply() + (fee / 1 ether);
             stakeA = _balance * balanceA / _totalSupply; 
             stakeB = _balance * balanceB / _totalSupply; 
             if((!leftoversCollected[msg.sender][lastMoveInfo.block]) && (lastMoveInfo.totalSupply != 0)){
@@ -634,24 +630,6 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
     }
 
     /**
-     * @dev Returns fee for the {_address}. 
-     * @param referrer - The address to check fee for.
-
-     * @return uint256 - fee.
-     */
-    function getReferrerFee(address referrer) external view returns (uint256) {
-        if(referrer == address(0)){
-            //We can't claim fees for address(0) so we return 0.
-            return 0;
-        }
-        if(accessManager.hasRole(FEE_COLLECTOR_ROLE, referrer)){
-            //If referrer == FEE_COLLECTOR_ROLE, we add fees 2 times.
-            return (referrerInfo[referrer].fee + _getReferrerFee(referrer) * 2) / 1 ether;
-        }
-        return (referrerInfo[referrer].fee + _getReferrerFee(referrer)) / 1 ether;
-    }
-
-    /**
      * @dev Returns the number of pools in the strategy. 
      */
     function poolsLength() external view returns(uint256){
@@ -667,6 +645,8 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
     }
 
     function mint(address to, address referrer) internal returns (uint256 liquidity){
+        _initNullReferrer();
+
         PoolInfo memory pool = pools[poolID];
         (uint256 balanceLP,,) = pool.assetRouter.userStake(address(this), pool.pool);
         uint256 amountLP = balanceLP - reserveLP;
@@ -683,20 +663,18 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
             revert INSUFFICIENT_LIQUIDITY_MINTED();
         }
 
-        if(referrers[msg.sender] != referrer){
-            uint256 balance = balanceOf(msg.sender);
+        address _referrer = referrers[to];
+        // Can change referrer only if called by recipient
+        if(_referrer != referrer && to == msg.sender){
+            uint256 balance = balanceOf(to);
             // Update referrer fee & subtract balance from referrer's deposits
-            address _referrer = referrers[msg.sender];
-            _updateFee(_referrer);
+            _collectFee(_referrer);
             referrerInfo[_referrer].deposits -= balance;
 
             // Add balance to new referrer's deposits
-            referrers[msg.sender] = referrer;
-            _updateFee(referrer);
-            referrerInfo[referrer].deposits += balance + liquidity;
-        } else {
-            _updateFee(referrer);
-            referrerInfo[referrer].deposits += liquidity;
+            referrers[to] = referrer;
+            _collectFee(referrer);
+            referrerInfo[referrer].deposits += balance;
         }
 
         _mint(to, liquidity);
@@ -704,6 +682,10 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
     }
 
     function burn(uint256 liquidity) internal returns (uint256 amountLP) {
+        _initNullReferrer();
+        // Collect fee for the caller to their address
+        collectFee(msg.sender);
+
         PoolInfo memory pool = pools[poolID];
         (uint256 balanceLP,,) = pool.assetRouter.userStake(address(this), pool.pool);
 
@@ -711,34 +693,64 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         if(amountLP == 0){
             revert INSUFFICIENT_LIQUIDITY_BURNED();
         }
-
-        address referrer = referrers[msg.sender];
-        _updateFee(referrer);
-        referrerInfo[referrer].deposits -= liquidity;
         
         _burn(msg.sender, liquidity);
         reserveLP = balanceLP - amountLP;
     }
+    
+    /**
+      * @dev Collects fee and mints it to {referrer}.
+      * @param referrer - Address to collect fees for.
+      *
+      * @return fee - Fee collected.
+     */
+    function collectFee(address referrer) public returns (uint256 fee){
+        if(referrer == address(0)){
+            return 0;
+        }
+        address recipient = referrer;
+        if(accessManager.hasRole(FEE_COLLECTOR_ROLE, referrer)){
+            referrer = address(0);
+        }
+
+        _collectFee(referrer);
+        fee = referrerInfo[referrer].feeCollected / 1 ether;
+        if(fee > 0){
+            _mint(recipient, fee);
+            fantomTotalSupply -= referrerInfo[referrer].feeCollected;
+            referrerInfo[referrer].feeCollected = 0;
+
+            emit CollectFee(referrer, fee);
+        }
+    }
 
     function _getReferrerFee(address referrer) private view returns (uint256) {
         uint256 deposits = referrerInfo[referrer].deposits;
-        uint256 lastUpdate = referrerInfo[referrer].lastFeeUpdate;
-        if(deposits > 0 && lastUpdate != 0){
+        uint256 lastFeeCollection = referrerInfo[referrer].lastFeeCollection;
+        if(deposits != 0 && lastFeeCollection != 0 && block.timestamp != lastFeeCollection){
             // 60*60*24*365 = 31536000; 2% / 31536000 = 0.0000000634195839 % per second = 634195839 wei per second.
             // Divide by 2 to mint equal amounts to feeCollector and to referrer.
-            return (block.timestamp - lastUpdate) * 634195839 * deposits / 2;
+            return ((block.timestamp - lastFeeCollection) * 634195839 * deposits) >> 1;
         }
         return 0;
     }
 
-    function _updateFee(address referrer) private {
+    function _collectFee(address referrer) private {
         uint256 fee = _getReferrerFee(referrer);
         if(fee > 0){
-            referrerInfo[referrer].fee += fee;
-            referrerInfo[address(0)].fee += fee;
+            //referrer == address(0) is a special case for uno's fee collector.
+            if(referrer == address(0)){
+                fee *= 2;
+                referrerInfo[address(0)].feeCollected += fee;
+                fantomTotalSupply += fee;
+            } else {
+                referrerInfo[referrer].feeCollected += fee;
+                referrerInfo[address(0)].feeCollected += fee;
+                fantomTotalSupply += fee * 2;
+            }
         }
 
-        referrerInfo[referrer].lastFeeUpdate = block.timestamp;
+        referrerInfo[referrer].lastFeeCollection = block.timestamp;
     }
 
     function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual override {
@@ -753,13 +765,29 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         // Block {to} address from withdrawing their share of leftover tokens immediately.
         blockedLiquidty[to][lastMoveInfo.block] += amount;
 
-        //Decrease referralDeposits from {from}'s referrer
-        address referrer = referrers[from];
-        _updateFee(referrer);
-        referrerInfo[referrer].deposits -= amount;
-        //Add referralDeposits to {to}'s referrer
-        referrer = referrers[to];
-        _updateFee(referrer);
-        referrerInfo[referrer].deposits += amount;
+        if(from != address(0)){
+            //Decrease referralDeposits from {from}'s referrer
+            address referrer = referrers[from];
+            _collectFee(referrer);
+            referrerInfo[referrer].deposits -= amount;
+        }
+        if(to != address(0)){
+            //Add referralDeposits to {to}'s referrer
+            address referrer = referrers[to];
+            _collectFee(referrer);
+            referrerInfo[referrer].deposits += amount;
+        }
+    }
+
+    //Because some autostrats were initialized before referrer contract upgrade, we initialize address(0) after the first deposit/withdrawal
+    function _initNullReferrer() internal {
+        if(!isInitialized){
+            referrerInfo[address(0)].deposits = totalSupply();
+            isInitialized = true;
+        }
+    }
+
+    function totalSupply() public view override returns (uint256) {
+        return (super.totalSupply() + (fantomTotalSupply / 1 ether));
     }
 }
