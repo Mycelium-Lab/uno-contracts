@@ -596,7 +596,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         } else {
             uint256 _fee = _getReferrerFee(_address);
             fee = _fee * 2;
-            _balance += _fee / 1 ether;
+            _balance += (referrerInfo[_address].feeCollected + _fee) / 1 ether;
         }
 
         // Get _address'es referrer fee
@@ -697,6 +697,8 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         _burn(msg.sender, liquidity);
         reserveLP = balanceLP - amountLP;
     }
+
+    //TODO: add getReferrerFee public function
     
     /**
       * @dev Collects fee and mints it to {referrer}.
