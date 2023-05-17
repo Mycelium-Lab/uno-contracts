@@ -645,8 +645,6 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
     }
 
     function mint(address to, address referrer) internal returns (uint256 liquidity){
-        _initNullReferrer();
-
         PoolInfo memory pool = pools[poolID];
         (uint256 balanceLP,,) = pool.assetRouter.userStake(address(this), pool.pool);
         uint256 amountLP = balanceLP - reserveLP;
@@ -682,7 +680,6 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
     }
 
     function burn(uint256 liquidity) internal returns (uint256 amountLP) {
-        _initNullReferrer();
         // Collect fee for the caller to their address
         collectFee(msg.sender);
 
@@ -698,8 +695,6 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         reserveLP = balanceLP - amountLP;
     }
 
-    //TODO: add getReferrerFee public function
-    
     /**
       * @dev Collects fee and mints it to {referrer}.
       * @param referrer - Address to collect fees for.
@@ -729,7 +724,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
     function _getReferrerFee(address referrer) private view returns (uint256) {
         uint256 deposits = referrerInfo[referrer].deposits;
         uint256 lastFeeCollection = referrerInfo[referrer].lastFeeCollection;
-        if(deposits != 0 && lastFeeCollection != 0 && block.timestamp != lastFeeCollection){
+        if(isInitialized && deposits != 0 && lastFeeCollection != 0 && block.timestamp != lastFeeCollection){
             // 60*60*24*365 = 31536000; 2% / 31536000 = 0.0000000634195839 % per second = 634195839 wei per second.
             // Divide by 2 to mint equal amounts to feeCollector and to referrer.
             return ((block.timestamp - lastFeeCollection) * 634195839 * deposits) >> 1;
@@ -738,6 +733,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
     }
 
     function _collectFee(address referrer) private {
+        _initNullReferrer();
         uint256 fee = _getReferrerFee(referrer);
         if(fee > 0){
             //referrer == address(0) is a special case for uno's fee collector.
