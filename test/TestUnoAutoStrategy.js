@@ -158,25 +158,25 @@ contract('UnoAutoStrategy', (accounts) => {
             it('reverts if provided with the wrong poolID', async () => {
                 const poolID = await autoStrategy.poolID()
                 await expectRevert(
-                    autoStrategy.deposit(poolID.add(new BN(1)), 0, 0, 0, 0, account1, {
+                    autoStrategy.deposit(poolID.add(new BN(1)), 0, 0, 0, 0, account1, constants.ZERO_ADDRESS, {
                         from: account1
                     }),
                     'BAD_POOL_ID'
                 )
                 await expectRevert(
-                    autoStrategy.depositETH(poolID.add(new BN(1)), 0, 0, 0, account1, {
+                    autoStrategy.depositETH(poolID.add(new BN(1)), 0, 0, 0, account1, constants.ZERO_ADDRESS, {
                         from: account1
                     }),
                     'BAD_POOL_ID'
                 )
                 await expectRevert(
-                    autoStrategy.depositSingleAsset(poolID.add(new BN(1)), account1, 0, ['0x', '0x'], 0, 0, account1, {
+                    autoStrategy.depositSingleAsset(poolID.add(new BN(1)), account1, 0, ['0x', '0x'], 0, 0, account1, constants.ZERO_ADDRESS, {
                         from: account1
                     }),
                     'BAD_POOL_ID'
                 )
                 await expectRevert(
-                    autoStrategy.depositSingleETH(poolID.add(new BN(1)), ['0x', '0x'], 0, 0, account1, {
+                    autoStrategy.depositSingleETH(poolID.add(new BN(1)), ['0x', '0x'], 0, 0, account1, constants.ZERO_ADDRESS, {
                         from: account1
                     }),
                     'BAD_POOL_ID'
@@ -222,7 +222,7 @@ contract('UnoAutoStrategy', (accounts) => {
                 strategyTokenBalanceBefore = await strategyToken.balanceOf(account1)
 
                 // Deposit
-                receipt = await autoStrategy.deposit(id, amounts[1], amounts[1], 0, 0, account1, {
+                receipt = await autoStrategy.deposit(id, amounts[1], amounts[1], 0, 0, account1, constants.ZERO_ADDRESS, {
                     from: account1
                 })
 
@@ -331,7 +331,7 @@ contract('UnoAutoStrategy', (accounts) => {
                 // Deposit
                 for (let i = 0; i < testAccounts.length; i++) {
                     txs.push(
-                        await autoStrategy.deposit(id, amounts[2], amounts[2], 0, 0, testAccounts[i], {
+                        await autoStrategy.deposit(id, amounts[2], amounts[2], 0, 0, testAccounts[i], constants.ZERO_ADDRESS, {
                             from: testAccounts[i]
                         })
                     )
@@ -484,7 +484,7 @@ contract('UnoAutoStrategy', (accounts) => {
                     from: account1
                 })
 
-                await autoStrategy.deposit(id, amounts[3], amounts[3], 0, 0, account1, {
+                await autoStrategy.deposit(id, amounts[3], amounts[3], 0, 0, account1, constants.ZERO_ADDRESS, {
                     from: account1
                 })
 
@@ -610,7 +610,7 @@ contract('UnoAutoStrategy', (accounts) => {
                         from: testAccounts[i]
                     })
 
-                    await autoStrategy.deposit(id, amounts[4], amounts[4], 0, 0, testAccounts[i], {
+                    await autoStrategy.deposit(id, amounts[4], amounts[4], 0, 0, testAccounts[i], constants.ZERO_ADDRESS, {
                         from: testAccounts[i]
                     })
 
@@ -766,7 +766,7 @@ contract('UnoAutoStrategy', (accounts) => {
                     from: account1
                 })
 
-                await autoStrategy.deposit(poolID, amounts[3], amounts[3], 0, 0, account1, {
+                await autoStrategy.deposit(poolID, amounts[3], amounts[3], 0, 0, account1, constants.ZERO_ADDRESS, {
                     from: account1
                 })
 
@@ -809,7 +809,7 @@ contract('UnoAutoStrategy', (accounts) => {
                         from: testAccounts[i]
                     })
 
-                    await autoStrategy.deposit(id, amounts[3], amounts[3], 0, 0, testAccounts[i], {
+                    await autoStrategy.deposit(id, amounts[3], amounts[3], 0, 0, testAccounts[i], constants.ZERO_ADDRESS, {
                         from: testAccounts[i]
                     })
 
@@ -896,7 +896,7 @@ contract('UnoAutoStrategy', (accounts) => {
                 })
 
                 // Deposit
-                receipt = await autoStrategy.deposit(id, tokenABalance, tokenBBalance, 0, 0, account1, {
+                receipt = await autoStrategy.deposit(id, tokenABalance, tokenBBalance, 0, 0, account1, constants.ZERO_ADDRESS, {
                     from: account1
                 })
 
@@ -999,7 +999,7 @@ contract('UnoAutoStrategy', (accounts) => {
             it('reverts deposit if paused', async () => {
                 const poolID = await autoStrategy.poolID()
                 await expectRevert(
-                    autoStrategy.deposit(poolID, 0, 0, 0, 0, account1, {
+                    autoStrategy.deposit(poolID, 0, 0, 0, 0, account1, constants.ZERO_ADDRESS, {
                         from: account1
                     }),
                     'PAUSABLE: PAUSED'

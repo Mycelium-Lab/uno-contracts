@@ -81,7 +81,7 @@ contract('UnoAutoStrategy', (accounts) => {
             tokenBBalanceBefore = await tokenB.balanceOf(account1)
 
             // Deposit
-            receipt = await autoStrategy.depositETH(id, amounts[1], 0, 0, account1, {
+            receipt = await autoStrategy.depositETH(id, amounts[1], 0, 0, account1, constants.ZERO_ADDRESS, {
                 value: amounts[0],
                 from: account1
             })
@@ -140,8 +140,6 @@ contract('UnoAutoStrategy', (accounts) => {
                 new BN(10),
                 'stakeB is not correct'
             )
-            console.log(stakeA.toString(), sentA.toString())
-            console.log(stakeB.toString(), sentB.toString())
             approxeq(
                 stakeA,
                 sentA,

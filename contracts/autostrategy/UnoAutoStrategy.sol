@@ -75,7 +75,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
 
     uint256 private constant MINIMUM_LIQUIDITY = 10**3;
     bytes32 private constant LIQUIDITY_MANAGER_ROLE = keccak256('LIQUIDITY_MANAGER_ROLE');
-    address public constant WMATIC = 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270;
+    address private constant WMATIC = 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270;
     bytes32 private constant FEE_COLLECTOR_ROLE = keccak256('FEE_COLLECTOR_ROLE');
 
     struct ReferrerInfo {
@@ -108,25 +108,22 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
     event Withdraw(uint256 indexed poolID, address indexed from, address indexed recipient, uint256 amountLP);
 
     event MoveLiquidity(uint256 indexed previousPoolID, uint256 indexed nextPoolID);
-    event CollectFee(address indexed referrer, uint256 fee);
 
     //To save contract size
+    error PAUSED();
     error BAD_POOL_ID();
     error BAD_POOL_COUNT();
     error CALLER_NOT_LIQUIDITY_MANAGER();
     error NO_LIQUIDITY();
     error CANT_CALL_ON_THE_SAME_BLOCK();
-    error BAD_SWAP_A_TOKENS_LENGTH();
-    error BAD_SWAP_A_INPUT_TOKEN();
-    error BAD_SWAP_A_OUTPUT_TOKEN();
-    error BAD_SWAP_B_TOKENS_LENGTH();
-    error BAD_SWAP_B_INPUT_TOKEN();
-    error BAD_SWAP_B_OUTPUT_TOKEN();
-    error INSUFFICIENT_LIQUIDITY_MINTED();
-    error INSUFFICIENT_LIQUIDITY_BURNED();
+    error BAD_SWAP_A();
+    error BAD_SWAP_B();
+    error INSUFFICIENT_LIQUIDITY();
 
     modifier whenNotPaused(){
-        require(factory.paused() == false, 'PAUSABLE: PAUSED');
+        if(factory.paused()){
+            revert PAUSED();
+        }
         _;
     }
 
@@ -522,14 +519,13 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
                 bytes memory pathDefinition
             ) = abi.decode(swapAData[4:], (IOdosRouter.inputToken[],IOdosRouter.outputToken[],uint256,uint256,address,bytes));
 
-            if((inputs.length != 1) || (outputs.length != 1)){
-                revert BAD_SWAP_A_TOKENS_LENGTH();
-            }
-            if(inputs[0].tokenAddress != address(currentPool.tokenA)){
-                revert BAD_SWAP_A_INPUT_TOKEN();
-            }
-            if(outputs[0].tokenAddress != address(newPool.tokenA)){
-                revert BAD_SWAP_A_OUTPUT_TOKEN();
+            // More discriptive errors would be nice but our contract size is very limited
+            if(
+                ((inputs.length != 1) || (outputs.length != 1)) ||
+                (inputs[0].tokenAddress != address(currentPool.tokenA)) ||
+                (outputs[0].tokenAddress != address(newPool.tokenA))
+            ){
+                revert BAD_SWAP_A();
             }
 
             inputs[0].amountIn = tokenABalance;
@@ -546,14 +542,13 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
                 bytes memory pathDefinition
             ) = abi.decode(swapBData[4:], (IOdosRouter.inputToken[],IOdosRouter.outputToken[],uint256,uint256,address,bytes));
 
-            if((inputs.length != 1) || (outputs.length != 1)){
-                revert BAD_SWAP_B_TOKENS_LENGTH();
-            }
-            if(inputs[0].tokenAddress != address(currentPool.tokenB)){
-                revert BAD_SWAP_B_INPUT_TOKEN();
-            }
-            if(outputs[0].tokenAddress != address(newPool.tokenB)){
-                revert BAD_SWAP_B_OUTPUT_TOKEN();
+            // More discriptive errors would be nice but our contract size is very limited
+            if(
+                ((inputs.length != 1) || (outputs.length != 1)) ||
+                (inputs[0].tokenAddress != address(currentPool.tokenB)) ||
+                (outputs[0].tokenAddress != address(newPool.tokenB))
+            ){
+                revert BAD_SWAP_B();
             }
 
             inputs[0].amountIn = tokenBBalance;
@@ -658,7 +653,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         }
 
         if(liquidity == 0){
-            revert INSUFFICIENT_LIQUIDITY_MINTED();
+            revert INSUFFICIENT_LIQUIDITY();
         }
 
         address _referrer = referrers[to];
@@ -688,7 +683,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
 
         amountLP = liquidity * balanceLP / totalSupply(); 
         if(amountLP == 0){
-            revert INSUFFICIENT_LIQUIDITY_BURNED();
+            revert INSUFFICIENT_LIQUIDITY();
         }
         
         _burn(msg.sender, liquidity);
@@ -705,6 +700,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         if(referrer == address(0)){
             return 0;
         }
+        
         address recipient = referrer;
         if(accessManager.hasRole(FEE_COLLECTOR_ROLE, referrer)){
             referrer = address(0);
@@ -716,15 +712,13 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
             _mint(recipient, fee);
             fantomTotalSupply -= referrerInfo[referrer].feeCollected;
             referrerInfo[referrer].feeCollected = 0;
-
-            emit CollectFee(referrer, fee);
         }
     }
 
     function _getReferrerFee(address referrer) private view returns (uint256) {
         uint256 deposits = referrerInfo[referrer].deposits;
         uint256 lastFeeCollection = referrerInfo[referrer].lastFeeCollection;
-        if(isInitialized && deposits != 0 && lastFeeCollection != 0 && block.timestamp != lastFeeCollection){
+        if(deposits != 0 && lastFeeCollection != 0 && block.timestamp != lastFeeCollection){
             // 60*60*24*365 = 31536000; 2% / 31536000 = 0.0000000634195839 % per second = 634195839 wei per second.
             // Divide by 2 to mint equal amounts to feeCollector and to referrer.
             return ((block.timestamp - lastFeeCollection) * 634195839 * deposits) >> 1;
@@ -733,7 +727,12 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
     }
 
     function _collectFee(address referrer) private {
-        _initNullReferrer();
+        // Some autostrats were initialized before referral upgrade, so we initialize all liquidity as having address(0) as it's referrer here.
+        if(!isInitialized){
+            referrerInfo[address(0)].deposits = totalSupply();
+            isInitialized = true;
+        }
+
         uint256 fee = _getReferrerFee(referrer);
         if(fee > 0){
             //referrer == address(0) is a special case for uno's fee collector.
@@ -774,14 +773,6 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
             address referrer = referrers[to];
             _collectFee(referrer);
             referrerInfo[referrer].deposits += amount;
-        }
-    }
-
-    //Because some autostrats were initialized before referrer contract upgrade, we initialize address(0) after the first deposit/withdrawal
-    function _initNullReferrer() internal {
-        if(!isInitialized){
-            referrerInfo[address(0)].deposits = totalSupply();
-            isInitialized = true;
         }
     }
 
