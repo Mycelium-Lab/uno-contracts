@@ -656,16 +656,16 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
             revert INSUFFICIENT_LIQUIDITY();
         }
 
-        address _referrer = referrers[to];
-        // Can change referrer only if called by recipient
-        if(_referrer != referrer && to == msg.sender){
-            uint256 balance = balanceOf(to);
+        address _referrer = referrers[msg.sender];
+        // Can change referrer only for sender
+        if(_referrer != referrer){
+            uint256 balance = balanceOf(msg.sender);
             // Update referrer fee & subtract balance from referrer's deposits
             _collectFee(_referrer);
             referrerInfo[_referrer].deposits -= balance;
 
             // Add balance to new referrer's deposits
-            referrers[to] = referrer;
+            referrers[msg.sender] = referrer;
             _collectFee(referrer);
             referrerInfo[referrer].deposits += balance;
         }
@@ -721,7 +721,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         if(deposits != 0 && lastFeeCollection != 0 && block.timestamp != lastFeeCollection){
             // 60*60*24*365 = 31536000; 2% / 31536000 = 0.0000000634195839 % per second = 634195839 wei per second.
             // Divide by 2 to mint equal amounts to feeCollector and to referrer.
-            return ((block.timestamp - lastFeeCollection) * 634195839 * deposits) >> 1;
+            return ((block.timestamp - lastFeeCollection) * 317097919 * deposits);
         }
         return 0;
     }
@@ -746,7 +746,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
                 fantomTotalSupply += fee * 2;
             }
         }
-
+        
         referrerInfo[referrer].lastFeeCollection = block.timestamp;
     }
 

@@ -1,5 +1,5 @@
 const {
-    expectEvent, BN
+    expectEvent, BN, constants
 } = require('@openzeppelin/test-helpers')
 const { deployProxy } = require('@openzeppelin/truffle-upgrades')
 

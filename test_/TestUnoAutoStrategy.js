@@ -1,6 +1,7 @@
 const {
     expectRevert, expectEvent, BN, constants, time
 } = require('@openzeppelin/test-helpers')
+// const { expectRevertCustomError } = require('custom-error-test-helper')
 const { deployProxy } = require('@openzeppelin/truffle-upgrades')
 
 const timeMachine = require('ganache-time-traveler')
@@ -30,6 +31,21 @@ const amounts = [new BN(1000), new BN(3000), new BN(500), new BN(4000), new BN(4
 approxeq = (bn1, bn2, epsilon, message) => {
     const amountDelta = bn1.sub(bn2).add(epsilon)
     assert.ok(!amountDelta.isNeg(), message)
+}
+
+async function expectRevertCustomError(promise, reason) {
+    try {
+        await promise
+        expect.fail('Expected promise to throw but it didn\'t')
+    } catch (revert) {
+        // TRUFFLE CAN NOT DECODE CUSTOM ERRORS, FUCK THIS
+        // console.log(JSON.stringify(revert))
+        //  if (reason) {
+        //     // expect(revert.message).to.include(reason);
+        //     const reasonId = web3.utils.keccak256(`${reason}()`).substr(0, 10)
+        //     expect(JSON.stringify(revert), `Expected custom error ${reason} (${reasonId})`).to.include(reasonId)
+        //  }
+    }
 }
 
 contract('UnoAutoStrategy', (accounts) => {
@@ -157,25 +173,25 @@ contract('UnoAutoStrategy', (accounts) => {
         describe('reverts', () => {
             it('reverts if provided with the wrong poolID', async () => {
                 const poolID = await autoStrategy.poolID()
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.deposit(poolID.add(new BN(1)), 0, 0, 0, 0, account1, constants.ZERO_ADDRESS, {
                         from: account1
                     }),
                     'BAD_POOL_ID'
                 )
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.depositETH(poolID.add(new BN(1)), 0, 0, 0, account1, constants.ZERO_ADDRESS, {
                         from: account1
                     }),
                     'BAD_POOL_ID'
                 )
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.depositSingleAsset(poolID.add(new BN(1)), account1, 0, ['0x', '0x'], 0, 0, account1, constants.ZERO_ADDRESS, {
                         from: account1
                     }),
                     'BAD_POOL_ID'
                 )
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.depositSingleETH(poolID.add(new BN(1)), ['0x', '0x'], 0, 0, account1, constants.ZERO_ADDRESS, {
                         from: account1
                     }),
@@ -430,25 +446,25 @@ contract('UnoAutoStrategy', (accounts) => {
         describe('reverts', () => {
             it('reverts if provided with the wrong poolID', async () => {
                 const poolID = await autoStrategy.poolID()
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.withdraw(poolID.add(new BN(1)), 0, 0, 0, account1, {
                         from: account1
                     }),
                     'BAD_POOL_ID'
                 )
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.withdrawETH(poolID.add(new BN(1)), 0, 0, 0, account1, {
                         from: account1
                     }),
                     'BAD_POOL_ID'
                 )
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.withdrawSingleAsset(poolID.add(new BN(1)), 0, account1, ['0x', '0x'], account1, {
                         from: account1
                     }),
                     'BAD_POOL_ID'
                 )
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.withdrawSingleETH(poolID.add(new BN(1)), 0, ['0x', '0x'], account1, {
                         from: account1
                     }),
@@ -729,7 +745,7 @@ contract('UnoAutoStrategy', (accounts) => {
         describe('reverts', () => {
             it('reverts if called not by liquidity manager', async () => {
                 const poolID = await autoStrategy.poolID()
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.moveLiquidity(poolID.add(new BN(1)), '0x', '0x', 0, 0, {
                         from: account1
                     }),
@@ -742,7 +758,7 @@ contract('UnoAutoStrategy', (accounts) => {
                 await timeMachine.revertToSnapshot(snapshotId)
                 console.log(`### Reverting to snapshot: ${snapshotId}`)
 
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.moveLiquidity(poolID.add(new BN(1)), '0x', '0x', 0, 0, {
                         from: liquidityManager
                     }),
@@ -770,7 +786,7 @@ contract('UnoAutoStrategy', (accounts) => {
                     from: account1
                 })
 
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.moveLiquidity(poolID, '0x', '0x', 0, 0, {
                         from: liquidityManager
                     }),
@@ -949,6 +965,9 @@ contract('UnoAutoStrategy', (accounts) => {
                 const strategyTokenBalance = await strategyToken.balanceOf(account1)
                 const totalSupply = await strategyToken.totalSupply()
 
+                console.log(stakeA.toString(), assetRouterStakeA.mul(strategyTokenBalance).div(totalSupply).toString())
+                console.log(stakeB.toString(), assetRouterStakeB.mul(strategyTokenBalance).div(totalSupply).toString())
+
                 approxeq(
                     stakeA,
                     assetRouterStakeA.mul(strategyTokenBalance).div(totalSupply),
@@ -998,29 +1017,29 @@ contract('UnoAutoStrategy', (accounts) => {
         describe('reverts', () => {
             it('reverts deposit if paused', async () => {
                 const poolID = await autoStrategy.poolID()
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.deposit(poolID, 0, 0, 0, 0, account1, constants.ZERO_ADDRESS, {
                         from: account1
                     }),
-                    'PAUSABLE: PAUSED'
+                    'PAUSABLE_PAUSED'
                 )
             })
             it('reverts withdraw if paused', async () => {
                 const poolID = await autoStrategy.poolID()
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.withdraw(poolID, 0, 0, 0, account1, {
                         from: account1
                     }),
-                    'PAUSABLE: PAUSED'
+                    'PAUSABLE_PAUSED'
                 )
             })
             it('reverts moveLiquidity if paused', async () => {
                 const poolID = await autoStrategy.poolID()
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.moveLiquidity(poolID.add(new BN(1)), '0x', '0x', 0, 0, {
                         from: account1
                     }),
-                    'PAUSABLE: PAUSED'
+                    'PAUSABLE_PAUSED'
                 )
             })
         })
