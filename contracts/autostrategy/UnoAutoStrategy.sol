@@ -108,6 +108,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
     event Withdraw(uint256 indexed poolID, address indexed from, address indexed recipient, uint256 amountLP);
 
     event MoveLiquidity(uint256 indexed previousPoolID, uint256 indexed nextPoolID);
+    event CollectFee(address indexed recipient, uint256 fee);
 
     //To save contract size
     error PAUSED();
@@ -588,15 +589,19 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         } else if(accessManager.hasRole(FEE_COLLECTOR_ROLE, _address)){
             fee = _getReferrerFee(address(0)) * 2;
             _balance += (referrerInfo[_address].feeCollected + fee) / 1 ether;
+            // Get _address'es referrer fee
+            if(referrers[_address] != address(0)){
+                fee += _getReferrerFee(referrers[_address]) * 2;
+            }
         } else {
             uint256 _fee = _getReferrerFee(_address);
-            fee = _fee * 2;
             _balance += (referrerInfo[_address].feeCollected + _fee) / 1 ether;
-        }
 
-        // Get _address'es referrer fee
-        if(referrers[_address] != _address){
-           fee += _getReferrerFee(referrers[_address]) * 2;
+            fee = _fee * 2;
+            // Get _address'es referrer fee
+            if(referrers[_address] != _address){
+                fee += _getReferrerFee(referrers[_address]) * 2;
+            }
         }
 
         if(_balance != 0){
@@ -644,6 +649,8 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         (uint256 balanceLP,,) = pool.assetRouter.userStake(address(this), pool.pool);
         uint256 amountLP = balanceLP - reserveLP;
 
+        //TODO: i think the fee is taken immediatly because _collectFee adds tokens to totalSupply after _totalSupply is taken here essentialy dividing it
+        //todo: _collectFee before?//YEP! because the fee should not get collected immediatly, you had nothing to do with the pool before mint so why collect fee from you?
         uint256 _totalSupply = totalSupply();
         if (_totalSupply == 0) {
             liquidity = amountLP - MINIMUM_LIQUIDITY;
@@ -659,15 +666,18 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         address _referrer = referrers[msg.sender];
         // Can change referrer only for sender
         if(_referrer != referrer){
-            uint256 balance = balanceOf(msg.sender);
-            // Update referrer fee & subtract balance from referrer's deposits
-            _collectFee(_referrer);
-            referrerInfo[_referrer].deposits -= balance;
-
-            // Add balance to new referrer's deposits
             referrers[msg.sender] = referrer;
-            _collectFee(referrer);
-            referrerInfo[referrer].deposits += balance;
+            uint256 balance = balanceOf(msg.sender);
+            // If == 0, we don't need to call _collectFee
+            if(balance > 0){
+                // Update referrer fee & subtract balance from referrer's deposits
+                _collectFee(_referrer);
+                referrerInfo[_referrer].deposits -= balance;
+
+                // Add balance to new referrer's deposits
+                _collectFee(referrer);
+                referrerInfo[referrer].deposits += balance;
+            }
         }
 
         _mint(to, liquidity);
@@ -676,7 +686,8 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
 
     function burn(uint256 liquidity) internal returns (uint256 amountLP) {
         // Collect fee for the caller to their address
-        collectFee(msg.sender);
+        //TODO: cleect fee here bacuase you need to be in the pool of peaple who the fee is collected from because you participated
+        liquidity += collectFee(msg.sender);
 
         PoolInfo memory pool = pools[poolID];
         (uint256 balanceLP,,) = pool.assetRouter.userStake(address(this), pool.pool);
@@ -712,6 +723,8 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
             _mint(recipient, fee);
             fantomTotalSupply -= referrerInfo[referrer].feeCollected;
             referrerInfo[referrer].feeCollected = 0;
+
+            emit CollectFee(recipient, fee);
         }
     }
 

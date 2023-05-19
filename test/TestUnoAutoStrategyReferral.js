@@ -26,9 +26,11 @@ const account2 = '0x72A53cDBBcc1b9efa39c834A540550e23463AAcB' // -u
 const account3 = '0x7EF2D7B88D43F1831241F0dD63E0bdeF048Ba8aC' // -u
 const distributor = '0x2aae5d0f3bee441acc1fb2abe9c2672a54f4bb48' // -u
 
-const amounts = [new BN('100000000000')]
+const amounts = [new BN('100000000000'), new BN('1000')]
 
 approxeq = (bn1, bn2, epsilon, message) => {
+    console.log(bn1.toString())
+    console.log(bn2.toString())
     const amountDelta = bn1.sub(bn2).add(epsilon)
     assert.ok(!amountDelta.isNeg(), message)
 }
@@ -37,7 +39,9 @@ contract('UnoAutoStrategy', (accounts) => {
     const admin = accounts[0]
     const pauser = accounts[1]
     const liquidityManager = accounts[2]
-    const feeCollector = accounts[2]
+    const feeCollector = accounts[3]
+    const randomAccount = accounts[5]
+    const account4 = accounts[4]
 
     let accessManager
 
@@ -45,7 +49,6 @@ contract('UnoAutoStrategy', (accounts) => {
     let autoStrategy
 
     let snapshotId
-    let snapshotIdBeforeDeposit
 
     let assetRouterQuickswap
     let assetRouterSushiswap
@@ -102,125 +105,407 @@ contract('UnoAutoStrategy', (accounts) => {
         const snapshot = await timeMachine.takeSnapshot()
         snapshotId = snapshot.result
     })
-    describe('Deposits', () => {
-        describe('deposit tokens', () => {
-            let id
+    describe('Collect Fee', () => {
+        let id
 
-            let balanceBeforeAcc1
-            let balanceBeforeAcc2
-            let balanceBefore1
-            let balanceBefore2
-            let block1; let
-                block2
-            before(async () => {
-                id = await autoStrategy.poolID()
+        let balanceBeforeAcc1
+        let balanceBeforeAcc2
+        let balanceBefore1
+        let balanceBefore2
+        let block1; let
+            block2
+        let tokenA
+        let tokenB
+        before(async () => {
+            id = await autoStrategy.poolID()
 
-                const data = await autoStrategy.pools(id)
+            const data = await autoStrategy.pools(id)
 
-                const tokenA = await IERC20.at(data.tokenA)
-                const tokenB = await IERC20.at(data.tokenB)
+            tokenA = await IERC20.at(data.tokenA)
+            tokenB = await IERC20.at(data.tokenB)
 
-                await tokenA.approve(autoStrategy.address, amounts[0], {
-                    from: account1
-                })
-                await tokenB.approve(autoStrategy.address, amounts[0], {
-                    from: account1
-                })
-
-                await tokenA.transfer(account2, amounts[0], {
-                    from: account1
-                })
-                await tokenB.transfer(account2, amounts[0], {
-                    from: account1
-                })
-
-                await tokenA.approve(autoStrategy.address, amounts[0], {
-                    from: account2
-                })
-                await tokenB.approve(autoStrategy.address, amounts[0], {
-                    from: account2
-                })
-
-                // Deposit
-                await autoStrategy.deposit(id, amounts[0], amounts[0], 0, 0, account1, constants.ZERO_ADDRESS, {
-                    from: account1
-                })
-                block1 = await web3.eth.getBlock('latest')
-                balanceBeforeAcc1 = await autoStrategy.balanceOf(account1)
-                balanceBefore1 = await autoStrategy.balanceOf(constants.ZERO_ADDRESS)
-
-                await autoStrategy.deposit(id, amounts[0], amounts[0], 0, 0, account2, account3, {
-                    from: account2
-                })
-                block2 = await web3.eth.getBlock('latest')
-                balanceBeforeAcc2 = await autoStrategy.balanceOf(account2)
-                balanceBefore2 = await autoStrategy.balanceOf(account3)
+            await tokenA.approve(autoStrategy.address, amounts[0], {
+                from: account1
             })
-            it('Collects fee', async () => {
-                await time.increase(31536000)// 1 year after
+            await tokenB.approve(autoStrategy.address, amounts[0], {
+                from: account1
+            })
 
-                // should fail silently because it throws return on address (0)
-                await autoStrategy.collectFee(constants.ZERO_ADDRESS, { from: account1 })
+            await tokenA.transfer(account2, amounts[0], {
+                from: account1
+            })
+            await tokenB.transfer(account2, amounts[0], {
+                from: account1
+            })
+
+            await tokenA.approve(autoStrategy.address, amounts[0], {
+                from: account2
+            })
+            await tokenB.approve(autoStrategy.address, amounts[0], {
+                from: account2
+            })
+
+            // Deposit
+            await autoStrategy.deposit(id, amounts[0], amounts[0], 0, 0, account1, constants.ZERO_ADDRESS, {
+                from: account1
+            })
+            block1 = await web3.eth.getBlock('latest')
+            balanceBeforeAcc1 = await autoStrategy.balanceOf(account1)
+            balanceBefore1 = await autoStrategy.balanceOf(constants.ZERO_ADDRESS)
+
+            await autoStrategy.deposit(id, amounts[0], amounts[0], 0, 0, account2, account3, {
+                from: account2
+            })
+            block2 = await web3.eth.getBlock('latest')
+            balanceBeforeAcc2 = await autoStrategy.balanceOf(account2)
+            balanceBefore2 = await autoStrategy.balanceOf(account3)
+        })
+        let block3
+        let block4
+        let expectedFee
+        let expectedFee2
+        it('Collects fee after 1 year', async () => {
+            // even though we did not mint fee yet, totalSupply is already increased because of fantomTotalSupply
+            // TODO: does not act like i thought it would
+            const expectedTotalDeposits = balanceBeforeAcc2.add(balanceBeforeAcc1).add(new BN('1000'))/* .add((new BN((block2.timestamp - block1.timestamp).toString())).mul(new BN('317097919')).mul(new BN('2')).mul(balanceBeforeAcc1.add(new BN('1000')))
+                .div(new BN('1000000000000000000'))) */
+            assert.equal(
+                expectedTotalDeposits.toString(),
+                (await autoStrategy.totalSupply()).toString(),
+                'Total Supply not correct'
+            )
+            await time.increase(31536000)// 1 year after
+
+            // should fail silently because it throws return on address (0)
+            let tx = await autoStrategy.collectFee(constants.ZERO_ADDRESS, { from: account1 })
+            expectEvent.notEmitted(tx, 'CollectFee')
+            assert.equal(
+                balanceBefore1.toString(),
+                (await autoStrategy.balanceOf(constants.ZERO_ADDRESS)).sub(balanceBefore1).toString(),
+                'Token balance changed after collectFee on address (0)'
+            )
+
+            tx = await autoStrategy.collectFee(feeCollector, { from: account1 })
+            block3 = await web3.eth.getBlock('latest')
+            expectedFee = (new BN((block3.timestamp - block1.timestamp).toString())).mul(new BN('317097919')).mul(new BN('2')).mul(balanceBeforeAcc1.add(new BN('1000')))
+                .div(new BN('1000000000000000000'))
+            expectEvent(tx, 'CollectFee', {
+                recipient: feeCollector,
+                fee: expectedFee
+            })
+            const balanceFeeCollector = await autoStrategy.balanceOf(feeCollector)
+            assert.equal(
+                expectedFee.toString(),
+                balanceFeeCollector.toString(),
+                'Token balance not changed for fee collector after collectFee'
+            )
+
+            tx = await autoStrategy.collectFee(account3, { from: account1 })
+            block4 = await web3.eth.getBlock('latest')
+            expectedFee2 = (new BN((block4.timestamp - block2.timestamp).toString())).mul(new BN('317097919')).mul(balanceBeforeAcc2)
+                .div(new BN('1000000000000000000'))
+            expectEvent(tx, 'CollectFee', {
+                recipient: account3,
+                fee: expectedFee2
+            })
+            assert.equal(
+                expectedFee2.toString(),
+                (await autoStrategy.balanceOf(account3)).sub(balanceBefore2).toString(),
+                'Token balance not changed for account3 after collectFee'
+            )
+        })
+        it('Collects fee after another year', async () => {
+            await time.increase(31536000)// another 1 year after
+            const balanceFeeCollectorBefore = await autoStrategy.balanceOf(feeCollector)
+            let tx = await autoStrategy.collectFee(feeCollector, { from: account1 })
+            expectEvent(tx, 'CollectFee', {
+                recipient: feeCollector
+            })
+            // We add expectedFee2 because it was not claimed yet
+            // We loose precision here because we divide first then add, so we use approxeq with 1 as a param
+            const expectedFee3 = (new BN(block4.timestamp - block3.timestamp)).mul(new BN('317097919')).mul(new BN('2')).mul((expectedFee).add(balanceBeforeAcc1.add(new BN('1000'))))
+                .div(new BN('1000000000000000000'))
+            const expectedFee4 = (new BN(((await web3.eth.getBlock('latest')).timestamp - block4.timestamp).toString())).mul(new BN('317097919')).mul(new BN('2')).mul((expectedFee).add(expectedFee2).add(balanceBeforeAcc1.add(new BN('1000'))))
+                .div(new BN('1000000000000000000'))
+            // expectedFee2 is added because we did not collect it earlier
+            approxeq(
+                expectedFee2.add(expectedFee3).add(expectedFee4),
+                (await autoStrategy.balanceOf(feeCollector)).sub(balanceFeeCollectorBefore),
+                new BN(2),
+                'Token balance not changed for fee collector after collectFee'
+            )
+
+            const balanceAcc3Before = await autoStrategy.balanceOf(account3)
+            tx = await autoStrategy.collectFee(account3, { from: account1 })
+            const expectedFee5 = (new BN(((await web3.eth.getBlock('latest')).timestamp - block4.timestamp).toString())).mul(new BN('317097919')).mul(balanceBeforeAcc2)
+                .div(new BN('1000000000000000000'))
+            expectEvent(tx, 'CollectFee', {
+                recipient: account3,
+                fee: expectedFee5
+            })
+            assert.equal(
+                expectedFee5.toString(),
+                (await autoStrategy.balanceOf(account3)).sub(balanceAcc3Before).toString(),
+                'Token balance not changed for acc3 after collectFee'
+            )
+        })
+        let block5
+        it('Changes referrer', async () => {
+            await time.increase(31536000)// another 1 year after
+            await tokenA.transfer(account2, amounts[0], {
+                from: account1
+            })
+            await tokenB.transfer(account2, amounts[0], {
+                from: account1
+            })
+            await tokenA.transfer(account3, amounts[1], {
+                from: account1
+            })
+            await tokenB.transfer(account3, amounts[1], {
+                from: account1
+            })
+            await tokenA.approve(autoStrategy.address, amounts[0], {
+                from: account2
+            })
+            await tokenB.approve(autoStrategy.address, amounts[0], {
+                from: account2
+            })
+            await tokenA.approve(autoStrategy.address, amounts[1], {
+                from: account3
+            })
+            await tokenB.approve(autoStrategy.address, amounts[1], {
+                from: account3
+            })
+
+            await autoStrategy.deposit(id, amounts[0], amounts[0], 0, 0, account2, account4, {
+                from: account2
+            })
+            const balance = await autoStrategy.balanceOf(account2)
+            block5 = await web3.eth.getBlock('latest')
+
+            await time.increase(31536000)// another 1 year after
+
+            const expectedA = (await autoStrategy.userStake(account3)).stakeA.add((await autoStrategy.userStake(account3)).leftoverA)
+            const expectedB = (await autoStrategy.userStake(account3)).stakeB.add((await autoStrategy.userStake(account3)).leftoverB)
+            const balanceABefore = await tokenA.balanceOf(account3)
+            const balanceBBefore = await tokenB.balanceOf(account3)
+            let tx = await autoStrategy.withdraw(id, 0, 0, 0, account3, { from: account3 })
+            expectEvent(tx, 'CollectFee', {
+                recipient: account3
+            })
+
+            const balanceAAfter = await tokenA.balanceOf(account3)
+            approxeq(
+                expectedA,
+                balanceAAfter.sub(balanceABefore),
+                new BN(1000),
+                'TokenA balance not correct'
+            )
+
+            const balanceBAfter = await tokenB.balanceOf(account3)
+            approxeq(
+                expectedB,
+                balanceBAfter.sub(balanceBBefore),
+                new BN(1000),
+                'TokenB balance not correct'
+            )
+
+            tx = await autoStrategy.collectFee(account4, { from: account4 })
+            const expectedFee6 = (new BN(((await web3.eth.getBlock('latest')).timestamp - block5.timestamp).toString())).mul(new BN('317097919')).mul(balance)
+                .div(new BN('1000000000000000000'))
+            expectEvent(tx, 'CollectFee', {
+                recipient: account4,
+                fee: expectedFee6
+            })
+
+            assert.equal(
+                expectedFee6.toString(),
+                (await autoStrategy.balanceOf(account4)).toString(),
+                'Token balance not changed for acc4 after collectFee'
+            )
+        })
+    })
+
+    // TODO: check comming from previous verison
+    // TODO: check transfers
+    // Todo: totalSupply check
+    describe('Collect Fee on Withdraw', () => {
+        let id
+
+        let tokenA
+        let tokenB
+        before(async () => {
+            await timeMachine.revertToSnapshot(snapshotId)
+            id = await autoStrategy.poolID()
+
+            const data = await autoStrategy.pools(id)
+
+            tokenA = await IERC20.at(data.tokenA)
+            tokenB = await IERC20.at(data.tokenB)
+
+            await tokenA.approve(autoStrategy.address, amounts[0], {
+                from: account1
+            })
+            await tokenB.approve(autoStrategy.address, amounts[0], {
+                from: account1
+            })
+
+            await tokenA.transfer(account2, amounts[0], {
+                from: account1
+            })
+            await tokenB.transfer(account2, amounts[0], {
+                from: account1
+            })
+
+            await tokenA.approve(autoStrategy.address, amounts[0], {
+                from: account2
+            })
+            await tokenB.approve(autoStrategy.address, amounts[0], {
+                from: account2
+            })
+
+            // Deposit
+            await autoStrategy.deposit(id, amounts[0], amounts[0], 0, 0, account1, constants.ZERO_ADDRESS, {
+                from: account1
+            })
+
+            await autoStrategy.deposit(id, amounts[0], amounts[0], 0, 0, account2, account3, {
+                from: account2
+            })
+        })
+        it('Collects fee', async () => {
+            await time.increase(31536000)// 1 year after
+            {
+                const {
+                    stakeA, stakeB, leftoverA, leftoverB
+                } = await autoStrategy.userStake(constants.ZERO_ADDRESS)
+
                 assert.equal(
-                    balanceBefore1.toString(),
-                    (await autoStrategy.balanceOf(constants.ZERO_ADDRESS)).sub(balanceBefore1).toString(),
-                    'Token balance changed after collectFee on address (0)'
+                    stakeA.toString(),
+                    '0',
+                    'TokenA balance not null'
+                )
+                assert.equal(
+                    stakeB.toString(),
+                    '0',
+                    'TokenB balance not null'
+                )
+            }
+
+            {
+                const {
+                    stakeA, stakeB, leftoverA, leftoverB
+                } = await autoStrategy.userStake(feeCollector)
+                const balanceABefore = await tokenA.balanceOf(feeCollector)
+                const balanceBBefore = await tokenB.balanceOf(feeCollector)
+                const tx = await autoStrategy.withdraw(id, 0, 0, 0, feeCollector, { from: feeCollector })
+                expectEvent(tx, 'CollectFee', {
+                    recipient: feeCollector
+                })
+
+                assert.equal(
+                    (await autoStrategy.userStake(feeCollector)).stakeA.add((await autoStrategy.userStake(feeCollector)).leftoverA).toString(),
+                    '0',
+                    'TokenA balance not null'
                 )
 
-                await autoStrategy.collectFee(feeCollector, { from: account1 })
-                const block3 = await web3.eth.getBlock('latest')
-                const expectedFee = (new BN((block3.timestamp - block1.timestamp).toString())).mul(new BN('317097919')).mul(new BN('2')).mul(balanceBeforeAcc1.add(new BN('1000')))
-                    .div(new BN('1000000000000000000'))
-                const balanceFeeCollector = await autoStrategy.balanceOf(feeCollector)
                 assert.equal(
-                    expectedFee.toString(),
-                    balanceFeeCollector.toString(),
-                    'Token balance not changed for fee collector after collectFee'
+                    (await autoStrategy.userStake(feeCollector)).stakeB.add((await autoStrategy.userStake(feeCollector)).leftoverB).toString(),
+                    '0',
+                    'TokenB balance not null'
                 )
 
-                await autoStrategy.collectFee(account3, { from: account1 })
-                const block4 = await web3.eth.getBlock('latest')
-                const expectedFee2 = (new BN((block4.timestamp - block2.timestamp).toString())).mul(new BN('317097919')).mul(balanceBeforeAcc2)
-                    .div(new BN('1000000000000000000'))
-                assert.equal(
-                    expectedFee2.toString(),
-                    (await autoStrategy.balanceOf(account3)).sub(balanceBefore2).toString(),
-                    'Token balance not changed for account3 after collectFee'
-                )
-
-                await time.increase(31536000)// another 1 year after
-                const balanceFeeCollectorBefore = await autoStrategy.balanceOf(feeCollector)
-                await autoStrategy.collectFee(feeCollector, { from: account1 })
-                // We add expectedFee2 because it was not claimed yet
-                // We loose precision here because we divide first then add, so we use approxeq with 1 as a param
-                const expectedFee3 = (new BN(block4.timestamp - block3.timestamp)).mul(new BN('317097919')).mul(new BN('2')).mul((expectedFee).add(balanceBeforeAcc1.add(new BN('1000'))))
-                    .div(new BN('1000000000000000000'))
-                const expectedFee4 = (new BN(((await web3.eth.getBlock('latest')).timestamp - block4.timestamp).toString())).mul(new BN('317097919')).mul(new BN('2')).mul((expectedFee).add(expectedFee2).add(balanceBeforeAcc1.add(new BN('1000'))))
-                    .div(new BN('1000000000000000000'))
-                // expectedFee2 is added because we did not collect it earlier
+                // This won't be exact because of slippage
+                const balanceAAfter = await tokenA.balanceOf(feeCollector)
                 approxeq(
-                    expectedFee2.add(expectedFee3).add(expectedFee4),
-                    (await autoStrategy.balanceOf(feeCollector)).sub(balanceFeeCollectorBefore),
-                    new BN(1),
-                    'Token balance not changed for fee collector after collectFee'
+                    stakeA.add(leftoverA),
+                    balanceAAfter.sub(balanceABefore),
+                    new BN(1000),
+                    'Token A balance not changed for fee collector after collectFee'
                 )
 
-                const balanceAcc3Before = await autoStrategy.balanceOf(account3)
-                await autoStrategy.collectFee(account3, { from: account1 })
-                const expectedFee5 = (new BN(((await web3.eth.getBlock('latest')).timestamp - block4.timestamp).toString())).mul(new BN('317097919')).mul(balanceBeforeAcc2)
-                    .div(new BN('1000000000000000000'))
-                assert.equal(
-                    expectedFee5.toString(),
-                    (await autoStrategy.balanceOf(account3)).sub(balanceAcc3Before).toString(),
-                    'Token balance not changed for acc3 after collectFee'
+                const balanceBAfter = await tokenB.balanceOf(feeCollector)
+                approxeq(
+                    stakeB.add(leftoverB),
+                    balanceBAfter.sub(balanceBBefore),
+                    new BN(1000),
+                    'Token B balance not changed for fee collector after collectFee'
                 )
+            }
+
+            const {
+                stakeA, stakeB, leftoverA, leftoverB
+            } = await autoStrategy.userStake(account3)
+            const balanceABefore = await tokenA.balanceOf(account3)
+            const balanceBBefore = await tokenB.balanceOf(account3)
+            const tx = await autoStrategy.withdraw(id, 0, 0, 0, account3, { from: account3 })
+            expectEvent(tx, 'CollectFee', {
+                recipient: account3
             })
-            // TODO: check collectFee on withdraw
-            // TODO: check comming from previous verison
-            // TODO: check userStake calculation
-            // TODO: check transfers
-            // TODO: check withdrawals affecting fee amount (calling _collectFee)
-            // TODO: totalSupply fantomTotalSupply check
+
+            assert.equal(
+                (await autoStrategy.userStake(account3)).stakeA.add((await autoStrategy.userStake(account3)).leftoverA).toString(),
+                '0',
+                'TokenA balance not null'
+            )
+
+            assert.equal(
+                (await autoStrategy.userStake(account3)).stakeB.add((await autoStrategy.userStake(account3)).leftoverB).toString(),
+                '0',
+                'TokenB balance not null'
+            )
+
+            // This won't be exact because of slippage
+            const balanceAAfter = await tokenA.balanceOf(account3)
+            approxeq(
+                stakeA.add(leftoverA),
+                balanceAAfter.sub(balanceABefore),
+                new BN(1000),
+                'Token A balance not changed for fee collector after collectFee'
+            )
+
+            const balanceBAfter = await tokenB.balanceOf(account3)
+            approxeq(
+                stakeB.add(leftoverB),
+                balanceBAfter.sub(balanceBBefore),
+                new BN(1000),
+                'Token B balance not changed for fee collector after collectFee'
+            )
+        })
+        it('Not collects fee after full withdrawal', async () => {
+            const balance = await autoStrategy.balanceOf(account2)
+            let tx = await autoStrategy.withdraw(id, balance, 0, 0, account2, { from: account2 })
+            // there is no fee for account2
+            expectEvent.notEmitted(tx, 'CollectFee')
+            assert.equal(
+                (await autoStrategy.balanceOf(account2)).toString(),
+                '0',
+                'Token balance not null'
+            )
+            // We transfer all account2's tokens to not affect userStake
+            tx = await autoStrategy.collectFee(account3, { from: account3 })
+            expectEvent(tx, 'CollectFee', { recipient: account3 })
+            await autoStrategy.transfer(randomAccount, await autoStrategy.balanceOf(account3), { from: account3 })
+            await time.increase(31536000)// 1 year after
+            assert.equal(
+                ((await autoStrategy.userStake(account3)).stakeA).add((await autoStrategy.userStake(account3)).leftoverA).toString(),
+                '0',
+                'Fee staked not null'
+            )
+            assert.equal(
+                ((await autoStrategy.userStake(account3)).stakeB).add((await autoStrategy.userStake(account3)).leftoverB).toString(),
+                '0',
+                'Fee staked not null'
+            )
+
+            const balanceAcc3Before = await autoStrategy.balanceOf(account3)
+            tx = await autoStrategy.collectFee(account3, { from: account1 })
+            expectEvent.notEmitted(tx, 'CollectFee')
+            assert.equal(
+                (await autoStrategy.balanceOf(account3)).toString(),
+                balanceAcc3Before.toString(),
+                'Token balance changed'
+            )
         })
     })
 })
