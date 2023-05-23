@@ -16,6 +16,7 @@ const FarmFactory = artifacts.require('UnoFarmFactory')
 const AccessManager = artifacts.require('UnoAccessManager')
 
 const AutoStrategy = artifacts.require('UnoAutoStrategy')
+const AutoStrategyV0 = artifacts.require('UnoAutoStrategyV0')
 const AutoStrategyFactory = artifacts.require('UnoAutoStrategyFactory')
 
 const pool1 = '0xafb76771c98351aa7fca13b130c9972181612b54' // usdt-usdc quickswap
@@ -166,9 +167,7 @@ contract('UnoAutoStrategy', (accounts) => {
         let expectedFee2
         it('Collects fee after 1 year', async () => {
             // even though we did not mint fee yet, totalSupply is already increased because of fantomTotalSupply
-            // TODO: does not act like i thought it would
-            const expectedTotalDeposits = balanceBeforeAcc2.add(balanceBeforeAcc1).add(new BN('1000'))/* .add((new BN((block2.timestamp - block1.timestamp).toString())).mul(new BN('317097919')).mul(new BN('2')).mul(balanceBeforeAcc1.add(new BN('1000')))
-                .div(new BN('1000000000000000000'))) */
+            const expectedTotalDeposits = balanceBeforeAcc2.add(balanceBeforeAcc1).add(new BN('1000'))
             assert.equal(
                 expectedTotalDeposits.toString(),
                 (await autoStrategy.totalSupply()).toString(),
@@ -198,6 +197,12 @@ contract('UnoAutoStrategy', (accounts) => {
                 expectedFee.toString(),
                 balanceFeeCollector.toString(),
                 'Token balance not changed for fee collector after collectFee'
+            )
+            const expectedTotalDeposits2 = balanceBeforeAcc2.add(balanceBeforeAcc1).add(new BN('1000')).add(expectedFee)
+            assert.equal(
+                expectedTotalDeposits2.toString(),
+                (await autoStrategy.totalSupply()).toString(),
+                'Total Supply not correct'
             )
 
             tx = await autoStrategy.collectFee(account3, { from: account1 })
@@ -326,9 +331,7 @@ contract('UnoAutoStrategy', (accounts) => {
         })
     })
 
-    // TODO: check comming from previous verison
     // TODO: check transfers
-    // Todo: totalSupply check
     describe('Collect Fee on Withdraw', () => {
         let id
 
@@ -336,6 +339,9 @@ contract('UnoAutoStrategy', (accounts) => {
         let tokenB
         before(async () => {
             await timeMachine.revertToSnapshot(snapshotId)
+            const snapshot = await timeMachine.takeSnapshot()
+            snapshotId = snapshot.result
+
             id = await autoStrategy.poolID()
 
             const data = await autoStrategy.pools(id)
@@ -505,6 +511,278 @@ contract('UnoAutoStrategy', (accounts) => {
                 (await autoStrategy.balanceOf(account3)).toString(),
                 balanceAcc3Before.toString(),
                 'Token balance changed'
+            )
+        })
+    })
+    describe('Sets correct totalSupply', () => {
+        let id
+
+        let tokenA
+        let tokenB
+        let block1
+        let block2
+        let balanceBefore1
+        let balanceBefore2
+        before(async () => {
+            await timeMachine.revertToSnapshot(snapshotId)
+            const snapshot = await timeMachine.takeSnapshot()
+            snapshotId = snapshot.result
+            id = await autoStrategy.poolID()
+
+            const data = await autoStrategy.pools(id)
+
+            tokenA = await IERC20.at(data.tokenA)
+            tokenB = await IERC20.at(data.tokenB)
+
+            await tokenA.approve(autoStrategy.address, amounts[0], {
+                from: account1
+            })
+            await tokenB.approve(autoStrategy.address, amounts[0], {
+                from: account1
+            })
+            // Deposit
+            await autoStrategy.deposit(id, amounts[0], amounts[0], 0, 0, account1, constants.ZERO_ADDRESS, {
+                from: account1
+            })
+            block1 = await web3.eth.getBlock('latest')
+            balanceBefore1 = await autoStrategy.balanceOf(account1)
+
+            await time.increase(31536000)// 1 year after
+
+            await tokenA.approve(autoStrategy.address, amounts[0], {
+                from: account1
+            })
+            await tokenB.approve(autoStrategy.address, amounts[0], {
+                from: account1
+            })
+            await autoStrategy.deposit(id, amounts[0], amounts[0], 0, 0, account2, constants.ZERO_ADDRESS, {
+                from: account1
+            })
+            block2 = await web3.eth.getBlock('latest')
+            balanceBefore2 = await autoStrategy.balanceOf(account2)
+        })
+        it('Sets correct totalSupply', async () => {
+            const expectedTotalDeposits = balanceBefore1.add(balanceBefore2).add(new BN('1000')).add((new BN((block2.timestamp - block1.timestamp).toString())).mul(new BN('317097919')).mul(new BN('2')).mul(balanceBefore1.add(new BN('1000')))
+                .div(new BN('1000000000000000000')))
+            console.log(
+                expectedTotalDeposits.toString(),
+                (await autoStrategy.totalSupply()).toString()
+            )
+            assert.equal(
+                expectedTotalDeposits.toString(),
+                (await autoStrategy.totalSupply()).toString(),
+                'Total Supply not correct'
+            )
+        })
+    })
+    describe('ERC-20 transfers', () => {
+        let block1
+        let balanceBefore1
+        before(async () => {
+            await timeMachine.revertToSnapshot(snapshotId)
+            id = await autoStrategy.poolID()
+
+            const data = await autoStrategy.pools(id)
+
+            tokenA = await IERC20.at(data.tokenA)
+            tokenB = await IERC20.at(data.tokenB)
+
+            await tokenA.approve(autoStrategy.address, amounts[0], {
+                from: account1
+            })
+            await tokenB.approve(autoStrategy.address, amounts[0], {
+                from: account1
+            })
+
+            await tokenA.transfer(account2, amounts[0], {
+                from: account1
+            })
+            await tokenB.transfer(account2, amounts[0], {
+                from: account1
+            })
+
+            await tokenA.approve(autoStrategy.address, amounts[0], {
+                from: account2
+            })
+            await tokenB.approve(autoStrategy.address, amounts[0], {
+                from: account2
+            })
+
+            // Deposit
+            await autoStrategy.deposit(id, amounts[0], amounts[0], 0, 0, account1, account3, {
+                from: account1
+            })
+            block1 = await web3.eth.getBlock('latest')
+            balanceBefore1 = await autoStrategy.balanceOf(account1)
+            // await autoStrategy.deposit(id, amounts[0], amounts[0], 0, 0, account2, account3, {
+            //    from: account2
+            // })
+            // block2 = await web3.eth.getBlock('latest')
+            // balanceBeforeAcc2 = await autoStrategy.balanceOf(account2)
+            // balanceBefore2 = await autoStrategy.balanceOf(account3)
+        })
+
+        it('Transfers correctly', async () => {
+            await time.increase(31536000)// 1 year after
+            let tx = await autoStrategy.transfer(account2, balanceBefore1, {
+                from: account1
+            })
+            const block2 = await web3.eth.getBlock('latest')
+
+            expectEvent(tx, 'Transfer', {
+                from: account1,
+                to: account2,
+                value: balanceBefore1
+            })
+
+            await time.increase(31536000)// 1 year after
+
+            tx = await autoStrategy.collectFee(account3, { from: account1 })
+            const block3 = await web3.eth.getBlock('latest')
+            const expectedFee = (new BN((block2.timestamp - block1.timestamp).toString())).mul(new BN('317097919')).mul(balanceBefore1)
+                .div(new BN('1000000000000000000'))
+            expectEvent(tx, 'CollectFee', {
+                recipient: account3,
+                fee: expectedFee
+            })
+            const balanceAcc3 = await autoStrategy.balanceOf(account3)
+            assert.equal(
+                expectedFee.toString(),
+                balanceAcc3.toString(),
+                'Token balance not changed for acc3 after collectFee'
+            )
+
+            tx = await autoStrategy.collectFee(feeCollector, { from: account1 })
+            const block4 = await web3.eth.getBlock('latest')
+            const expectedFeePrev = (new BN((block2.timestamp - block1.timestamp).toString())).mul(new BN('317097919')).mul(new BN('2')).mul(new BN('1000'))
+                .div(new BN('1000000000000000000'))
+            const expectedFee1 = (new BN((block3.timestamp - block2.timestamp).toString())).mul(new BN('317097919')).mul(new BN('2')).mul((new BN('1000')).add(balanceBefore1))
+                .div(new BN('1000000000000000000'))
+            const expectedFee2 = (new BN((block4.timestamp - block3.timestamp).toString())).mul(new BN('317097919')).mul(new BN('2')).mul((new BN('1000')).add(balanceBefore1).add(expectedFee))
+                .div(new BN('1000000000000000000'))
+
+            // add expected fee because we also collect fee from account3
+            expectEvent(tx, 'CollectFee', {
+                recipient: feeCollector,
+                fee: expectedFee.add(expectedFee1).add(expectedFee2).add(expectedFeePrev)
+            })
+            const balanceFeeCollector = await autoStrategy.balanceOf(feeCollector)
+            assert.equal(
+                expectedFee.add(expectedFee1).add(expectedFee2).add(expectedFeePrev).toString(),
+                balanceFeeCollector.toString(),
+                'Token balance not changed for feeCollector after collectFee'
+            )
+        })
+    })
+    describe('Upgrade from previous version', () => {
+        let id
+        before(async () => {
+            accessManager = await AccessManager.new({ from: admin }) // accounts[0] is admin
+            await accessManager.grantRole(
+                '0xfbd454f36a7e1a388bd6fc3ab10d434aa4578f811acbbcf33afb1c697486313c',
+                distributor,
+                { from: admin }
+            )// DISTRIBUTOR_ROLE
+            await accessManager.grantRole(
+                '0x77e60b99a50d27fb027f6912a507d956105b4148adab27a86d235c8bcca8fa2f',
+                liquidityManager,
+                { from: admin }
+            ) // LIQUIDITY_MANAGER_ROLE
+            await accessManager.grantRole('0x65d7a28e3265b37a6474929f336521b332c1681b933f6cb9f3376673440d862a', pauser, {
+                from: admin
+            }) // PAUSER_ROLE
+            await accessManager.grantRole('0x2dca0f5ce7e75a4b43fe2b0d6f5d0b7a2bf92ecf89f8f0aa17b8308b67038821', feeCollector, {
+                from: admin
+            }) // FEE_COLLECTOR_ROLE
+
+            const autoStrategyImplementation = await AutoStrategyV0.new()
+            autoStrategyFactory = await AutoStrategyFactory.new(autoStrategyImplementation.address, accessManager.address)
+
+            assetRouterQuickswap = await deployProxy(
+                UnoAssetRouterQuickswap,
+                { kind: 'uups', initializer: false }
+            )
+            const farmImplementationQuickswap = await UnoFarmQuickswap.new()
+            await FarmFactory.new(farmImplementationQuickswap.address, accessManager.address, assetRouterQuickswap.address)
+
+            assetRouterSushiswap = await deployProxy(
+                UnoAssetRouterSushiswap,
+                { kind: 'uups', initializer: false }
+            )
+            const farmImplementationSushiswap = await UnoFarmSushiswap.new()
+            await FarmFactory.new(farmImplementationSushiswap.address, accessManager.address, assetRouterSushiswap.address)
+
+            await autoStrategyFactory.approveAssetRouter(assetRouterQuickswap.address, {
+                from: admin
+            })
+            await autoStrategyFactory.approveAssetRouter(assetRouterSushiswap.address, {
+                from: admin
+            })
+
+            await autoStrategyFactory.createStrategy([
+                { pool: pool1, assetRouter: assetRouterQuickswap.address },
+                { pool: pool2, assetRouter: assetRouterSushiswap.address }
+            ])
+
+            autoStrategy = await AutoStrategyV0.at(await autoStrategyFactory.autoStrategies(0))
+        })
+        it('Upgrades version', async () => {
+            id = await autoStrategy.poolID()
+
+            const data = await autoStrategy.pools(id)
+
+            const tokenA = await IERC20.at(data.tokenA)
+            const tokenB = await IERC20.at(data.tokenB)
+
+            await tokenA.approve(autoStrategy.address, amounts[0], {
+                from: account1
+            })
+            await tokenB.approve(autoStrategy.address, amounts[0], {
+                from: account1
+            })
+            await autoStrategy.deposit(id, amounts[0], amounts[0], 0, 0, account1, {
+                from: account1
+            })
+
+            const autoStrategyImplementation = await AutoStrategy.new()
+            await autoStrategyFactory.upgradeStrategies(autoStrategyImplementation.address)
+
+            autoStrategy = await AutoStrategy.at(await autoStrategyFactory.autoStrategies(0))
+
+            await tokenA.transfer(account2, amounts[0], {
+                from: account1
+            })
+            await tokenB.transfer(account2, amounts[0], {
+                from: account1
+            })
+            await tokenA.approve(autoStrategy.address, amounts[0], {
+                from: account2
+            })
+            await tokenB.approve(autoStrategy.address, amounts[0], {
+                from: account2
+            })
+
+            await autoStrategy.deposit(id, amounts[0], amounts[0], 0, 0, account2, constants.ZERO_ADDRESS, {
+                from: account2
+            })
+            const block1 = await web3.eth.getBlock('latest')
+            const ts = await autoStrategy.totalSupply()
+
+            await time.increase(31536000)// 1 year after
+
+            tx = await autoStrategy.collectFee(feeCollector, { from: account1 })
+            const block3 = await web3.eth.getBlock('latest')
+            expectedFee = (new BN((block3.timestamp - block1.timestamp).toString())).mul(new BN('317097919')).mul(new BN('2')).mul(ts)
+                .div(new BN('1000000000000000000'))
+            expectEvent(tx, 'CollectFee', {
+                recipient: feeCollector,
+                fee: expectedFee
+            })
+            const balanceFeeCollector = await autoStrategy.balanceOf(feeCollector)
+            assert.equal(
+                expectedFee.toString(),
+                balanceFeeCollector.toString(),
+                'Token balance not changed for fee collector after collectFee'
             )
         })
     })

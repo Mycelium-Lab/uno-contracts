@@ -7,7 +7,7 @@ import '@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.
 import '@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol';
 
-contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgradeable {
+contract UnoAutoStrategyV0 is Initializable, ERC20Upgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
     /**
      * @dev PoolInfo:
@@ -75,21 +75,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
 
     uint256 private constant MINIMUM_LIQUIDITY = 10**3;
     bytes32 private constant LIQUIDITY_MANAGER_ROLE = keccak256('LIQUIDITY_MANAGER_ROLE');
-    address private constant WMATIC = 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270;
-    bytes32 private constant FEE_COLLECTOR_ROLE = keccak256('FEE_COLLECTOR_ROLE');
-
-    struct ReferrerInfo {
-        uint256 lastFeeCollection;
-        uint256 deposits;
-        uint256 feeCollected;
-    }
-    /// @dev maps referrer address to referrer info
-    mapping(address => ReferrerInfo) private referrerInfo;
-    /// @dev maps referral to referrer
-    mapping(address => address) private referrers;
-    /// @dev This is added to totalSupply internaly to get rid of _mint() inside _collectFee() to avoid recursive fee collection.
-    uint256 private fantomTotalSupply;
-    bool private isInitialized;
+    address public constant WMATIC = 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270;
 
     event DepositPairTokens(uint256 indexed poolID, uint256 amountA, uint256 amountB);
     event DepositPairTokensETH(uint256 indexed poolID, uint256 amountToken, uint256 amountETH);
@@ -108,23 +94,9 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
     event Withdraw(uint256 indexed poolID, address indexed from, address indexed recipient, uint256 amountLP);
 
     event MoveLiquidity(uint256 indexed previousPoolID, uint256 indexed nextPoolID);
-    event CollectFee(address indexed recipient, uint256 fee);
-
-    //To save contract size
-    error PAUSED();
-    error BAD_POOL_ID();
-    error BAD_POOL_COUNT();
-    error CALLER_NOT_LIQUIDITY_MANAGER();
-    error NO_LIQUIDITY();
-    error CANT_CALL_ON_THE_SAME_BLOCK();
-    error BAD_SWAP_A();
-    error BAD_SWAP_B();
-    error INSUFFICIENT_LIQUIDITY();
 
     modifier whenNotPaused(){
-        if(factory.paused()){
-            revert PAUSED();
-        }
+        require(factory.paused() == false, 'PAUSABLE: PAUSED');
         _;
     }
 
@@ -133,9 +105,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
     receive() external payable {}
 
     function initialize(_PoolInfo[] calldata poolInfos, IUnoAccessManager _accessManager) external initializer {
-        if((poolInfos.length < 2) || (poolInfos.length > 50)){
-            revert BAD_POOL_COUNT();
-        }
+        require ((poolInfos.length >= 2) && (poolInfos.length <= 50), 'BAD_POOL_COUNT');
 
         __ERC20_init("UNO-AutoStrategy", "UNO-LP");
         __ReentrancyGuard_init();
@@ -163,7 +133,6 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         accessManager = _accessManager;
         lastMoveInfo.block = block.number;
         factory = IUnoAutoStrategyFactory(msg.sender);
-        isInitialized = true;
     }
 
     /**
@@ -179,10 +148,8 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      * @return sentB - Deposited token B amount.
      * @return liquidity - Total liquidity minted for the {recipient}.
      */
-    function deposit(uint256 pid, uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin, address recipient, address referrer) whenNotPaused nonReentrant external returns (uint256 sentA, uint256 sentB, uint256 liquidity) {
-        if(pid != poolID){
-            revert BAD_POOL_ID();
-        }
+    function deposit(uint256 pid, uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin, address recipient) whenNotPaused nonReentrant external returns (uint256 sentA, uint256 sentB, uint256 liquidity) {
+        require (pid == poolID, 'BAD_POOL_ID');
         PoolInfo memory pool = pools[poolID];
 
         pool.tokenA.safeTransferFrom(msg.sender, address(this), amountA);
@@ -190,7 +157,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
 
         uint256 amountLP;
         (sentA, sentB, amountLP) = pool.assetRouter.deposit(pool.pool, amountA, amountB, amountAMin, amountBMin, address(this));
-        liquidity = mint(recipient, referrer);
+        liquidity = mint(recipient);
 
         if(amountA > sentA){
             pool.tokenA.safeTransfer(msg.sender, amountA - sentA);
@@ -215,10 +182,8 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      * @return sentETH - Deposited ETH amount.
      * @return liquidity - Total liquidity minted for the {recipient}.
      */
-    function depositETH(uint256 pid, uint256 amountToken, uint256 amountTokenMin, uint256 amountETHMin, address recipient, address referrer) whenNotPaused nonReentrant external payable returns (uint256 sentToken, uint256 sentETH, uint256 liquidity) {
-        if(pid != poolID){
-            revert BAD_POOL_ID();
-        }
+    function depositETH(uint256 pid, uint256 amountToken, uint256 amountTokenMin, uint256 amountETHMin, address recipient) whenNotPaused nonReentrant external payable returns (uint256 sentToken, uint256 sentETH, uint256 liquidity) {
+        require (pid == poolID, 'BAD_POOL_ID');
         PoolInfo memory pool = pools[poolID];
 
         IERC20Upgradeable token;
@@ -233,7 +198,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
 
         uint256 amountLP;
         (sentToken, sentETH, amountLP) = pool.assetRouter.depositETH{value: msg.value}(pool.pool, amountToken, amountTokenMin, amountETHMin, address(this));
-        liquidity = mint(recipient, referrer);
+        liquidity = mint(recipient);
 
         if(amountToken > sentToken){
             token.safeTransfer(msg.sender, amountToken - sentToken);
@@ -259,10 +224,8 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      * @return sent - Total {token} amount sent to the farm. NOTE: Returns dust left from swap in {token}, but if A/B amounts are not correct also returns dust in pool's tokens.
      * @return liquidity - Total liquidity minted for the {recipient}.
      */
-    function depositSingleAsset(uint256 pid, address token, uint256 amount, bytes[2] calldata swapData, uint256 amountAMin, uint256 amountBMin, address recipient, address referrer) whenNotPaused nonReentrant external returns (uint256 sent, uint256 liquidity) {
-        if(pid != poolID){
-            revert BAD_POOL_ID();
-        }
+    function depositSingleAsset(uint256 pid, address token, uint256 amount, bytes[2] calldata swapData, uint256 amountAMin, uint256 amountBMin, address recipient) whenNotPaused nonReentrant external returns (uint256 sent, uint256 liquidity) {
+        require (pid == poolID, 'BAD_POOL_ID');
         PoolInfo memory pool = pools[poolID];
 
         uint256 balanceA = pool.tokenA.balanceOf(address(this));
@@ -273,7 +236,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
 
         uint256 amountLP;
         (sent, amountLP) = pool.assetRouter.depositSingleAsset(pool.pool, token, amount, swapData, amountAMin, amountBMin, address(this));
-        liquidity = mint(recipient, referrer);
+        liquidity = mint(recipient);
 
         IERC20Upgradeable(token).safeTransfer(msg.sender, amount - sent);
         uint256 _balanceA = pool.tokenA.balanceOf(address(this));
@@ -300,10 +263,8 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      * @return sentETH - Total MATIC amount sent to the farm. NOTE: Returns dust left from swap in MATIC, but if A/B amount are not correct also returns dust in pool's tokens.
      * @return liquidity - Total liquidity minted for the {recipient}.
      */
-    function depositSingleETH(uint256 pid, bytes[2] calldata swapData, uint256 amountAMin, uint256 amountBMin, address recipient, address referrer) whenNotPaused nonReentrant external payable returns (uint256 sentETH, uint256 liquidity) {
-        if(pid != poolID){
-            revert BAD_POOL_ID();
-        }
+    function depositSingleETH(uint256 pid, bytes[2] calldata swapData, uint256 amountAMin, uint256 amountBMin, address recipient) whenNotPaused nonReentrant external payable returns (uint256 sentETH, uint256 liquidity) {
+        require (pid == poolID, 'BAD_POOL_ID');
         PoolInfo memory pool = pools[poolID];
 
         uint256 balanceA = pool.tokenA.balanceOf(address(this));
@@ -311,7 +272,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
 
         uint256 amountLP;
         (sentETH, amountLP) = pool.assetRouter.depositSingleETH{value: msg.value}(pool.pool, swapData, amountAMin, amountBMin, address(this));
-        liquidity = mint(recipient, referrer);
+        liquidity = mint(recipient);
 
         payable(msg.sender).transfer(msg.value - sentETH);
         uint256 _balanceA = pool.tokenA.balanceOf(address(this));
@@ -339,9 +300,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      * @return amountB - Token B amount sent to the {recipient}.
      */
     function withdraw(uint256 pid, uint256 liquidity, uint256 amountAMin, uint256 amountBMin, address recipient) whenNotPaused nonReentrant external returns (uint256 amountA, uint256 amountB) {
-        if(pid != poolID){
-            revert BAD_POOL_ID();
-        }
+        require (pid == poolID, 'BAD_POOL_ID');
         PoolInfo memory pool = pools[poolID];
 
         (uint256 leftoverA, uint256 leftoverB) = collectLeftovers(recipient);
@@ -368,9 +327,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      * @return amountETH - MATIC amount sent to the {recipient}.
      */
     function withdrawETH(uint256 pid, uint256 liquidity, uint256 amountTokenMin, uint256 amountETHMin, address recipient) whenNotPaused nonReentrant external returns (uint256 amountToken, uint256 amountETH) {
-        if(pid != poolID){
-            revert BAD_POOL_ID();
-        }
+        require (pid == poolID, 'BAD_POOL_ID');
         PoolInfo memory pool = pools[poolID];
 
         (uint256 leftoverA, uint256 leftoverB) = collectLeftovers(recipient);
@@ -405,9 +362,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      * @return amountB - Token B dust sent to the {recipient}.
      */
     function withdrawSingleAsset(uint256 pid, uint256 liquidity, address token, bytes[2] calldata swapData, address recipient) whenNotPaused nonReentrant external returns (uint256 amountToken, uint256 amountA, uint256 amountB) {
-        if(pid != poolID){
-            revert BAD_POOL_ID();
-        }
+        require (pid == poolID, 'BAD_POOL_ID');
         PoolInfo memory pool = pools[poolID];
 
         (uint256 leftoverA, uint256 leftoverB) = collectLeftovers(recipient);
@@ -434,9 +389,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      * @return amountB - Token B dust sent to the {recipient}.
      */
     function withdrawSingleETH(uint256 pid, uint256 liquidity, bytes[2] calldata swapData, address recipient) whenNotPaused nonReentrant external returns (uint256 amountETH, uint256 amountA, uint256 amountB) {
-        if(pid != poolID){
-            revert BAD_POOL_ID();
-        }
+        require (pid == poolID, 'BAD_POOL_ID');
         PoolInfo memory pool = pools[poolID];
 
         (uint256 leftoverA, uint256 leftoverB) = collectLeftovers(recipient);
@@ -488,18 +441,10 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      * Note: This function can only be called by LiquidityManager.
      */
     function moveLiquidity(uint256 _poolID, bytes calldata swapAData, bytes calldata swapBData, uint256 amountAMin, uint256 amountBMin) whenNotPaused nonReentrant external {
-        if(!accessManager.hasRole(LIQUIDITY_MANAGER_ROLE, msg.sender)){
-            revert CALLER_NOT_LIQUIDITY_MANAGER();
-        }
-        if(totalSupply() == 0){
-            revert NO_LIQUIDITY();
-        }
-        if(lastMoveInfo.block == block.number){
-            revert CANT_CALL_ON_THE_SAME_BLOCK();
-        }
-        if((_poolID >= pools.length) || (_poolID == poolID)){
-            revert BAD_POOL_ID();
-        }
+        require(accessManager.hasRole(LIQUIDITY_MANAGER_ROLE, msg.sender), 'CALLER_NOT_LIQUIDITY_MANAGER');
+        require(totalSupply() != 0, 'NO_LIQUIDITY');
+        require(lastMoveInfo.block != block.number, 'CANT_CALL_ON_THE_SAME_BLOCK');
+        require((_poolID < pools.length) && (_poolID != poolID), 'BAD_POOL_ID');
 
         PoolInfo memory currentPool = pools[poolID];
         PoolInfo memory newPool = pools[_poolID];
@@ -520,14 +465,9 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
                 bytes memory pathDefinition
             ) = abi.decode(swapAData[4:], (IOdosRouter.inputToken[],IOdosRouter.outputToken[],uint256,uint256,address,bytes));
 
-            // More discriptive errors would be nice but our contract size is very limited
-            if(
-                ((inputs.length != 1) || (outputs.length != 1)) ||
-                (inputs[0].tokenAddress != address(currentPool.tokenA)) ||
-                (outputs[0].tokenAddress != address(newPool.tokenA))
-            ){
-                revert BAD_SWAP_A();
-            }
+            require((inputs.length == 1) && (outputs.length == 1), 'BAD_SWAP_A_TOKENS_LENGTH');
+            require(inputs[0].tokenAddress == address(currentPool.tokenA), 'BAD_SWAP_A_INPUT_TOKEN');
+            require(outputs[0].tokenAddress == address(newPool.tokenA), 'BAD_SWAP_A_OUTPUT_TOKEN');
 
             inputs[0].amountIn = tokenABalance;
             OdosRouter.swap(inputs, outputs, type(uint256).max, valueOutMin, executor, pathDefinition);
@@ -543,14 +483,9 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
                 bytes memory pathDefinition
             ) = abi.decode(swapBData[4:], (IOdosRouter.inputToken[],IOdosRouter.outputToken[],uint256,uint256,address,bytes));
 
-            // More discriptive errors would be nice but our contract size is very limited
-            if(
-                ((inputs.length != 1) || (outputs.length != 1)) ||
-                (inputs[0].tokenAddress != address(currentPool.tokenB)) ||
-                (outputs[0].tokenAddress != address(newPool.tokenB))
-            ){
-                revert BAD_SWAP_B();
-            }
+            require((inputs.length == 1) && (outputs.length == 1), 'BAD_SWAP_B_TOKENS_LENGTH');
+            require(inputs[0].tokenAddress == address(currentPool.tokenB), 'BAD_SWAP_B_INPUT_TOKEN');
+            require(outputs[0].tokenAddress == address(newPool.tokenB), 'BAD_SWAP_B_OUTPUT_TOKEN');
 
             inputs[0].amountIn = tokenBBalance;
             OdosRouter.swap(inputs, outputs, type(uint256).max, valueOutMin, executor, pathDefinition);
@@ -582,30 +517,9 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         PoolInfo memory pool = pools[poolID];
         (, uint256 balanceA, uint256 balanceB) = pool.assetRouter.userStake(address(this), pool.pool);
 
-        uint256 fee;
         uint256 _balance = balanceOf(_address);
-        if(_address == address(0)){
-            fee = _getReferrerFee(address(0)) * 2;
-        } else if(accessManager.hasRole(FEE_COLLECTOR_ROLE, _address)){
-            fee = _getReferrerFee(address(0)) * 2;
-            _balance += (referrerInfo[_address].feeCollected + fee) / 1 ether;
-            // Get _address'es referrer fee
-            if(referrers[_address] != address(0)){
-                fee += _getReferrerFee(referrers[_address]) * 2;
-            }
-        } else {
-            uint256 _fee = _getReferrerFee(_address);
-            _balance += (referrerInfo[_address].feeCollected + _fee) / 1 ether;
-
-            fee = _fee * 2;
-            // Get _address'es referrer fee
-            if(referrers[_address] != _address){
-                fee += _getReferrerFee(referrers[_address]) * 2;
-            }
-        }
-
         if(_balance != 0){
-            uint256 _totalSupply = totalSupply() + (fee / 1 ether);
+            uint256 _totalSupply = totalSupply();
             stakeA = _balance * balanceA / _totalSupply; 
             stakeB = _balance * balanceB / _totalSupply; 
             if((!leftoversCollected[msg.sender][lastMoveInfo.block]) && (lastMoveInfo.totalSupply != 0)){
@@ -636,13 +550,19 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         return pools.length;
     }
 
-    function mint(address to, address referrer) internal returns (uint256 liquidity){
+    /**
+     * @dev Returns pair of tokens currently in use. 
+     */
+    function tokens() external view returns(address, address){
+        PoolInfo memory pool = pools[poolID];
+        return (address(pool.tokenA), address(pool.tokenB));
+    }
+
+    function mint(address to) internal returns (uint256 liquidity){
         PoolInfo memory pool = pools[poolID];
         (uint256 balanceLP,,) = pool.assetRouter.userStake(address(this), pool.pool);
         uint256 amountLP = balanceLP - reserveLP;
 
-        //TODO: i think the fee is taken immediatly because _collectFee adds tokens to totalSupply after _totalSupply is taken here essentialy dividing it
-        //todo: _collectFee before?//YEP! because the fee should not get collected immediatly, you had nothing to do with the pool before mint so why collect fee from you?
         uint256 _totalSupply = totalSupply();
         if (_totalSupply == 0) {
             liquidity = amountLP - MINIMUM_LIQUIDITY;
@@ -651,108 +571,21 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
             liquidity = amountLP * _totalSupply / reserveLP;
         }
 
-        if(liquidity == 0){
-            revert INSUFFICIENT_LIQUIDITY();
-        }
-
-        address _referrer = referrers[msg.sender];
-        // Can change referrer only for sender
-        if(_referrer != referrer){
-            referrers[msg.sender] = referrer;
-            uint256 balance = balanceOf(msg.sender);
-            // If == 0, we don't need to call _collectFee
-            if(balance > 0){
-                // Update referrer fee & subtract balance from referrer's deposits
-                _collectFee(_referrer);
-                referrerInfo[_referrer].deposits -= balance;
-
-                // Add balance to new referrer's deposits
-                _collectFee(referrer);
-                referrerInfo[referrer].deposits += balance;
-            }
-        }
-
+        require(liquidity > 0, 'INSUFFICIENT_LIQUIDITY_MINTED');
         _mint(to, liquidity);
+
         reserveLP = balanceLP;
     }
 
     function burn(uint256 liquidity) internal returns (uint256 amountLP) {
-        // Collect fee for the caller to their address
-        //TODO: cleect fee here bacuase you need to be in the pool of peaple who the fee is collected from because you participated
-        liquidity += collectFee(msg.sender);
-
         PoolInfo memory pool = pools[poolID];
         (uint256 balanceLP,,) = pool.assetRouter.userStake(address(this), pool.pool);
 
         amountLP = liquidity * balanceLP / totalSupply(); 
-        if(amountLP == 0){
-            revert INSUFFICIENT_LIQUIDITY();
-        }
-        
+        require(amountLP > 0, 'INSUFFICIENT_LIQUIDITY_BURNED');
         _burn(msg.sender, liquidity);
+
         reserveLP = balanceLP - amountLP;
-    }
-
-    /**
-      * @dev Collects fee and mints it to {referrer}.
-      * @param referrer - Address to collect fees for.
-      *
-      * @return fee - Fee collected.
-     */
-    function collectFee(address referrer) public returns (uint256 fee){
-        if(referrer == address(0)){
-            return 0;
-        }
-        
-        address recipient = referrer;
-        if(accessManager.hasRole(FEE_COLLECTOR_ROLE, referrer)){
-            referrer = address(0);
-        }
-
-        _collectFee(referrer);
-        fee = referrerInfo[referrer].feeCollected / 1 ether;
-        if(fee > 0){
-            _mint(recipient, fee);
-            fantomTotalSupply -= referrerInfo[referrer].feeCollected;
-            referrerInfo[referrer].feeCollected = 0;
-
-            emit CollectFee(recipient, fee);
-        }
-    }
-
-    function _getReferrerFee(address referrer) private view returns (uint256) {
-        uint256 deposits = referrerInfo[referrer].deposits;
-        uint256 lastFeeCollection = referrerInfo[referrer].lastFeeCollection;
-        if(deposits != 0 && lastFeeCollection != 0 && block.timestamp != lastFeeCollection){
-            // 60*60*24*365 = 31536000; 2% / 31536000 = 0.0000000634195839 % per second = 634195839 wei per second.
-            // Divide by 2 to mint equal amounts to feeCollector and to referrer.
-            return ((block.timestamp - lastFeeCollection) * 317097919 * deposits);
-        }
-        return 0;
-    }
-
-    function _collectFee(address referrer) private {
-        // Some autostrats were initialized before referral upgrade, so we initialize all liquidity as having address(0) as it's referrer here.
-        if(!isInitialized){
-            referrerInfo[address(0)].deposits = totalSupply();
-            isInitialized = true;
-        }
-
-        uint256 fee = _getReferrerFee(referrer);
-        if(fee > 0){
-            //referrer == address(0) is a special case for uno's fee collector.
-            if(referrer == address(0)){
-                fee *= 2;
-                referrerInfo[address(0)].feeCollected += fee;
-                fantomTotalSupply += fee;
-            } else {
-                referrerInfo[referrer].feeCollected += fee;
-                referrerInfo[address(0)].feeCollected += fee;
-                fantomTotalSupply += fee * 2;
-            }
-        }
-        
-        referrerInfo[referrer].lastFeeCollection = block.timestamp;
     }
 
     function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual override {
@@ -766,22 +599,5 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         }
         // Block {to} address from withdrawing their share of leftover tokens immediately.
         blockedLiquidty[to][lastMoveInfo.block] += amount;
-
-        if(from != address(0)){
-            //Decrease referralDeposits from {from}'s referrer
-            address referrer = referrers[from];
-            _collectFee(referrer);
-            referrerInfo[referrer].deposits -= amount;
-        }
-        if(to != address(0)){
-            //Add referralDeposits to {to}'s referrer
-            address referrer = referrers[to];
-            _collectFee(referrer);
-            referrerInfo[referrer].deposits += amount;
-        }
-    }
-
-    function totalSupply() public view override returns (uint256) {
-        return super.totalSupply() + (fantomTotalSupply / 1 ether);
     }
 }
