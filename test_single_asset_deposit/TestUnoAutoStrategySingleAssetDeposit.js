@@ -1,5 +1,5 @@
 const {
-    expectEvent, BN
+    expectEvent, BN, constants
 } = require('@openzeppelin/test-helpers')
 const { deployProxy } = require('@openzeppelin/truffle-upgrades')
 
@@ -84,7 +84,7 @@ contract('UnoAutoStrategy', (accounts) => {
                 } = await autoStrategy.userStake(DAIHolder))
 
                 // Deposit
-                receipt = await autoStrategy.depositSingleAsset(id, DAIToken.address, DAIAmount, [tokenAData, tokenBData], 0, 0, DAIHolder, {
+                receipt = await autoStrategy.depositSingleAsset(id, DAIToken.address, DAIAmount, [tokenAData, tokenBData], 0, 0, DAIHolder, constants.ZERO_ADDRESS, {
                     from: DAIHolder
                 })
             })
@@ -164,7 +164,7 @@ contract('UnoAutoStrategy', (accounts) => {
             })
             it('fires events', async () => {
                 ethBalanceBefore = new BN(await web3.eth.getBalance(DAIHolder))
-                const receipt = await autoStrategy.depositSingleETH(id, [tokenAData, tokenBData], 0, 0, DAIHolder, { from: DAIHolder, value: amountETH })
+                const receipt = await autoStrategy.depositSingleETH(id, [tokenAData, tokenBData], 0, 0, DAIHolder, constants.ZERO_ADDRESS, { from: DAIHolder, value: amountETH })
 
                 const gasUsed = new BN(receipt.receipt.gasUsed)
                 const effectiveGasPrice = new BN(receipt.receipt.effectiveGasPrice)
