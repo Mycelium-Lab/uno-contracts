@@ -1,5 +1,5 @@
 const {
-    expectEvent, BN
+    expectEvent, BN, constants
 } = require('@openzeppelin/test-helpers')
 const { deployProxy } = require('@openzeppelin/truffle-upgrades')
 
@@ -81,7 +81,7 @@ contract('UnoAutoStrategy', (accounts) => {
             tokenBBalanceBefore = await tokenB.balanceOf(account1)
 
             // Deposit
-            receipt = await autoStrategy.depositETH(id, amounts[1], 0, 0, account1, {
+            receipt = await autoStrategy.depositETH(id, amounts[1], 0, 0, account1, constants.ZERO_ADDRESS, {
                 value: amounts[0],
                 from: account1
             })
@@ -101,6 +101,11 @@ contract('UnoAutoStrategy', (accounts) => {
                 poolID: id,
                 from: account1,
                 recipient: account1
+            })
+            expectEvent(receipt, 'DepositPairTokensETH', {
+                poolID: id,
+                amountToken: sentB,
+                amountETH: sentA
             })
         })
         it('mints tokens', async () => {
@@ -175,7 +180,7 @@ contract('UnoAutoStrategy', (accounts) => {
             const tokenABalance = new BN(await web3.eth.getBalance(account1))
             const tokenBBalance = await tokenB.balanceOf(account1)
 
-            sentA = tokenABalance.sub(_tokenABalance).sub(ETHSpentOnGas) // sub gas cost
+            sentA = tokenABalance.sub(_tokenABalance).add(ETHSpentOnGas) // sub gas cost
             sentB = tokenBBalance.sub(_tokenBBalance)
         })
         it('fires events', async () => {
@@ -183,6 +188,12 @@ contract('UnoAutoStrategy', (accounts) => {
                 poolID: id,
                 from: account1,
                 recipient: account1
+            })
+
+            expectEvent(receipt, 'WithdrawPairTokensETH', {
+                poolID: id,
+                amountToken: sentB,
+                amountETH: sentA
             })
         })
         it('burns tokens', async () => {

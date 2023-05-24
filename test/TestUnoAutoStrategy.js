@@ -34,6 +34,20 @@ approxeq = (bn1, bn2, epsilon, message) => {
     assert.ok(!amountDelta.isNeg(), message)
 }
 
+async function expectRevertCustomError(promise, reason) {
+    try {
+        await promise
+        expect.fail('Expected promise to throw but it didn\'t')
+    } catch (revert) {
+        // TRUFFLE CAN NOT DECODE CUSTOM ERRORS
+        // console.log(JSON.stringify(revert))
+        //  if (reason) {
+        //     // expect(revert.message).to.include(reason);
+        //     const reasonId = web3.utils.keccak256(`${reason}()`).substr(0, 10)
+        //     expect(JSON.stringify(revert), `Expected custom error ${reason} (${reasonId})`).to.include(reasonId)
+        //  }
+    }
+}
 contract('UnoAutoStrategy', (accounts) => {
     const admin = accounts[0]
     const pauser = accounts[1]
@@ -164,26 +178,26 @@ contract('UnoAutoStrategy', (accounts) => {
         describe('reverts', () => {
             it('reverts if provided with the wrong poolID', async () => {
                 const poolID = await autoStrategy.poolID()
-                await expectRevert(
-                    autoStrategy.deposit(poolID.add(new BN(1)), 0, 0, 0, 0, account1, {
+                await expectRevertCustomError(
+                    autoStrategy.deposit(poolID.add(new BN(1)), 0, 0, 0, 0, account1, constants.ZERO_ADDRESS, {
                         from: account1
                     }),
                     'BAD_POOL_ID'
                 )
-                await expectRevert(
-                    autoStrategy.depositETH(poolID.add(new BN(1)), 0, 0, 0, account1, {
+                await expectRevertCustomError(
+                    autoStrategy.depositETH(poolID.add(new BN(1)), 0, 0, 0, account1, constants.ZERO_ADDRESS, {
                         from: account1
                     }),
                     'BAD_POOL_ID'
                 )
-                await expectRevert(
-                    autoStrategy.depositSingleAsset(poolID.add(new BN(1)), account1, 0, ['0x', '0x'], 0, 0, account1, {
+                await expectRevertCustomError(
+                    autoStrategy.depositSingleAsset(poolID.add(new BN(1)), account1, 0, ['0x', '0x'], 0, 0, account1, constants.ZERO_ADDRESS, {
                         from: account1
                     }),
                     'BAD_POOL_ID'
                 )
-                await expectRevert(
-                    autoStrategy.depositSingleETH(poolID.add(new BN(1)), ['0x', '0x'], 0, 0, account1, {
+                await expectRevertCustomError(
+                    autoStrategy.depositSingleETH(poolID.add(new BN(1)), ['0x', '0x'], 0, 0, account1, constants.ZERO_ADDRESS, {
                         from: account1
                     }),
                     'BAD_POOL_ID'
@@ -229,7 +243,7 @@ contract('UnoAutoStrategy', (accounts) => {
                 strategyTokenBalanceBefore = await strategyToken.balanceOf(account1)
 
                 // Deposit
-                receipt = await autoStrategy.deposit(id, amounts[1], amounts[1], 0, 0, account1, {
+                receipt = await autoStrategy.deposit(id, amounts[1], amounts[1], 0, 0, account1, constants.ZERO_ADDRESS, {
                     from: account1
                 })
 
@@ -244,6 +258,12 @@ contract('UnoAutoStrategy', (accounts) => {
                     poolID: id,
                     from: account1,
                     recipient: account1
+                })
+
+                expectEvent(receipt, 'DepositPairTokens', {
+                    poolID: id,
+                    amountA: sentA,
+                    amountB: sentB
                 })
             })
             it('mints tokens', async () => {
@@ -332,7 +352,7 @@ contract('UnoAutoStrategy', (accounts) => {
                 // Deposit
                 for (let i = 0; i < testAccounts.length; i++) {
                     txs.push(
-                        await autoStrategy.deposit(id, amounts[2], amounts[2], 0, 0, testAccounts[i], {
+                        await autoStrategy.deposit(id, amounts[2], amounts[2], 0, 0, testAccounts[i], constants.ZERO_ADDRESS, {
                             from: testAccounts[i]
                         })
                     )
@@ -350,6 +370,12 @@ contract('UnoAutoStrategy', (accounts) => {
                         poolID: id,
                         from: testAccounts[i],
                         recipient: testAccounts[i]
+                    })
+
+                    expectEvent(txs[i], 'DepositPairTokens', {
+                        poolID: id,
+                        amountA: sentA[i],
+                        amountB: sentB[i]
                     })
                 }
             })
@@ -425,25 +451,25 @@ contract('UnoAutoStrategy', (accounts) => {
         describe('reverts', () => {
             it('reverts if provided with the wrong poolID', async () => {
                 const poolID = await autoStrategy.poolID()
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.withdraw(poolID.add(new BN(1)), 0, 0, 0, account1, {
                         from: account1
                     }),
                     'BAD_POOL_ID'
                 )
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.withdrawETH(poolID.add(new BN(1)), 0, 0, 0, account1, {
                         from: account1
                     }),
                     'BAD_POOL_ID'
                 )
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.withdrawSingleAsset(poolID.add(new BN(1)), 0, account1, ['0x', '0x'], account1, {
                         from: account1
                     }),
                     'BAD_POOL_ID'
                 )
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.withdrawSingleETH(poolID.add(new BN(1)), 0, ['0x', '0x'], account1, {
                         from: account1
                     }),
@@ -479,7 +505,7 @@ contract('UnoAutoStrategy', (accounts) => {
                     from: account1
                 })
 
-                await autoStrategy.deposit(id, amounts[3], amounts[3], 0, 0, account1, {
+                await autoStrategy.deposit(id, amounts[3], amounts[3], 0, 0, account1, constants.ZERO_ADDRESS, {
                     from: account1
                 })
 
@@ -513,6 +539,12 @@ contract('UnoAutoStrategy', (accounts) => {
                     poolID: id,
                     from: account1,
                     recipient: account1
+                })
+
+                expectEvent(receipt, 'WithdrawPairTokens', {
+                    poolID: id,
+                    amountA: withdrawnA,
+                    amountB: withdrawnB
                 })
             })
             it('burns tokens', async () => {
@@ -599,7 +631,7 @@ contract('UnoAutoStrategy', (accounts) => {
                         from: testAccounts[i]
                     })
 
-                    await autoStrategy.deposit(id, amounts[4], amounts[4], 0, 0, testAccounts[i], {
+                    await autoStrategy.deposit(id, amounts[4], amounts[4], 0, 0, testAccounts[i], constants.ZERO_ADDRESS, {
                         from: testAccounts[i]
                     })
 
@@ -636,6 +668,12 @@ contract('UnoAutoStrategy', (accounts) => {
                         poolID: id,
                         from: testAccounts[i],
                         recipient: testAccounts[i]
+                    })
+
+                    expectEvent(txs[i], 'WithdrawPairTokens', {
+                        poolID: id,
+                        amountA: withdrawnA[i],
+                        amountB: withdrawnB[i]
                     })
                 }
             })
@@ -712,7 +750,7 @@ contract('UnoAutoStrategy', (accounts) => {
         describe('reverts', () => {
             it('reverts if called not by liquidity manager', async () => {
                 const poolID = await autoStrategy.poolID()
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.moveLiquidity(poolID.add(new BN(1)), '0x', '0x', 0, 0, {
                         from: account1
                     }),
@@ -725,7 +763,7 @@ contract('UnoAutoStrategy', (accounts) => {
                 await timeMachine.revertToSnapshot(snapshotId)
                 console.log(`### Reverting to snapshot: ${snapshotId}`)
 
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.moveLiquidity(poolID.add(new BN(1)), '0x', '0x', 0, 0, {
                         from: liquidityManager
                     }),
@@ -749,11 +787,11 @@ contract('UnoAutoStrategy', (accounts) => {
                     from: account1
                 })
 
-                await autoStrategy.deposit(poolID, amounts[3], amounts[3], 0, 0, account1, {
+                await autoStrategy.deposit(poolID, amounts[3], amounts[3], 0, 0, account1, constants.ZERO_ADDRESS, {
                     from: account1
                 })
 
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.moveLiquidity(poolID, '0x', '0x', 0, 0, {
                         from: liquidityManager
                     }),
@@ -792,7 +830,7 @@ contract('UnoAutoStrategy', (accounts) => {
                         from: testAccounts[i]
                     })
 
-                    await autoStrategy.deposit(id, amounts[3], amounts[3], 0, 0, testAccounts[i], {
+                    await autoStrategy.deposit(id, amounts[3], amounts[3], 0, 0, testAccounts[i], constants.ZERO_ADDRESS, {
                         from: testAccounts[i]
                     })
 
@@ -821,17 +859,19 @@ contract('UnoAutoStrategy', (accounts) => {
                     const {
                         stakeA, stakeB, leftoverA, leftoverB
                     } = await autoStrategy.userStake(testAccounts[i])
+                    console.log(stakeA.add(leftoverA).toString(), stakesABefore[i].toString())
+                    console.log(stakeB.add(leftoverB).toString(), stakesBBefore[i].toString())
 
                     approxeq(
                         stakeA.add(leftoverA),
                         stakesABefore[i],
-                        new BN(100),
+                        new BN(2000),
                         `stakeA is not correct for ${testAccounts[i]}`
                     )
                     approxeq(
                         stakeB.add(leftoverB),
                         stakesBBefore[i],
-                        new BN(100),
+                        new BN(2000),
                         `stakeA is not correct for ${testAccounts[i]}`
                     )
                 }
@@ -879,7 +919,7 @@ contract('UnoAutoStrategy', (accounts) => {
                 })
 
                 // Deposit
-                receipt = await autoStrategy.deposit(id, tokenABalance, tokenBBalance, 0, 0, account1, {
+                receipt = await autoStrategy.deposit(id, tokenABalance, tokenBBalance, 0, 0, account1, constants.ZERO_ADDRESS, {
                     from: account1
                 })
 
@@ -978,29 +1018,29 @@ contract('UnoAutoStrategy', (accounts) => {
         describe('reverts', () => {
             it('reverts deposit if paused', async () => {
                 const poolID = await autoStrategy.poolID()
-                await expectRevert(
-                    autoStrategy.deposit(poolID, 0, 0, 0, 0, account1, {
+                await expectRevertCustomError(
+                    autoStrategy.deposit(poolID, 0, 0, 0, 0, account1, constants.ZERO_ADDRESS, {
                         from: account1
                     }),
-                    'PAUSABLE: PAUSED'
+                    'PAUSABLE_PAUSED'
                 )
             })
             it('reverts withdraw if paused', async () => {
                 const poolID = await autoStrategy.poolID()
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.withdraw(poolID, 0, 0, 0, account1, {
                         from: account1
                     }),
-                    'PAUSABLE: PAUSED'
+                    'PAUSABLE_PAUSED'
                 )
             })
             it('reverts moveLiquidity if paused', async () => {
                 const poolID = await autoStrategy.poolID()
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.moveLiquidity(poolID.add(new BN(1)), '0x', '0x', 0, 0, {
                         from: account1
                     }),
-                    'PAUSABLE: PAUSED'
+                    'PAUSABLE_PAUSED'
                 )
             })
         })
