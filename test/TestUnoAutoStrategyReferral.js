@@ -43,6 +43,7 @@ contract('UnoAutoStrategy', (accounts) => {
     const feeCollector = accounts[3]
     const randomAccount = accounts[5]
     const account4 = accounts[4]
+    const account5 = accounts[6]
 
     let accessManager
 
@@ -331,7 +332,6 @@ contract('UnoAutoStrategy', (accounts) => {
         })
     })
 
-    // TODO: check transfers
     describe('Collect Fee on Withdraw', () => {
         let id
 
@@ -381,23 +381,6 @@ contract('UnoAutoStrategy', (accounts) => {
         })
         it('Collects fee', async () => {
             await time.increase(31536000)// 1 year after
-            {
-                const {
-                    stakeA, stakeB, leftoverA, leftoverB
-                } = await autoStrategy.userStake(constants.ZERO_ADDRESS)
-
-                assert.equal(
-                    stakeA.toString(),
-                    '0',
-                    'TokenA balance not null'
-                )
-                assert.equal(
-                    stakeB.toString(),
-                    '0',
-                    'TokenB balance not null'
-                )
-            }
-
             {
                 const {
                     stakeA, stakeB, leftoverA, leftoverB
@@ -479,6 +462,7 @@ contract('UnoAutoStrategy', (accounts) => {
             )
         })
         it('Not collects fee after full withdrawal', async () => {
+            await time.increase(31536000)// 1 year after
             const balance = await autoStrategy.balanceOf(account2)
             let tx = await autoStrategy.withdraw(id, balance, 0, 0, account2, { from: account2 })
             // there is no fee for account2
@@ -488,6 +472,7 @@ contract('UnoAutoStrategy', (accounts) => {
                 '0',
                 'Token balance not null'
             )
+            await time.increase(31536000)// 1 year after
             // We transfer all account2's tokens to not affect userStake
             tx = await autoStrategy.collectFee(account3, { from: account3 })
             expectEvent(tx, 'CollectFee', { recipient: account3 })
@@ -783,6 +768,48 @@ contract('UnoAutoStrategy', (accounts) => {
                 expectedFee.toString(),
                 balanceFeeCollector.toString(),
                 'Token balance not changed for fee collector after collectFee'
+            )
+        })
+        it('Does not collect fee from new deposits', async () => {
+            await time.increase(3153600000)// 100 years after
+            await tokenA.transfer(account5, amounts[0], {
+                from: account1
+            })
+            await tokenB.transfer(account5, amounts[0], {
+                from: account1
+            })
+            await tokenA.approve(autoStrategy.address, amounts[0], {
+                from: account5
+            })
+            await tokenB.approve(autoStrategy.address, amounts[0], {
+                from: account5
+            })
+            await autoStrategy.deposit(id, amounts[0], amounts[0], 0, 0, account5, constants.ZERO_ADDRESS, {
+                from: account5
+            })
+            const balanceAAfter = await tokenA.balanceOf(account5)
+            const balanceBAfter = await tokenB.balanceOf(account5)
+            const {
+                stakeA, stakeB, leftoverA, leftoverB
+            } = await autoStrategy.userStake(account5)
+            console.log('stakeA: ', amounts[0].sub(balanceAAfter).toString(), stakeA.add(leftoverA).toString())
+            console.log('stakeB: ', amounts[0].sub(balanceBAfter).toString(), stakeB.add(leftoverB).toString())
+
+            await autoStrategy.withdraw(id, await autoStrategy.balanceOf(account5), 0, 0, account5, {
+                from: account5
+            })
+
+            approxeq(
+                (await tokenA.balanceOf(account5)),
+                stakeA.add(leftoverA),
+                new BN(1000),
+                'Token A balance not changed correctly'
+            )
+            approxeq(
+                (await tokenB.balanceOf(account5)),
+                stakeB.add(leftoverB),
+                new BN(1000),
+                'Token B balance not changed correctly'
             )
         })
     })

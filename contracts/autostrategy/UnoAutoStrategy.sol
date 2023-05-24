@@ -579,33 +579,20 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      * @return leftoverB - Token B Leftovers obligated to the {_address} after moveLiquidity() function call.
      */
     function userStake(address _address) external view returns (uint256 stakeA, uint256 stakeB, uint256 leftoverA, uint256 leftoverB) {
-        PoolInfo memory pool = pools[poolID];
-        (, uint256 balanceA, uint256 balanceB) = pool.assetRouter.userStake(address(this), pool.pool);
-
-        uint256 fee;
-        uint256 _balance = balanceOf(_address);
+        uint256 _balance;
         if(_address == address(0)){
-            fee = _getReferrerFee(address(0)) * 2;
+            revert();
         } else if(accessManager.hasRole(FEE_COLLECTOR_ROLE, _address)){
-            fee = _getReferrerFee(address(0)) * 2;
-            _balance += (referrerInfo[_address].feeCollected + fee) / 1 ether;
-            // Get _address'es referrer fee
-            if(referrers[_address] != address(0)){
-                fee += _getReferrerFee(referrers[_address]) * 2;
-            }
+            _balance = balanceOf(_address) + (referrerInfo[_address].feeCollected + _getReferrerFee(address(0)) * 2) / 1 ether;
         } else {
-            uint256 _fee = _getReferrerFee(_address);
-            _balance += (referrerInfo[_address].feeCollected + _fee) / 1 ether;
-
-            fee = _fee * 2;
-            // Get _address'es referrer fee
-            if(referrers[_address] != _address){
-                fee += _getReferrerFee(referrers[_address]) * 2;
-            }
+            _balance = balanceOf(_address) + (referrerInfo[_address].feeCollected + _getReferrerFee(_address)) / 1 ether;
         }
 
         if(_balance != 0){
-            uint256 _totalSupply = totalSupply() + (fee / 1 ether);
+            PoolInfo memory pool = pools[poolID];
+            (, uint256 balanceA, uint256 balanceB) = pool.assetRouter.userStake(address(this), pool.pool);
+
+            uint256 _totalSupply = totalSupply();
             stakeA = _balance * balanceA / _totalSupply; 
             stakeB = _balance * balanceB / _totalSupply; 
             if((!leftoversCollected[msg.sender][lastMoveInfo.block]) && (lastMoveInfo.totalSupply != 0)){
@@ -636,13 +623,19 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         return pools.length;
     }
 
+    /**	
+     * @dev Returns pair of tokens currently in use. 	
+     */	
+    function tokens() external view returns(address, address){	
+        PoolInfo memory pool = pools[poolID];	
+        return (address(pool.tokenA), address(pool.tokenB));	
+    }
+
     function mint(address to, address referrer) internal returns (uint256 liquidity){
         PoolInfo memory pool = pools[poolID];
         (uint256 balanceLP,,) = pool.assetRouter.userStake(address(this), pool.pool);
         uint256 amountLP = balanceLP - reserveLP;
 
-        //TODO: i think the fee is taken immediatly because _collectFee adds tokens to totalSupply after _totalSupply is taken here essentialy dividing it
-        //todo: _collectFee before?//YEP! because the fee should not get collected immediatly, you had nothing to do with the pool before mint so why collect fee from you?
         uint256 _totalSupply = totalSupply();
         if (_totalSupply == 0) {
             liquidity = amountLP - MINIMUM_LIQUIDITY;
@@ -677,14 +670,13 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
     }
 
     function burn(uint256 liquidity) internal returns (uint256 amountLP) {
-        // Collect fee for the caller to their address
-        //TODO: cleect fee here bacuase you need to be in the pool of peaple who the fee is collected from because you participated
-        liquidity += collectFee(msg.sender);
-
         PoolInfo memory pool = pools[poolID];
         (uint256 balanceLP,,) = pool.assetRouter.userStake(address(this), pool.pool);
 
-        amountLP = liquidity * balanceLP / totalSupply(); 
+        uint256 _totalSupply = totalSupply();
+        // Collect fee for the caller to their address
+        liquidity += collectFee(msg.sender);
+        amountLP = liquidity * balanceLP / _totalSupply; 
         if(amountLP == 0){
             revert INSUFFICIENT_LIQUIDITY();
         }
