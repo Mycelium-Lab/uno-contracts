@@ -520,7 +520,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
                 bytes memory pathDefinition
             ) = abi.decode(swapAData[4:], (IOdosRouter.inputToken[],IOdosRouter.outputToken[],uint256,uint256,address,bytes));
 
-            // More discriptive errors would be nice but our contract size is very limited
+            // More descriptive errors would be nice but our contract size is very limited
             if(
                 ((inputs.length != 1) || (outputs.length != 1)) ||
                 (inputs[0].tokenAddress != address(currentPool.tokenA)) ||
@@ -543,7 +543,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
                 bytes memory pathDefinition
             ) = abi.decode(swapBData[4:], (IOdosRouter.inputToken[],IOdosRouter.outputToken[],uint256,uint256,address,bytes));
 
-            // More discriptive errors would be nice but our contract size is very limited
+            // More descriptive errors would be nice but our contract size is very limited
             if(
                 ((inputs.length != 1) || (outputs.length != 1)) ||
                 (inputs[0].tokenAddress != address(currentPool.tokenB)) ||
