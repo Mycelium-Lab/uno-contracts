@@ -38,7 +38,7 @@ async function expectRevertCustomError(promise, reason) {
         await promise
         expect.fail('Expected promise to throw but it didn\'t')
     } catch (revert) {
-        // TRUFFLE CAN NOT DECODE CUSTOM ERRORS, FUCK THIS
+        // TRUFFLE CAN NOT DECODE CUSTOM ERRORS
         // console.log(JSON.stringify(revert))
         //  if (reason) {
         //     // expect(revert.message).to.include(reason);
