@@ -174,6 +174,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      * @param amountAMin - Bounds the extent to which the B/A price can go up before the transaction reverts.
      * @param amountBMin - Bounds the extent to which the A/B price can go up before the transaction reverts.
      * @param recipient - Address which will receive the deposit.
+     * @param referrer - Address the fees from {msg.sender}'s liquidity will be collected to
      
      * @return sentA - Deposited token A amount.
      * @return sentB - Deposited token B amount.
@@ -210,6 +211,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      * @param amountTokenMin - Bounds the extent to which the TOKEN/WMATIC price can go up before the transaction reverts.
      * @param amountETHMin - Bounds the extent to which the WMATIC/TOKEN price can go up before the transaction reverts.
      * @param recipient - Address which will receive the deposit.
+     * @param referrer - Address the fees from {msg.sender}'s liquidity will be collected to
      
      * @return sentToken - Deposited token amount.
      * @return sentETH - Deposited ETH amount.
@@ -255,6 +257,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      * @param amountAMin - Bounds the extent to which the B/A price can go up before the transaction reverts.
      * @param amountBMin - Bounds the extent to which the A/B price can go up before the transaction reverts.
      * @param recipient - Address which will receive the deposit.
+     * @param referrer - Address the fees from {msg.sender}'s liquidity will be collected to
      
      * @return sent - Total {token} amount sent to the farm. NOTE: Returns dust left from swap in {token}, but if A/B amounts are not correct also returns dust in pool's tokens.
      * @return liquidity - Total liquidity minted for the {recipient}.
@@ -296,6 +299,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      * @param amountAMin - Bounds the extent to which the B/A price can go up before the transaction reverts.
      * @param amountBMin - Bounds the extent to which the A/B price can go up before the transaction reverts.
      * @param recipient - Address which will receive the deposit.
+     * @param referrer - Address the fees from {msg.sender}'s liquidity will be collected to
      
      * @return sentETH - Total MATIC amount sent to the farm. NOTE: Returns dust left from swap in MATIC, but if A/B amount are not correct also returns dust in pool's tokens.
      * @return liquidity - Total liquidity minted for the {recipient}.
