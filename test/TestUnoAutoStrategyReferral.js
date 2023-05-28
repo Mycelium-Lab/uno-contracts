@@ -813,4 +813,109 @@ contract('UnoAutoStrategy', (accounts) => {
             )
         })
     })
+
+    describe('Upgrade from previous version 2', () => {
+        let id
+        before(async () => {
+            accessManager = await AccessManager.new({ from: admin }) // accounts[0] is admin
+            await accessManager.grantRole(
+                '0xfbd454f36a7e1a388bd6fc3ab10d434aa4578f811acbbcf33afb1c697486313c',
+                distributor,
+                { from: admin }
+            )// DISTRIBUTOR_ROLE
+            await accessManager.grantRole(
+                '0x77e60b99a50d27fb027f6912a507d956105b4148adab27a86d235c8bcca8fa2f',
+                liquidityManager,
+                { from: admin }
+            ) // LIQUIDITY_MANAGER_ROLE
+            await accessManager.grantRole('0x65d7a28e3265b37a6474929f336521b332c1681b933f6cb9f3376673440d862a', pauser, {
+                from: admin
+            }) // PAUSER_ROLE
+            await accessManager.grantRole('0x2dca0f5ce7e75a4b43fe2b0d6f5d0b7a2bf92ecf89f8f0aa17b8308b67038821', feeCollector, {
+                from: admin
+            }) // FEE_COLLECTOR_ROLE
+
+            const autoStrategyImplementation = await AutoStrategyV0.new()
+            autoStrategyFactory = await AutoStrategyFactory.new(autoStrategyImplementation.address, accessManager.address)
+
+            assetRouterQuickswap = await deployProxy(
+                UnoAssetRouterQuickswap,
+                { kind: 'uups', initializer: false }
+            )
+            const farmImplementationQuickswap = await UnoFarmQuickswap.new()
+            await FarmFactory.new(farmImplementationQuickswap.address, accessManager.address, assetRouterQuickswap.address)
+
+            assetRouterSushiswap = await deployProxy(
+                UnoAssetRouterSushiswap,
+                { kind: 'uups', initializer: false }
+            )
+            const farmImplementationSushiswap = await UnoFarmSushiswap.new()
+            await FarmFactory.new(farmImplementationSushiswap.address, accessManager.address, assetRouterSushiswap.address)
+
+            await autoStrategyFactory.approveAssetRouter(assetRouterQuickswap.address, {
+                from: admin
+            })
+            await autoStrategyFactory.approveAssetRouter(assetRouterSushiswap.address, {
+                from: admin
+            })
+
+            await autoStrategyFactory.createStrategy([
+                { pool: pool1, assetRouter: assetRouterQuickswap.address },
+                { pool: pool2, assetRouter: assetRouterSushiswap.address }
+            ])
+
+            autoStrategy = await AutoStrategyV0.at(await autoStrategyFactory.autoStrategies(0))
+        })
+        it('Upgrades version', async () => {
+            id = await autoStrategy.poolID()
+
+            const data = await autoStrategy.pools(id)
+
+            const tokenA = await IERC20.at(data.tokenA)
+            const tokenB = await IERC20.at(data.tokenB)
+
+            await tokenA.approve(autoStrategy.address, amounts[0], {
+                from: account1
+            })
+            await tokenB.approve(autoStrategy.address, amounts[0], {
+                from: account1
+            })
+            await autoStrategy.deposit(id, amounts[0], amounts[0], 0, 0, account1, {
+                from: account1
+            })
+
+            const balanceABefore = await tokenA.balanceOf(account1)
+            const balanceBBefore = await tokenB.balanceOf(account1)
+            const {
+                stakeA, stakeB, leftoverA, leftoverB
+            } = await autoStrategy.userStake(account1)
+
+            const autoStrategyImplementation = await AutoStrategy.new()
+            await autoStrategyFactory.upgradeStrategies(autoStrategyImplementation.address)
+
+            autoStrategy = await AutoStrategy.at(await autoStrategyFactory.autoStrategies(0))
+
+            await autoStrategy.withdraw(id, await autoStrategy.balanceOf(account1), 0, 0, account1, {
+                from: account1
+            })
+            assert.equal(
+                (await autoStrategy.balanceOf(account1)).toString(),
+                '0',
+                'Token balance not 0'
+            )
+
+            approxeq(
+                (await tokenA.balanceOf(account1)).sub(balanceABefore),
+                stakeA.add(leftoverA),
+                new BN(10),
+                'Token A balance not changed correctly'
+            )
+            approxeq(
+                (await tokenB.balanceOf(account1)).sub(balanceBBefore),
+                stakeB.add(leftoverB),
+                new BN(10),
+                'Token B balance not changed correctly'
+            )
+        })
+    })
 })
