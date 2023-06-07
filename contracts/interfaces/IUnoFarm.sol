@@ -47,6 +47,17 @@ interface IUnoFarm {
         uint256 fee;
     }
 
+    error CALLER_NOT_ASSET_ROUTER();
+    error INVALID_LP_POOL();
+    error INVALID_ASSET_ROUTER();
+    error NO_LIQUIDITY_PROVIDED();
+    error INSUFFICIENT_AMOUNT();
+    error INSUFFICIENT_BALANCE();
+    error NO_LIQUIDITY();
+    error CALL_ON_THE_SAME_BLOCK();
+    error INVALID_ROUTE(address fromToken, address toToken);
+    error INVALID_FEE_ROUTE(address feeToken);
+
     function rewardToken() external view returns (address);
     function lpPair() external view returns (address);
     function tokenA() external view returns (address);

@@ -65,15 +65,15 @@ contract UnoFarmApeswap is Initializable, ReentrancyGuardUpgradeable, IUnoFarmAp
      */
     address public assetRouter;
     modifier onlyAssetRouter(){
-        require(msg.sender == assetRouter, 'CALLER_NOT_ASSET_ROUTER');
+        if(msg.sender != assetRouter) revert CALLER_NOT_ASSET_ROUTER();
         _;
     }
 
     // ============ Methods ============
 
     function initialize(address _lpPair, address _assetRouter) external initializer {
-        require (_lpPair != address(0), 'BAD_LP_POOL');
-        require (_assetRouter != address(0), 'BAD_ASSET_ROUTER');
+        if(_lpPair == address(0)) revert INVALID_LP_POOL();
+        if(_assetRouter == address(0)) revert INVALID_ASSET_ROUTER();
 
         __ReentrancyGuard_init();
         assetRouter = _assetRouter;
@@ -113,7 +113,7 @@ contract UnoFarmApeswap is Initializable, ReentrancyGuardUpgradeable, IUnoFarmAp
      * Stakes {amount} of LP tokens from this contract's balance in the {MiniApe}.
      */
     function deposit(uint256 amount, address recipient) external nonReentrant onlyAssetRouter{
-        require(amount > 0, 'NO_LIQUIDITY_PROVIDED');
+        if(amount == 0) revert NO_LIQUIDITY_PROVIDED();
 
         _updateDeposit(recipient);
         userInfo[recipient].stake += amount;
@@ -126,14 +126,15 @@ contract UnoFarmApeswap is Initializable, ReentrancyGuardUpgradeable, IUnoFarmAp
      * @dev Withdraws funds from {origin} and sends them to the {recipient}.
      */
     function withdraw(uint256 amount, address origin, address recipient) external nonReentrant onlyAssetRouter{
-        require(amount > 0, 'INSUFFICIENT_AMOUNT');
+        if(amount == 0) revert INSUFFICIENT_AMOUNT();
 
         _updateDeposit(origin);
         UserInfo storage user = userInfo[origin];
         // Subtract amount from user.reward first, then subtract remainder from user.stake.
         if(amount > user.reward){
             uint256 balance = user.stake + user.reward;
-            require(amount <= balance, 'INSUFFICIENT_BALANCE');
+            if(amount > balance) revert INSUFFICIENT_BALANCE();
+
             user.stake = balance - amount;
             totalDeposits = totalDeposits + user.reward - amount;
             user.reward = 0;
@@ -155,8 +156,8 @@ contract UnoFarmApeswap is Initializable, ReentrancyGuardUpgradeable, IUnoFarmAp
         SwapInfo[2] calldata feeSwapInfos,
         FeeInfo calldata feeInfo
     ) external onlyAssetRouter nonReentrant returns(uint256 reward){
-        require(totalDeposits > 0, 'NO_LIQUIDITY');
-        require(distributionInfo[distributionID - 1].block != block.number, 'CANT_CALL_ON_THE_SAME_BLOCK');
+        if(totalDeposits == 0) revert NO_LIQUIDITY();
+        if(distributionInfo[distributionID - 1].block == block.number) revert CALL_ON_THE_SAME_BLOCK();
 
         MiniApe.harvest(pid, address(this));
 
@@ -172,13 +173,13 @@ contract UnoFarmApeswap is Initializable, ReentrancyGuardUpgradeable, IUnoFarmAp
         if (rewardTokenHalf > 0) {
             if (tokenA != rewardToken) {
                 address[] calldata route = swapInfos[0].route;
-                require(route[0] == rewardToken && route[route.length - 1] == tokenA, 'BAD_REWARD_TOKEN_A_ROUTE');
+                if(route[0] != rewardToken || route[route.length - 1] != tokenA) revert INVALID_ROUTE(rewardToken, tokenA);
                 apeswapRouter.swapExactTokensForTokens(rewardTokenHalf, swapInfos[0].amountOutMin, route, address(this), block.timestamp);
             }
 
             if (tokenB != rewardToken) {
                 address[] calldata route = swapInfos[1].route;
-                require(route[0] == rewardToken && route[route.length - 1] == tokenB, 'BAD_REWARD_TOKEN_B_ROUTE');
+                if(route[0] != rewardToken || route[route.length - 1] != tokenB) revert INVALID_ROUTE(rewardToken, tokenB);
                 apeswapRouter.swapExactTokensForTokens(rewardTokenHalf, swapInfos[1].amountOutMin, route, address(this), block.timestamp);
             }
         }
@@ -186,13 +187,13 @@ contract UnoFarmApeswap is Initializable, ReentrancyGuardUpgradeable, IUnoFarmAp
         if (rewarderTokenHalf > 0) {
             if (tokenA != rewarderToken) {
                 address[] calldata route = swapInfos[2].route;
-                require(route[0] == rewarderToken && route[route.length - 1] == tokenA, 'BAD_REWARDER_TOKEN_A_ROUTE');
+                if (route[0] != rewarderToken || route[route.length - 1] != tokenA) revert INVALID_ROUTE(rewarderToken, tokenA);
                 apeswapRouter.swapExactTokensForTokens(rewarderTokenHalf, swapInfos[2].amountOutMin, route, address(this), block.timestamp);
             }
 
             if (tokenB != rewarderToken) {
                 address[] calldata route = swapInfos[3].route;
-                require(route[0] == rewarderToken && route[route.length - 1] == tokenB, 'BAD_REWARDER_TOKEN_B_ROUTE');
+                if (route[0] != rewarderToken || route[route.length - 1] != tokenB) revert INVALID_ROUTE(rewarderToken, tokenB);
                 apeswapRouter.swapExactTokensForTokens(rewarderTokenHalf, swapInfos[3].amountOutMin, route, address(this), block.timestamp);
             }
         }
@@ -225,7 +226,7 @@ contract UnoFarmApeswap is Initializable, ReentrancyGuardUpgradeable, IUnoFarmAp
             if(feeAmount > 0){
                 address[] calldata route = feeSwapInfo.route;
                 if(route.length > 0 && route[0] != route[route.length - 1]){
-                    require(route[0] == token, 'BAD_FEE_TOKEN_ROUTE');
+                    if(route[0] != token) revert INVALID_FEE_ROUTE(token);
                     apeswapRouter.swapExactTokensForTokens(feeAmount, feeSwapInfo.amountOutMin, route, feeInfo.feeTo, block.timestamp);
                     return;
                 }
@@ -298,7 +299,7 @@ contract UnoFarmApeswap is Initializable, ReentrancyGuardUpgradeable, IUnoFarmAp
                 break;
             }
         }
-        require(poolExists, 'PID_NOT_EXISTS');
+        if(!poolExists) revert PID_NOT_EXISTS();
         return _pid;
     }
 }
