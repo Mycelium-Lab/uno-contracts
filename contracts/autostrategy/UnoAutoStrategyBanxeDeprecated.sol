@@ -3,12 +3,12 @@ pragma solidity 0.8.10;
 import "../interfaces/IUnoAssetRouter.sol";   
 import '@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol';
-import '@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol';
+import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 
 contract UnoAutoStrategyBanxeDeprecated is Initializable, ERC20Upgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable, UUPSUpgradeable {
-    using SafeERC20Upgradeable for IERC20Upgradeable;
+    using SafeERC20 for IERC20;
     /**
      * @dev PoolInfo:
      * {assetRouter} - UnoAssetRouter contract.
@@ -36,8 +36,8 @@ contract UnoAutoStrategyBanxeDeprecated is Initializable, ERC20Upgradeable, Reen
     uint256 public poolID;
     PoolInfo[] public pools;
 
-    IERC20Upgradeable public tokenA;
-    IERC20Upgradeable public tokenB;
+    IERC20 public tokenA;
+    IERC20 public tokenB;
 
     uint256 private reserveLP;
     uint256 private constant MINIMUM_LIQUIDITY = 10**3;
@@ -76,15 +76,15 @@ contract UnoAutoStrategyBanxeDeprecated is Initializable, ERC20Upgradeable, Reen
         __ReentrancyGuard_init();
         __Pausable_init();
 
-        address[] memory poolTokens = poolInfos[0].assetRouter.getTokens(poolInfos[0].pool);
-        tokenA = IERC20Upgradeable(poolTokens[0]);
-        tokenB = IERC20Upgradeable(poolTokens[1]);
+        IERC20[] memory poolTokens = poolInfos[0].assetRouter.getTokens(poolInfos[0].pool);
+        tokenA = IERC20(poolTokens[0]);
+        tokenB = IERC20(poolTokens[1]);
         
         for (uint256 i = 0; i < poolInfos.length; i++) {
             PoolInfo memory poolInfo = poolInfos[i];
             if(i != 0){
-                address[] memory _tokens = poolInfo.assetRouter.getTokens(poolInfo.pool);
-                require(((_tokens[0] == address(tokenA)) && (_tokens[1] == address(tokenB))) || ((_tokens[0] == address(tokenB)) && (_tokens[1] == address(tokenA))), 'WRONG_POOL_TOKENS');
+                IERC20[] memory _tokens = poolInfo.assetRouter.getTokens(poolInfo.pool);
+                require(((_tokens[0] == tokenA) && (_tokens[1] == tokenB)) || ((_tokens[0] == tokenB) && (_tokens[1] == tokenA)), 'WRONG_POOL_TOKENS');
             }
             pools.push(poolInfo);
 
@@ -181,8 +181,8 @@ contract UnoAutoStrategyBanxeDeprecated is Initializable, ERC20Upgradeable, Reen
      * Note: This function can only be called by Admin.
      */
     function addPool(PoolInfo calldata poolInfo) external onlyRole(ADMIN_ROLE) {
-        address[] memory _tokens = poolInfo.assetRouter.getTokens(poolInfo.pool);
-        require(((_tokens[0] == address(tokenA)) && (_tokens[1] == address(tokenB))) || ((_tokens[0] == address(tokenB)) && (_tokens[1] == address(tokenA))), 'WRONG_POOL_TOKENS');
+        IERC20[] memory _tokens = poolInfo.assetRouter.getTokens(poolInfo.pool);
+        require(((_tokens[0] == tokenA) && (_tokens[1] == tokenB)) || ((_tokens[0] == tokenB) && (_tokens[1] == tokenA)), 'WRONG_POOL_TOKENS');
         
         pools.push(poolInfo);
         require(pools.length <= 50, "TOO_MANY_POOLS");
@@ -202,8 +202,8 @@ contract UnoAutoStrategyBanxeDeprecated is Initializable, ERC20Upgradeable, Reen
 
         uint256 balanceA;
         uint256 balanceB;
-        address[] memory _tokens = pool.assetRouter.getTokens(pool.pool);
-        if(_tokens[0] == address(tokenA)){
+        IERC20[] memory _tokens = pool.assetRouter.getTokens(pool.pool);
+        if(_tokens[0] == tokenA){
             (, balanceA, balanceB) = pool.assetRouter.userStake(address(this), pool.pool);
         } else {
             (, balanceB, balanceA) = pool.assetRouter.userStake(address(this), pool.pool);
@@ -228,8 +228,8 @@ contract UnoAutoStrategyBanxeDeprecated is Initializable, ERC20Upgradeable, Reen
     function totalDeposits() external view returns(uint256 totalDepositsA, uint256 totalDepositsB){
         PoolInfo memory pool = pools[poolID];
 
-        address[] memory _tokens = pool.assetRouter.getTokens(pool.pool);
-        if(_tokens[0] == address(tokenA)){
+        IERC20[] memory _tokens = pool.assetRouter.getTokens(pool.pool);
+        if(_tokens[0] == tokenA){
             (, totalDepositsA, totalDepositsB) = pool.assetRouter.userStake(address(this), pool.pool);
         } else {
             (, totalDepositsB, totalDepositsA) = pool.assetRouter.userStake(address(this), pool.pool);
@@ -286,8 +286,8 @@ contract UnoAutoStrategyBanxeDeprecated is Initializable, ERC20Upgradeable, Reen
 
     function _deposit(uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin) internal returns (uint256 sentA, uint256 sentB, uint256 liquidity){
         PoolInfo memory pool = pools[poolID];
-        address[] memory _tokens = pool.assetRouter.getTokens(pool.pool);
-        if(_tokens[0] == address(tokenA)){
+        IERC20[] memory _tokens = pool.assetRouter.getTokens(pool.pool);
+        if(_tokens[0] == tokenA){
             (sentA, sentB, liquidity) = pool.assetRouter.deposit(pool.pool, amountA, amountB, amountAMin, amountBMin, address(this));
         } else {
             (sentB, sentA, liquidity) = pool.assetRouter.deposit(pool.pool, amountB, amountA, amountBMin, amountAMin, address(this));
@@ -296,8 +296,8 @@ contract UnoAutoStrategyBanxeDeprecated is Initializable, ERC20Upgradeable, Reen
 
     function _withdraw(uint256 amountLP, uint256 amountAMin, uint256 amountBMin, address recipient) internal returns (uint256 amountA, uint256 amountB){
         PoolInfo memory pool = pools[poolID];
-        address[] memory _tokens = pool.assetRouter.getTokens(pool.pool);
-        if(_tokens[0] == address(tokenA)){
+        IERC20[] memory _tokens = pool.assetRouter.getTokens(pool.pool);
+        if(_tokens[0] == tokenA){
             (amountA, amountB) = pool.assetRouter.withdraw(pool.pool, amountLP, amountAMin, amountBMin, recipient);
         } else {
             (amountB, amountA) = pool.assetRouter.withdraw(pool.pool, amountLP, amountBMin, amountAMin, recipient);

@@ -31,7 +31,7 @@ contract UnoAutoStrategyBanxeV2 is Initializable, ERC20Upgradeable, ReentrancyGu
     /**
      * @dev MoveLiquidityInfo:
      * {leftoverA} - TokenA leftovers after MoveLiquidity() call.
-     * {leftoverB} - TokenB leftovers after MoveLiquidity() call. 
+     * {leftoverB} - TokenB leftovers after MoveLiquidity() call.
      * {totalSupply} - totalSupply after MoveLiquidity() call.
      * {block} - MoveLiquidity() call block.
      */
@@ -104,12 +104,12 @@ contract UnoAutoStrategyBanxeV2 is Initializable, ERC20Upgradeable, ReentrancyGu
         __ReentrancyGuard_init();
         
         for (uint256 i = 0; i < poolInfos.length; i++) {
-            address[] memory _tokens = IUnoAssetRouter(poolInfos[i].assetRouter).getTokens(poolInfos[i].pool);
+            IERC20[] memory _tokens = IUnoAssetRouter(poolInfos[i].assetRouter).getTokens(poolInfos[i].pool);
             PoolInfo memory pool = PoolInfo({
                 pool: poolInfos[i].pool,
                 assetRouter: poolInfos[i].assetRouter,
-                tokenA: IERC20Upgradeable(_tokens[0]),
-                tokenB: IERC20Upgradeable(_tokens[1])
+                tokenA: IERC20Upgradeable(address(_tokens[0])),
+                tokenB: IERC20Upgradeable(address(_tokens[1]))
             });
             pools.push(pool);
 

@@ -2,6 +2,51 @@
 pragma solidity 0.8.10;
 
 interface IUnoFarm {
+    /**
+     * @dev DistributionInfo:
+     * {block} - Distribution block number.
+     * {rewardPerDepositAge} - Distribution reward divided by {totalDepositAge}. 
+     * {cumulativeRewardAgePerDepositAge} - Sum of {rewardPerDepositAge}s multiplied by distribution interval.
+     */
+    struct DistributionInfo {
+        uint256 block;
+        uint256 rewardPerDepositAge;
+        uint256 cumulativeRewardAgePerDepositAge;
+    }
+    /**
+     * @dev UserInfo:
+     * {stake} - Amount of LP tokens deposited by the user.
+     * {depositAge} - User deposits multiplied by blocks the deposit has been in. 
+     * {reward} - Amount of LP tokens entitled to the user.
+     * {lastDistribution} - Distribution ID before the last user deposit.
+     * {lastUpdate} - Deposit update block.
+     */
+    struct UserInfo {
+        uint256 stake;
+        uint256 depositAge;
+        uint256 reward;
+        uint32 lastDistribution;
+        uint256 lastUpdate;
+    }
+    /**
+     * @dev SwapInfo:
+     * {route} - Array of token addresses describing swap routes.
+     * {amountOutMin} - The minimum amount of output token that must be received for the transaction not to revert.
+     */
+    struct SwapInfo{
+        address[] route;
+        uint256 amountOutMin;
+    }
+    /**
+     * @dev FeeInfo:
+     * {feeCollector} - Contract to transfer fees to.
+     * {fee} - Fee percentage to collect (10^18 == 100%). 
+     */
+    struct FeeInfo {
+        address feeTo;
+        uint256 fee;
+    }
+
     function rewardToken() external view returns (address);
     function lpPair() external view returns (address);
     function tokenA() external view returns (address);
@@ -11,9 +56,13 @@ interface IUnoFarm {
     function initialize( address _lpStakingPool, address _assetRouter) external;
 
     function deposit(uint256 amountLP, address recipient) external;
-    function withdraw(uint256 amount, uint256 amountAMin, uint256 amountBMin, bool withdrawLP, address origin, address recipient) external returns(uint256 amountA, uint256 amountB);
+    function withdraw(uint256 amount, address origin, address recipient) external;
 
-    function distribute(address[] calldata rewardTokenToTokenARoute, address[] calldata rewardTokenToTokenBRoute, uint256[2] memory amountsOutMin) external returns(uint256 reward);
+    function distribute(
+        SwapInfo[4] calldata swapInfos,
+        SwapInfo[2] calldata feeSwapInfos,
+        FeeInfo calldata feeInfo
+    ) external returns(uint256 reward);
 
     function userBalance(address _address) external view returns (uint256);
     function getTotalDeposits() external view returns (uint256);
