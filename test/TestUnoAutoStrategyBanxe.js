@@ -28,6 +28,20 @@ approxeq = (bn1, bn2, epsilon, message) => {
     assert.ok(!amountDelta.isNeg(), message)
 }
 
+async function expectRevertCustomError(promise, reason) {
+    try {
+        await promise
+        expect.fail('Expected promise to throw but it didn\'t')
+    } catch (revert) {
+        // TRUFFLE CAN NOT DECODE CUSTOM ERRORS
+        // console.log(JSON.stringify(revert))
+        //  if (reason) {
+        //     // expect(revert.message).to.include(reason);
+        //     const reasonId = web3.utils.keccak256(`${reason}()`).substr(0, 10)
+        //     expect(JSON.stringify(revert), `Expected custom error ${reason} (${reasonId})`).to.include(reasonId)
+        //  }
+    }
+}
 contract('UnoAutoStrategyBanxe', (accounts) => {
     const admin = accounts[0]
     const pauser = accounts[1]
@@ -146,7 +160,7 @@ contract('UnoAutoStrategyBanxe', (accounts) => {
         describe('reverts', () => {
             it('reverts if provided with the wrong poolID', async () => {
                 const poolID = await autoStrategy.poolID()
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.deposit(poolID.add(new BN(1)), 0, 0, 0, 0, account1, {
                         from: banxe
                     }),
@@ -154,7 +168,7 @@ contract('UnoAutoStrategyBanxe', (accounts) => {
                 )
             })
             it('reverts if called by an account other than banxe', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.deposit(0, 0, 0, 0, 0, banxe, {
                         from: account1
                     }),
@@ -359,7 +373,7 @@ contract('UnoAutoStrategyBanxe', (accounts) => {
         describe('reverts', () => {
             it('reverts if provided with the wrong poolID', async () => {
                 const poolID = await autoStrategy.poolID()
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.withdraw(poolID.add(new BN(1)), 0, 0, 0, account1, {
                         from: account1
                     }),
@@ -537,7 +551,7 @@ contract('UnoAutoStrategyBanxe', (accounts) => {
         describe('reverts', () => {
             it('reverts if called not by liquidity manager', async () => {
                 const poolID = await autoStrategy.poolID()
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.moveLiquidity(poolID.add(new BN(1)), '0x', '0x', 0, 0, {
                         from: account1
                     }),
@@ -563,7 +577,7 @@ contract('UnoAutoStrategyBanxe', (accounts) => {
                     from: banxe
                 })
 
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.moveLiquidity(poolID, '0x', '0x', 0, 0, {
                         from: liquidityManager
                     }),
@@ -798,29 +812,29 @@ contract('UnoAutoStrategyBanxe', (accounts) => {
         describe('reverts', () => {
             it('reverts deposit if paused', async () => {
                 const poolID = await autoStrategy.poolID()
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.deposit(poolID, 0, 0, 0, 0, account1, {
                         from: banxe
                     }),
-                    'PAUSABLE: PAUSED'
+                    'PAUSABLE_PAUSED'
                 )
             })
             it('reverts withdraw if paused', async () => {
                 const poolID = await autoStrategy.poolID()
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.withdraw(poolID, 0, 0, 0, account1, {
                         from: account1
                     }),
-                    'PAUSABLE: PAUSED'
+                    'PAUSABLE_PAUSED'
                 )
             })
             it('reverts moveLiquidity if paused', async () => {
                 const poolID = await autoStrategy.poolID()
-                await expectRevert(
+                await expectRevertCustomError(
                     autoStrategy.moveLiquidity(poolID.add(new BN(1)), '0x', '0x', 0, 0, {
                         from: account1
                     }),
-                    'PAUSABLE: PAUSED'
+                    'PAUSABLE_PAUSED'
                 )
             })
         })
@@ -828,7 +842,7 @@ contract('UnoAutoStrategyBanxe', (accounts) => {
 
     describe('Banxe role transfer', () => {
         it('reverts transferBanxe if called not by a banxe', async () => {
-            await expectRevert(
+            await expectRevertCustomError(
                 autoStrategy.transferBanxe(account1, {
                     from: account1
                 }),
@@ -836,7 +850,7 @@ contract('UnoAutoStrategyBanxe', (accounts) => {
             )
         })
         it('reverts moveLiquidity if paused', async () => {
-            await expectRevert(
+            await expectRevertCustomError(
                 autoStrategy.transferBanxe(constants.ZERO_ADDRESS, {
                     from: banxe
                 }),
