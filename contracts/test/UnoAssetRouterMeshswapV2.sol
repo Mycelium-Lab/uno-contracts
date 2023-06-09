@@ -2,6 +2,7 @@
 pragma solidity 0.8.10;
 
 import { IUnoFarmMeshswap as Farm } from "../apps/meshswap/interfaces/IUnoFarmMeshswap.sol";
+import '../interfaces/IUnoFarm.sol';
 import '../interfaces/IUniswapV2Router.sol';
 import "../interfaces/IUnoFarmFactory.sol";
 import "../interfaces/IUnoAccessManager.sol";
@@ -448,7 +449,7 @@ contract UnoAssetRouterMeshswapV2 is Initializable, PausableUpgradeable, UUPSUpg
 		uint256 reward = farm.distribute(
 			swapInfos,
 			feeSwapInfo,
-			Farm.FeeInfo(feeTo, fee)
+			IUnoFarm.FeeInfo(feeTo, fee)
 		);
 		emit Distribute(lpPair, reward);
 	}

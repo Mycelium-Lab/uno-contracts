@@ -2,6 +2,7 @@
 pragma solidity 0.8.10;
 
 import {IUnoFarmQuickswap as Farm} from '../apps/quickswap/interfaces/IUnoFarmQuickswap.sol'; 
+import '../interfaces/IUnoFarm.sol';
 import '../interfaces/IUniswapV2Router.sol';
 import '../interfaces/IUnoFarmFactory.sol';
 import '../interfaces/IUnoAccessManager.sol'; 
@@ -447,7 +448,7 @@ contract UnoAssetRouterQuickswapV2 is Initializable, PausableUpgradeable, UUPSUp
         Farm farm = Farm(farmFactory.Farms(lpStakingPool));
         require(farm != Farm(address(0)), 'FARM_NOT_EXISTS');
 
-        uint256 reward = farm.distribute(swapInfos, feeSwapInfo, Farm.FeeInfo(feeTo, fee));
+        uint256 reward = farm.distribute(swapInfos, feeSwapInfo, IUnoFarm.FeeInfo(feeTo, fee));
         emit Distribute(lpStakingPool, reward);
     }
 

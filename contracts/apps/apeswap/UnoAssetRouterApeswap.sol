@@ -5,6 +5,7 @@ import './interfaces/IUnoAssetRouterApeswap.sol';
 import '../../interfaces/IUnoFarm.sol';
 import "../../interfaces/IAggregationRouterV5.sol";
 import "../../interfaces/IUniswapV2Pair.sol";
+import "../../interfaces/IUniswapV2Router.sol";
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 import '@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol';
@@ -27,7 +28,7 @@ contract UnoAssetRouterApeswap is Initializable, PausableUpgradeable, UUPSUpgrad
     uint256 public fee;
 
     address public constant WMATIC = 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270;
-    IUniswapV2Router01 public constant ApeswapRouter = IUniswapV2Router01(0xC0788A3aD43d79aa53B09c2EaCc313A787d1d607);
+    IUniswapV2Router01 private constant ApeswapRouter = IUniswapV2Router01(0xC0788A3aD43d79aa53B09c2EaCc313A787d1d607);
     address private constant OneInchRouter = 0x1111111254EEB25477B68fb85Ed929f73A960582;
 
     modifier onlyRole(bytes32 role){
@@ -228,9 +229,7 @@ contract UnoAssetRouterApeswap is Initializable, PausableUpgradeable, UUPSUpgrad
             (amountToken, amountETH) = _removeLiquidityETH(lpPair, tokenB, amount, amountTokenMin, amountETHMin, recipient);
         } else if (tokenB == WMATIC) {
             (amountToken, amountETH) = _removeLiquidityETH(lpPair, tokenA, amount, amountTokenMin, amountETHMin, recipient);
-        } else {
-            revert NOT_ETH_FARM();
-        }
+        } else revert NOT_ETH_FARM();
 
         emit Withdraw(lpPair, msg.sender, recipient, amount);
     }
@@ -291,12 +290,12 @@ contract UnoAssetRouterApeswap is Initializable, PausableUpgradeable, UUPSUpgrad
         Farm.SwapInfo[4] calldata swapInfos,
         Farm.SwapInfo[2] calldata feeSwapInfos,
         address feeTo
-    ) external whenNotPaused onlyRole(DISTRIBUTOR_ROLE) {
+    ) external whenNotPaused onlyRole(DISTRIBUTOR_ROLE) returns(uint256 reward){
         Farm farm = Farm(farmFactory.Farms(lpPair));
         if(farm == Farm(address(0))) revert FARM_NOT_EXISTS();
 
         //I don't understand why the definition for FeeInfo can not be imported from Farm
-        uint256 reward = farm.distribute(swapInfos, feeSwapInfos, IUnoFarm.FeeInfo(feeTo, fee));
+        reward = farm.distribute(swapInfos, feeSwapInfos, IUnoFarm.FeeInfo(feeTo, fee));
         emit Distribute(lpPair, reward);
     }
 
@@ -487,7 +486,7 @@ contract UnoAssetRouterApeswap is Initializable, PausableUpgradeable, UUPSUpgrad
         if(maxAmount > spentAmount){
             dust = maxAmount - spentAmount;
             desc.srcToken.safeTransfer(recipient, dust);
-        }else revert INSUFFICIENT_AMOUNT();
+        } else revert INSUFFICIENT_AMOUNT();
     }
 
     function _checkMsgValue(bytes[2] calldata swapData) internal view {

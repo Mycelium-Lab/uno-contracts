@@ -58,7 +58,6 @@ interface IUnoFarm {
     error INVALID_ROUTE(address fromToken, address toToken);
     error INVALID_FEE_ROUTE(address feeToken);
 
-    function rewardToken() external view returns (address);
     function lpPair() external view returns (address);
     function tokenA() external view returns (address);
     function tokenB() external view returns (address);
@@ -68,12 +67,6 @@ interface IUnoFarm {
 
     function deposit(uint256 amountLP, address recipient) external;
     function withdraw(uint256 amount, address origin, address recipient) external;
-
-    function distribute(
-        SwapInfo[4] calldata swapInfos,
-        SwapInfo[2] calldata feeSwapInfos,
-        FeeInfo calldata feeInfo
-    ) external returns(uint256 reward);
 
     function userBalance(address _address) external view returns (uint256);
     function getTotalDeposits() external view returns (uint256);

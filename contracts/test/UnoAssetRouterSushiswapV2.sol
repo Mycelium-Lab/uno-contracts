@@ -2,6 +2,7 @@
 pragma solidity 0.8.10;
 
 import {IUnoFarmSushiswap as Farm} from '../apps/sushiswap/interfaces/IUnoFarmSushiswap.sol'; 
+import '../interfaces/IUnoFarm.sol';
 import '../interfaces/IUniswapV2Router.sol';
 import '../interfaces/IUnoFarmFactory.sol';
 import '../interfaces/IUnoAccessManager.sol'; 
@@ -447,7 +448,7 @@ contract UnoAssetRouterSushiswapV2 is Initializable, PausableUpgradeable, UUPSUp
         Farm farm = Farm(farmFactory.Farms(lpPair));
         require(farm != Farm(address(0)), 'FARM_NOT_EXISTS');
 
-        uint256 reward = farm.distribute(swapInfos, feeSwapInfos, Farm.FeeInfo(feeTo, fee));
+        uint256 reward = farm.distribute(swapInfos, feeSwapInfos, IUnoFarm.FeeInfo(feeTo, fee));
         emit Distribute(lpPair, reward);
     }
 
