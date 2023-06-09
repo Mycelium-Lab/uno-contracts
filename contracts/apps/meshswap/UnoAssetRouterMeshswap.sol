@@ -486,7 +486,7 @@ contract UnoAssetRouterMeshswap is Initializable, PausableUpgradeable, UUPSUpgra
         if(maxAmount > spentAmount){
             dust = maxAmount - spentAmount;
             desc.srcToken.safeTransfer(recipient, dust);
-        }else revert INSUFFICIENT_AMOUNT();
+        } else if(maxAmount != spentAmount) revert INSUFFICIENT_AMOUNT();
     }
 
     function _checkMsgValue(bytes[2] calldata swapData) internal view {

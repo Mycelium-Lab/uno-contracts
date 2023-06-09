@@ -181,7 +181,7 @@ contract UnoAssetRouterQuickswapDual is Initializable, PausableUpgradeable, UUPS
             farm = Farm(farmFactory.createFarm(lpStakingPool));
         }
 
-        IERC20(farm.lpPair()).safeTransferFrom(msg.sender, address(farm), amount);
+        IERC20(farm.lpPool()).safeTransferFrom(msg.sender, address(farm), amount);
         farm.deposit(amount, recipient);
 
         emit Deposit(lpStakingPool, msg.sender, recipient, amount); 
@@ -203,7 +203,7 @@ contract UnoAssetRouterQuickswapDual is Initializable, PausableUpgradeable, UUPS
         if(farm == Farm(address(0))) revert FARM_NOT_EXISTS();
         
         farm.withdraw(amount, msg.sender, address(this));
-        (amountA, amountB) = _removeLiquidity(farm.lpPair(), farm.tokenA(), farm.tokenB(), amount, amountAMin, amountBMin, recipient);
+        (amountA, amountB) = _removeLiquidity(farm.lpPool(), farm.tokenA(), farm.tokenB(), amount, amountAMin, amountBMin, recipient);
 
         emit Withdraw(lpStakingPool, msg.sender, recipient, amount);  
     }
@@ -225,7 +225,7 @@ contract UnoAssetRouterQuickswapDual is Initializable, PausableUpgradeable, UUPS
 
         address tokenA = farm.tokenA();
         address tokenB = farm.tokenB();
-        address lpPair = farm.lpPair();
+        address lpPair = farm.lpPool();
 
         farm.withdraw(amount, msg.sender, address(this));
         if (tokenA == WMATIC) {
@@ -314,7 +314,7 @@ contract UnoAssetRouterQuickswapDual is Initializable, PausableUpgradeable, UUPS
         Farm farm = Farm(farmFactory.Farms(lpStakingPool));
         if (farm != Farm(address(0))) {
             stakeLP = farm.userBalance(_address);
-            address lpPair = farm.lpPair();
+            address lpPair = farm.lpPool();
             (stakeA, stakeB) = _getTokenStake(lpPair, stakeLP);
         }
     }
@@ -331,7 +331,7 @@ contract UnoAssetRouterQuickswapDual is Initializable, PausableUpgradeable, UUPS
         Farm farm = Farm(farmFactory.Farms(lpStakingPool));
         if (farm != Farm(address(0))) {
             totalDepositsLP = farm.getTotalDeposits();
-            address lpPair = farm.lpPair();
+            address lpPair = farm.lpPool();
             (totalDepositsA, totalDepositsB) = _getTokenStake(lpPair, totalDepositsLP);
         }
     }
@@ -491,7 +491,7 @@ contract UnoAssetRouterQuickswapDual is Initializable, PausableUpgradeable, UUPS
         if(maxAmount > spentAmount){
             dust = maxAmount - spentAmount;
             desc.srcToken.safeTransfer(recipient, dust);
-        } else revert INSUFFICIENT_AMOUNT();
+        } else if(maxAmount != spentAmount) revert INSUFFICIENT_AMOUNT();
     }
 
     function _checkMsgValue(bytes[2] calldata swapData) internal view {

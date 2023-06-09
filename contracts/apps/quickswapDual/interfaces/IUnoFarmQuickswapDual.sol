@@ -4,6 +4,8 @@ pragma solidity 0.8.10;
 import '../../../interfaces/IUnoFarm.sol';
 
 interface IUnoFarmQuickswapDual is IUnoFarm {
+    function tokenA() external view returns (address);
+    function tokenB() external view returns (address);
     function rewardTokenA() external view returns(address);
     function rewardTokenB() external view returns(address);
 

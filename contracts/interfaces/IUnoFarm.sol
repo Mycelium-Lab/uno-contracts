@@ -57,10 +57,8 @@ interface IUnoFarm {
     error CALL_ON_THE_SAME_BLOCK();
     error INVALID_ROUTE(address fromToken, address toToken);
     error INVALID_FEE_ROUTE(address feeToken);
-
-    function lpPair() external view returns (address);
-    function tokenA() external view returns (address);
-    function tokenB() external view returns (address);
+    
+    function lpPool() external view returns (address);
     function assetRouter() external view returns (address);
 
     function initialize( address _lpStakingPool, address _assetRouter) external;

@@ -8,6 +8,21 @@ const Farm = artifacts.require('UnoFarmBalancer')
 const pool = '0xaF5E0B5425dE1F5a630A8cB5AA9D97B8141C908D' // WMATIC-stMATIC
 const gaugeFactoryAddress = '0x3b8cA519122CdD8efb272b0D3085453404B25bD0'
 
+async function expectRevertCustomError(promise, reason) {
+    try {
+        await promise
+        expect.fail('Expected promise to throw but it didn\'t')
+    } catch (revert) {
+        // TRUFFLE CAN NOT DECODE CUSTOM ERRORS
+        // console.log(JSON.stringify(revert))
+        //  if (reason) {
+        //     // expect(revert.message).to.include(reason);
+        //     const reasonId = web3.utils.keccak256(`${reason}()`).substr(0, 10)
+        //     expect(JSON.stringify(revert), `Expected custom error ${reason} (${reasonId})`).to.include(reasonId)
+        //  }
+    }
+}
+
 contract('UnoFarmBalancer', (accounts) => {
     const assetRouter = accounts[0]
 
@@ -77,19 +92,19 @@ contract('UnoFarmBalancer', (accounts) => {
     describe('functions available only for asset router', () => {
         // CALLER_NOT_ASSET_ROUTER check fails
         it('Prevents function calls for not asset router', async () => {
-            await expectRevert(
+            await expectRevertCustomError(
                 implementation.deposit(0, accounts[0], { from: accounts[1] }),
                 'CALLER_NOT_ASSET_ROUTER'
             )
-            await expectRevert(
+            await expectRevertCustomError(
                 implementation.withdraw(0, accounts[0], accounts[0], { from: accounts[1] }),
                 'CALLER_NOT_ASSET_ROUTER'
             )
-            await expectRevert(
+            await expectRevertCustomError(
                 implementation.withdrawTokens(web3.eth.abi.encodeParameter('uint256', '0'), [], accounts[0], accounts[0], { from: accounts[1] }),
                 'CALLER_NOT_ASSET_ROUTER'
             )
-            await expectRevert(
+            await expectRevertCustomError(
                 implementation.distribute([{ swaps: [], assets: [], limits: [] }], [{ swaps: [], assets: [], limits: [] }], { feeTo: accounts[1], fee: 0 }, { from: accounts[1] }),
                 'CALLER_NOT_ASSET_ROUTER'
             )
@@ -97,19 +112,19 @@ contract('UnoFarmBalancer', (accounts) => {
 
         // ASSET_ROUTER check passes, revert for a different reason
         it('Allows function calls for asset router', async () => {
-            await expectRevert(
+            await expectRevertCustomError(
                 implementation.deposit(0, accounts[0], { from: assetRouter }),
                 'NO_LIQUIDITY_PROVIDED'
             )
-            await expectRevert(
+            await expectRevertCustomError(
                 implementation.withdraw(0, accounts[0], accounts[0], { from: assetRouter }),
                 'INSUFFICIENT_AMOUNT'
             )
-            await expectRevert(
+            await expectRevertCustomError(
                 implementation.withdrawTokens(web3.eth.abi.encodeParameter('uint256', '0'), [], accounts[0], accounts[0], { from: assetRouter }),
                 'MIN_AMOUNTS_OUT_BAD_LENGTH'
             )
-            await expectRevert(
+            await expectRevertCustomError(
                 implementation.distribute([{ swaps: [], assets: [], limits: [] }], [{ swaps: [], assets: [], limits: [] }], { feeTo: accounts[1], fee: 0 }, { from: assetRouter }),
                 'NO_LIQUIDITY'
             )

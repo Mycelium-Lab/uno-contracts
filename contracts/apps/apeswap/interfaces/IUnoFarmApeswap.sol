@@ -6,6 +6,8 @@ import '../../../interfaces/IUnoFarm.sol';
 interface IUnoFarmApeswap is IUnoFarm {
     error PID_NOT_EXISTS();
 
+    function tokenA() external view returns (address);
+    function tokenB() external view returns (address);
     function rewardToken() external view returns (address);
     function rewarderToken() external view returns (address);
     function pid() external view returns (uint256);

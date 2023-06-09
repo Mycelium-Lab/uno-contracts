@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MITlpPair
 pragma solidity 0.8.10;
 
 import './interfaces/IUnoAssetRouterApeswap.sol'; 
@@ -486,7 +486,7 @@ contract UnoAssetRouterApeswap is Initializable, PausableUpgradeable, UUPSUpgrad
         if(maxAmount > spentAmount){
             dust = maxAmount - spentAmount;
             desc.srcToken.safeTransfer(recipient, dust);
-        } else revert INSUFFICIENT_AMOUNT();
+        } else if(maxAmount != spentAmount) revert INSUFFICIENT_AMOUNT();
     }
 
     function _checkMsgValue(bytes[2] calldata swapData) internal view {

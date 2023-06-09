@@ -1,64 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
  
-import "../../interfaces/IVault.sol";
+ 
+import './interfaces/IUnoFarmBalancer.sol';
 import "../../interfaces/IBasePool.sol";
 import '../../interfaces/IChildChainLiquidityGaugeFactory.sol';
-import "../../interfaces/IRewardsOnlyGauge.sol"; 
 import "../../interfaces/IChildChainStreamer.sol"; 
 import '@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol';
-import '@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol';
-import '@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol';
+import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 
-contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
-    using SafeERC20Upgradeable for IERC20Upgradeable;
-    /**
-     * @dev DistributionInfo:
-     * {block} - Distribution block number.
-     * {rewardPerDepositAge} - Distribution reward divided by {totalDepositAge}. 
-     * {cumulativeRewardAgePerDepositAge} - Sum of {rewardPerDepositAge}s multiplied by distribution interval.
-     */
-    struct DistributionInfo {
-        uint256 block;
-        uint256 rewardPerDepositAge;
-        uint256 cumulativeRewardAgePerDepositAge;
-    }
-    /**
-     * @dev UserInfo:
-     * {stake} - Amount of LP tokens deposited by the user.
-     * {depositAge} - User deposits multiplied by blocks the deposit has been in. 
-     * {reward} - Amount of LP tokens entitled to the user.
-     * {lastDistribution} - Distribution ID before the last user deposit.
-     * {lastUpdate} - Deposit update block.
-     */
-    struct UserInfo {
-        uint256 stake;
-        uint256 depositAge;
-        uint256 reward;
-        uint32 lastDistribution;
-        uint256 lastUpdate;
-    }
-    /**
-     * @dev SwapInfo:
-     * {swaps} - Data used for token swaps.
-     * {assets} - Assets used in swaps.
-     * {limits} - Swap slippage limits.
-     */
-    struct SwapInfo{
-        IVault.BatchSwapStep[] swaps;
-        IERC20[] assets;
-        int256[] limits;
-    }
-    /**
-     * @dev FeeInfo:
-     * {feeCollector} - Contract to transfer fees to.
-     * {fee} - Fee percentage to collect (10^18 == 100%). 
-     */
-    struct FeeInfo {
-        address feeTo;
-        uint256 fee;
-    }
+contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable, IUnoFarmBalancer {
+    using SafeERC20 for IERC20;
 
     /**
      * @dev Third Party Contracts:
@@ -106,7 +59,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
      */
     address public assetRouter;
     modifier onlyAssetRouter(){
-        require(msg.sender == assetRouter, 'CALLER_NOT_ASSET_ROUTER');
+        if(msg.sender != assetRouter) revert CALLER_NOT_ASSET_ROUTER();
         _;
     }
 
@@ -116,8 +69,8 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
     // ============ Methods ============
 
     function initialize(address _lpPool, address _assetRouter) external initializer {
-        require (_lpPool != address(0), 'BAD_LP_POOL');
-        require (_assetRouter != address(0), 'BAD_ASSET_ROUTER');
+        if(_lpPool == address(0)) revert INVALID_LP_POOL();
+        if(_assetRouter == address(0)) revert INVALID_ASSET_ROUTER();
 
         __ReentrancyGuard_init();
         assetRouter = _assetRouter;
@@ -153,7 +106,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
      * Deposits {amount} of LP tokens from this contract's balance to the {Vault}.
      */
     function deposit(uint256 amount, address recipient) external nonReentrant onlyAssetRouter{
-        require (amount > 0, 'NO_LIQUIDITY_PROVIDED');
+        if(amount == 0) revert NO_LIQUIDITY_PROVIDED();
         
         _updateDeposit(recipient);
         userInfo[recipient].stake += amount;
@@ -168,7 +121,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
     function withdraw(uint256 amount, address origin, address recipient) external nonReentrant onlyAssetRouter{
         _onWithdrawUpdate(amount, origin);
         gauge.withdraw(amount);
-        IERC20Upgradeable(lpPool).safeTransfer(recipient, amount);
+        IERC20(lpPool).safeTransfer(recipient, amount);
     }
 
     /**
@@ -176,20 +129,22 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
      */
     function withdrawTokens(bytes calldata userData, uint256[] calldata minAmountsOut, address origin, address recipient) external nonReentrant onlyAssetRouter returns(uint256[] memory amounts, uint256 liquidity){
         (IERC20[] memory tokens, , ) = Vault.getPoolTokens(poolId);
-        require (minAmountsOut.length == tokens.length, 'MIN_AMOUNTS_OUT_BAD_LENGTH');
+        if(minAmountsOut.length != tokens.length) revert INVALID_MIN_AMOUNTS_OUT_LENGTH();
+
         (amounts, liquidity) = _exitPool(userData, minAmountsOut, tokens, recipient);
         _onWithdrawUpdate(liquidity, origin);
     }
 
     function _onWithdrawUpdate(uint256 amount, address origin) internal{
-        require(amount > 0, 'INSUFFICIENT_AMOUNT');
+        if(amount == 0) revert INSUFFICIENT_AMOUNT();
 
         _updateDeposit(origin);
         UserInfo storage user = userInfo[origin];
         // Subtract amount from user.reward first, then subtract remainder from user.stake.
         if(amount > user.reward){
             uint256 balance = user.stake + user.reward;
-            require(amount <= balance, 'INSUFFICIENT_BALANCE');
+            if(amount > balance) revert INSUFFICIENT_BALANCE();
+
             user.stake = balance - amount;
             totalDeposits = totalDeposits + user.reward - amount;
             user.reward = 0;
@@ -232,17 +187,17 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
         SwapInfo[] calldata feeSwapInfos,
         FeeInfo calldata feeInfo
     ) external onlyAssetRouter nonReentrant returns(uint256 reward){
-        require(totalDeposits > 0, 'NO_LIQUIDITY');
-        require(distributionInfo[distributionID - 1].block != block.number, 'CANT_CALL_ON_THE_SAME_BLOCK');
+        if(totalDeposits == 0) revert NO_LIQUIDITY();
+        if(distributionInfo[distributionID - 1].block == block.number) revert CALL_ON_THE_SAME_BLOCK();
 
         uint256 rewardCount = streamer.reward_count();
-        require((swapInfos.length == rewardCount) && (feeSwapInfos.length == rewardCount), 'PARAMS_LENGTHS_NOT_MATCH_REWARD_COUNT');
+        if((swapInfos.length != rewardCount) || (feeSwapInfos.length != rewardCount)) revert PARAMS_LENGTHS_NOT_MATCH_REWARD_COUNT();
 
         gauge.claim_rewards();
         for (uint256 i = 0; i < rewardCount; i++) {
-            IERC20Upgradeable rewardToken = IERC20Upgradeable(streamer.reward_tokens(i));
+            IERC20 rewardToken = streamer.reward_tokens(i);
             if (address(rewardToken) != address(gauge) && address(rewardToken) != lpPool) {  //can't use LP tokens in swap
-                collectFees(feeSwapInfos[i], feeInfo, rewardToken);
+                _collectFees(feeSwapInfos[i], feeInfo, rewardToken);
                 uint256 balance = rewardToken.balanceOf(address(this));
                 if(balance > 0){
                     rewardToken.approve(address(Vault), balance);
@@ -300,9 +255,9 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
     }
 
     /**
-     * @dev Swaps and sends fees to feeTo.
+     * @dev Swaps and sends fees to feeTo.//TODO: use quickswap router or 1inch?
      */
-    function collectFees(SwapInfo calldata feeSwapInfo, FeeInfo calldata feeInfo, IERC20Upgradeable token) internal {
+    function _collectFees(SwapInfo calldata feeSwapInfo, FeeInfo calldata feeInfo, IERC20 token) internal {
         if(feeInfo.feeTo != address(0)){
             uint256 feeAmount = token.balanceOf(address(this)) * feeInfo.fee / fractionMultiplier;
             if(feeAmount > 0){
@@ -334,7 +289,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
      * @dev Returns total funds staked by the {_address}.
      */
     function userBalance(address _address) external view returns (uint256) {
-        return userInfo[_address].stake + userReward(_address);
+        return userInfo[_address].stake + _userReward(_address);
     }
 
     /**
@@ -354,7 +309,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
             user.depositAge += user.stake * (block.number - user.lastUpdate);
         } else {
             // A reward has been distributed, update user.reward.
-            user.reward = userReward(_address);
+            user.reward = _userReward(_address);
             // Count fresh deposit age from previous reward distribution to now.
             user.depositAge = user.stake * (block.number - distributionInfo[distributionID - 1].block);
         }
@@ -367,7 +322,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable {
         totalDepositLastUpdate = block.number;
     }
 
-    function userReward(address _address) internal view returns (uint256) {
+    function _userReward(address _address) internal view returns (uint256) {
         UserInfo memory user = userInfo[_address];
         if (user.lastDistribution == distributionID) {
             // Return user.reward if the distribution after the last user deposit did not happen yet.
