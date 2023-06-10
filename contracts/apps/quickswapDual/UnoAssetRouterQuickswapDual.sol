@@ -257,7 +257,7 @@ contract UnoAssetRouterQuickswapDual is Initializable, PausableUpgradeable, UUPS
 
         address tokenA = farm.tokenA();
         address tokenB = farm.tokenB();
-        (uint256 _amountA, uint256 _amountB) = _removeLiquidity(lpStakingPool, tokenA, tokenB, amount, 0, 0, address(this));
+        (uint256 _amountA, uint256 _amountB) = _removeLiquidity(farm.lpPool(), tokenA, tokenB, amount, 0, 0, address(this));
         
         (amount0, amountA) = _swapWithdraw(swapData[0], IERC20(tokenA), _amountA, recipient);
         (amount1, amountB) = _swapWithdraw(swapData[1], IERC20(tokenB), _amountB, recipient);

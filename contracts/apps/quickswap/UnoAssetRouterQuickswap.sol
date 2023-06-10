@@ -136,7 +136,6 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
      * @return liquidity - Total liquidity sent to the farm (in lpTokens).
      */
     function depositWithSwap(address lpStakingPool, bytes[2] calldata swapData, address recipient) external payable whenNotPaused returns(uint256 sent0, uint256 sent1, uint256 dustA, uint256 dustB, uint256 liquidity){
-
         Farm farm = Farm(farmFactory.Farms(lpStakingPool));
         if(farm == Farm(address(0))){
             farm = Farm(farmFactory.createFarm(lpStakingPool));
@@ -257,7 +256,7 @@ contract UnoAssetRouterQuickswap is Initializable, PausableUpgradeable, UUPSUpgr
 
         address tokenA = farm.tokenA();
         address tokenB = farm.tokenB();
-        (uint256 _amountA, uint256 _amountB) = _removeLiquidity(lpStakingPool, tokenA, tokenB, amount, 0, 0, address(this));
+        (uint256 _amountA, uint256 _amountB) = _removeLiquidity(farm.lpPool(), tokenA, tokenB, amount, 0, 0, address(this));
         
         (amount0, amountA) = _swapWithdraw(swapData[0], IERC20(tokenA), _amountA, recipient);
         (amount1, amountB) = _swapWithdraw(swapData[1], IERC20(tokenB), _amountB, recipient);

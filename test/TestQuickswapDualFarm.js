@@ -56,9 +56,9 @@ contract('UnoFarmQuickswapDual', (accounts) => {
     })
 
     describe('Initializes variables', () => {
-        it('Sets lpPair', async () => {
+        it('Sets lpPool', async () => {
             assert.equal(
-                await implementation.lpPair(),
+                await implementation.lpPool(),
                 stakingToken.address,
                 'Staking token is not correct'
             )

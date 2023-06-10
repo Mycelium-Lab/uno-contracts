@@ -250,8 +250,7 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
         if(pid != poolID) revert BAD_POOL_ID();
         PoolInfo memory pool = pools[poolID];
 
-        _transferSwapTokens(address(pool.assetRouter), swapData[0]);
-        _transferSwapTokens(address(pool.assetRouter), swapData[1]);
+        _transferSwapTokens(address(pool.assetRouter), swapData);
 
         uint256 amountLP;
         (sent0, sent1, dustA, dustB, amountLP) = pool.assetRouter.depositWithSwap{value: msg.value}(pool.pool, swapData, address(this));
@@ -569,11 +568,25 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
         reserveLP = balanceLP - amountLP;
     }
 
-    function _transferSwapTokens(address assetRouter, bytes calldata swapData) internal {
-        (,IAggregationRouterV5.SwapDescription memory desc,) = abi.decode(swapData[4:], (address, IAggregationRouterV5.SwapDescription, bytes));
-        if(!_isETH(desc.srcToken)){
-            desc.srcToken.safeTransferFrom(msg.sender, address(this), desc.amount);
-            desc.srcToken.approve(assetRouter, desc.amount);
+    function _transferSwapTokens(address assetRouter, bytes[2] calldata swapData) internal {
+        (,IAggregationRouterV5.SwapDescription memory desc0,) = abi.decode(swapData[0][4:], (address, IAggregationRouterV5.SwapDescription, bytes));
+        (,IAggregationRouterV5.SwapDescription memory desc1,) = abi.decode(swapData[1][4:], (address, IAggregationRouterV5.SwapDescription, bytes));
+
+        if(desc0.srcToken == desc1.srcToken){
+            if(!_isETH(desc0.srcToken)){
+                uint256 amount = desc0.amount + desc1.amount;
+                desc0.srcToken.safeTransferFrom(msg.sender, address(this), amount);
+                desc0.srcToken.approve(assetRouter, amount);
+            }
+        }else{
+            if(!_isETH(desc0.srcToken)){
+                desc0.srcToken.safeTransferFrom(msg.sender, address(this), desc0.amount);
+                desc0.srcToken.approve(assetRouter, desc0.amount);
+            }
+            if(!_isETH(desc1.srcToken)){
+                desc1.srcToken.safeTransferFrom(msg.sender, address(this), desc1.amount);
+                desc1.srcToken.approve(assetRouter, desc1.amount);
+            }
         }
     }
 

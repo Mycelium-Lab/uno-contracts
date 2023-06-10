@@ -4,6 +4,15 @@ pragma solidity 0.8.10;
 import '../../../interfaces/IUnoFarm.sol';
 
 interface IUnoFarmApeswap is IUnoFarm {
+    /**
+     * @dev SwapInfo:
+     * {route} - Array of token addresses describing swap routes.
+     * {amountOutMin} - The minimum amount of output token that must be received for the transaction not to revert.
+     */
+    struct SwapInfo{
+        address[] route;
+        uint256 amountOutMin;
+    }
     error PID_NOT_EXISTS();
 
     function tokenA() external view returns (address);

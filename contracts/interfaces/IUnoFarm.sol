@@ -29,15 +29,6 @@ interface IUnoFarm {
         uint256 lastUpdate;
     }
     /**
-     * @dev SwapInfo:
-     * {route} - Array of token addresses describing swap routes.
-     * {amountOutMin} - The minimum amount of output token that must be received for the transaction not to revert.
-     */
-    struct SwapInfo{
-        address[] route;
-        uint256 amountOutMin;
-    }
-    /**
      * @dev FeeInfo:
      * {feeCollector} - Contract to transfer fees to.
      * {fee} - Fee percentage to collect (10^18 == 100%). 
