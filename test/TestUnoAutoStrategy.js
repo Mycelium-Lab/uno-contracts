@@ -191,13 +191,13 @@ contract('UnoAutoStrategy', (accounts) => {
                     'BAD_POOL_ID'
                 )
                 await expectRevertCustomError(
-                    autoStrategy.depositSingleAsset(poolID.add(new BN(1)), account1, 0, ['0x', '0x'], 0, 0, account1, constants.ZERO_ADDRESS, {
+                    autoStrategy.depositWithSwap(poolID.add(new BN(1)), ['0x', '0x'], account1, constants.ZERO_ADDRESS, {
                         from: account1
                     }),
                     'BAD_POOL_ID'
                 )
                 await expectRevertCustomError(
-                    autoStrategy.depositSingleETH(poolID.add(new BN(1)), ['0x', '0x'], 0, 0, account1, constants.ZERO_ADDRESS, {
+                    autoStrategy.depositWithSwap(poolID.add(new BN(1)), ['0x', '0x'], account1, constants.ZERO_ADDRESS, {
                         from: account1
                     }),
                     'BAD_POOL_ID'
@@ -464,13 +464,13 @@ contract('UnoAutoStrategy', (accounts) => {
                     'BAD_POOL_ID'
                 )
                 await expectRevertCustomError(
-                    autoStrategy.withdrawSingleAsset(poolID.add(new BN(1)), 0, account1, ['0x', '0x'], account1, {
+                    autoStrategy.withdrawWithSwap(poolID.add(new BN(1)), 0, ['0x', '0x'], account1, {
                         from: account1
                     }),
                     'BAD_POOL_ID'
                 )
                 await expectRevertCustomError(
-                    autoStrategy.withdrawSingleETH(poolID.add(new BN(1)), 0, ['0x', '0x'], account1, {
+                    autoStrategy.withdrawWithSwap(poolID.add(new BN(1)), 0, ['0x', '0x'], account1, {
                         from: account1
                     }),
                     'BAD_POOL_ID'

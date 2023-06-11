@@ -316,7 +316,7 @@ contract('UnoAutoStrategyFactory', (accounts) => {
                     from: account1
                 })
 
-                await autoStrategy.deposit(id, amounts[1], amounts[2], 0, 0, account1, { from: account1 })
+                await autoStrategy.deposit(id, amounts[1], amounts[2], 0, 0, account1, account1, { from: account1 })
             })
             it('updates autoStrategiesLength', async () => {
                 const autoStrategiesLength = await autoStrategyFactory.autoStrategiesLength()
