@@ -493,22 +493,6 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
         if(msg.value != value) revert INVALID_MSG_VALUE();
     }
 
-    /**
-     * @dev Swaps assets using 1inch exchange.
-     */  
-    function _swap(bytes calldata swapData, address toToken) internal returns(bytes memory data){
-        uint256 balanceBefore = IERC20(toToken).balanceOf(address(this));
-        bool success;
-        (success, data) = OneInchRouter.call(swapData);
-        if(!success) revert SWAP_NOT_SUCCESSFUL();
-
-        //not return returnAmount with spentAmount to avoid stack too deep errors
-        (uint256 returnAmount,) = abi.decode(data, (uint256, uint256));
-        //checks if all {{toToken}}s from swap were transfered to this address
-        uint256 balanceAfter = IERC20(toToken).balanceOf(address(this));
-        require(balanceAfter - balanceBefore == returnAmount, "BAD_RETURN_AMOUNT");
-    }
-
     function _convertToAddressArray(IERC20[] memory tokenArray) internal pure returns (address[] memory addresses) {
         addresses = new address[](tokenArray.length);
         for (uint256 i; i < tokenArray.length; i++) {
