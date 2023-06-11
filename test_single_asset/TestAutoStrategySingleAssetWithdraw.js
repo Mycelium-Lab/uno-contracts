@@ -19,7 +19,7 @@ const pool1 = '0x4B1F1e2435A9C96f7330FAea190Ef6A7C8D70001' // usdt usdc sushiswa
 const pool2 = '0xc4e595acDD7d12feC385E5dA5D43160e8A0bAC0E' // wmatic-eth sushiswap
 
 const DAIHolder = '0x06959153B974D0D5fDfd87D561db6d8d4FA0bb0B'// has to be unlocked and hold 0xf28164A485B0B2C90639E47b0f377b4a438a16B1
-
+const feeCollector = '0x46a3A41bd932244Dd08186e4c19F1a7E48cbcDf4'
 contract('UnoAutoStrategySingleAssetWithdraw', (accounts) => {
     const admin = accounts[0]
 
@@ -28,6 +28,8 @@ contract('UnoAutoStrategySingleAssetWithdraw', (accounts) => {
     let autoStrategyFactory
     let autoStrategy
     let strategyToken
+    let tokenA
+    let tokenB
 
     before(async () => {
         const implementation = await Farm.new({ from: admin })
@@ -37,6 +39,11 @@ contract('UnoAutoStrategySingleAssetWithdraw', (accounts) => {
         autoStrategyFactory = await AutoStrategyFactory.new(autoStrategyImplementation.address, accessManager.address)
 
         assetRouter = await deployProxy(AssetRouter, { kind: 'uups', initializer: false })
+        const [tokenAAddress, tokenBAddress] = await assetRouter.getTokens(pool1)
+
+        tokenA = await IERC20.at(tokenAAddress)
+        tokenB = await IERC20.at(tokenBAddress)
+
         await FarmFactory.new(implementation.address, accessManager.address, assetRouter.address, { from: admin })
 
         await autoStrategyFactory.approveAssetRouter(assetRouter.address, {
@@ -58,6 +65,8 @@ contract('UnoAutoStrategySingleAssetWithdraw', (accounts) => {
         describe('withdraw token', () => {
             let id
             let tokenBalanceBefore
+            let feeBalanceBeforeA
+            let feeBalanceBeforeB
 
             before(async () => {
                 id = await autoStrategy.poolID()
@@ -67,7 +76,9 @@ contract('UnoAutoStrategySingleAssetWithdraw', (accounts) => {
                 const tokenBData = `0x12aa3caf000000000000000000000000cfd674f8731e801a4a15c1ae31770960e1afded10000000000000000000000008f3cf7ad23cd3cadbd9735aff958023239c6a063000000000000000000000000c2132d05d31c914a87c6611c10748aeb04b58e8f000000000000000000000000cfd674f8731e801a4a15c1ae31770960e1afded1000000000000000000000000${assetRouter.address.substring(2).toLowerCase()}00000000000000000000000000000000000000000000001b1ae4d6e2ef500000000000000000000000000000000000000000000000000000000000000eaad1d70000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000001600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000025d00000000000000000000000000000000000000000000023f00006800004e80206c4eca278f3cf7ad23cd3cadbd9735aff958023239c6a06346a3a41bd932244dd08186e4c19f1a7e48cbcdf40000000000000000000000000000000000000000000000004563918244f400000020d6bdbf788f3cf7ad23cd3cadbd9735aff958023239c6a06300a0c9e75c48000000000000000006040000000000000000000000000000000000000000000000000001a900008f0c208f3cf7ad23cd3cadbd9735aff958023239c6a06359153f27eefe07e5ece4f9304ebba1da6f53ca886ae40711b8002dc6c059153f27eefe07e5ece4f9304ebba1da6f53ca881111111254eeb25477b68fb85ed929f73a9605820000000000000000000000000000000000000000000000000000000005debad18f3cf7ad23cd3cadbd9735aff958023239c6a06300a007e5c0d20000000000000000000000000000000000000000000000000000f600008f0c208f3cf7ad23cd3cadbd9735aff958023239c6a063f04adbf75cdfc5ed26eea4bbbb991db002036bdd6ae4071138002dc6c0f04adbf75cdfc5ed26eea4bbbb991db002036bdd2cf7252e74036d1da831d11089d326296e64a7280000000000000000000000000000000000000000000000000000000008d2d4938f3cf7ad23cd3cadbd9735aff958023239c6a06300206ae40711b8002dc6c02cf7252e74036d1da831d11089d326296e64a7281111111254eeb25477b68fb85ed929f73a9605820000000000000000000000000000000000000000000000000000000008cc17052791bca1f2de4661ed88a30c99a7a9449aa84174000000b4eb6cb3`// await fetchData(tokenBSwapParams);
                 await autoStrategy.depositWithSwap(id, [tokenAData, tokenBData], DAIHolder, constants.ZERO_ADDRESS, { from: DAIHolder })
 
-                tokenBalanceBefore = await DAIToken.balanceOf(DAIHolder);
+                tokenBalanceBefore = await DAIToken.balanceOf(DAIHolder)
+                feeBalanceBeforeA = await tokenA.balanceOf(feeCollector)
+                feeBalanceBeforeB = await tokenB.balanceOf(feeCollector);
                 ({
                     stakeA,
                     stakeB
@@ -109,11 +120,20 @@ contract('UnoAutoStrategySingleAssetWithdraw', (accounts) => {
                 assert.equal(stakeA.toString(), '0', 'Stake not withdrawn')
                 assert.equal(stakeB.toString(), '0', 'Stake not withdrawn')
             })
+            it('collects fee', async () => {
+                const feeBalanceAfterA = await tokenA.balanceOf(feeCollector)
+                assert.ok(feeBalanceAfterA.gt(feeBalanceBeforeA), 'fee balance not increased')
+
+                const feeBalanceAfterB = await tokenB.balanceOf(feeCollector)
+                assert.ok(feeBalanceAfterB.gt(feeBalanceBeforeB), 'fee balance not increased')
+            })
         })
         describe('withdraw ETH', () => {
             let id
             let ethBalanceBefore
             let ethSpentOnGas
+            let feeBalanceBeforeA
+            let feeBalanceBeforeB
 
             before(async () => {
                 id = await autoStrategy.poolID()
@@ -123,7 +143,9 @@ contract('UnoAutoStrategySingleAssetWithdraw', (accounts) => {
                 const tokenBData = `0x12aa3caf000000000000000000000000cfd674f8731e801a4a15c1ae31770960e1afded10000000000000000000000008f3cf7ad23cd3cadbd9735aff958023239c6a063000000000000000000000000c2132d05d31c914a87c6611c10748aeb04b58e8f000000000000000000000000cfd674f8731e801a4a15c1ae31770960e1afded1000000000000000000000000${assetRouter.address.substring(2).toLowerCase()}00000000000000000000000000000000000000000000001b1ae4d6e2ef500000000000000000000000000000000000000000000000000000000000000eaad1d70000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000001600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000025d00000000000000000000000000000000000000000000023f00006800004e80206c4eca278f3cf7ad23cd3cadbd9735aff958023239c6a06346a3a41bd932244dd08186e4c19f1a7e48cbcdf40000000000000000000000000000000000000000000000004563918244f400000020d6bdbf788f3cf7ad23cd3cadbd9735aff958023239c6a06300a0c9e75c48000000000000000006040000000000000000000000000000000000000000000000000001a900008f0c208f3cf7ad23cd3cadbd9735aff958023239c6a06359153f27eefe07e5ece4f9304ebba1da6f53ca886ae40711b8002dc6c059153f27eefe07e5ece4f9304ebba1da6f53ca881111111254eeb25477b68fb85ed929f73a9605820000000000000000000000000000000000000000000000000000000005debad18f3cf7ad23cd3cadbd9735aff958023239c6a06300a007e5c0d20000000000000000000000000000000000000000000000000000f600008f0c208f3cf7ad23cd3cadbd9735aff958023239c6a063f04adbf75cdfc5ed26eea4bbbb991db002036bdd6ae4071138002dc6c0f04adbf75cdfc5ed26eea4bbbb991db002036bdd2cf7252e74036d1da831d11089d326296e64a7280000000000000000000000000000000000000000000000000000000008d2d4938f3cf7ad23cd3cadbd9735aff958023239c6a06300206ae40711b8002dc6c02cf7252e74036d1da831d11089d326296e64a7281111111254eeb25477b68fb85ed929f73a9605820000000000000000000000000000000000000000000000000000000008cc17052791bca1f2de4661ed88a30c99a7a9449aa84174000000b4eb6cb3`// await fetchData(tokenBSwapParams);
                 await autoStrategy.depositWithSwap(id, [tokenAData, tokenBData], DAIHolder, constants.ZERO_ADDRESS, { from: DAIHolder })
 
-                ethBalanceBefore = new BN(await web3.eth.getBalance(DAIHolder));
+                ethBalanceBefore = new BN(await web3.eth.getBalance(DAIHolder))
+                feeBalanceBeforeA = await tokenA.balanceOf(feeCollector)
+                feeBalanceBeforeB = await tokenB.balanceOf(feeCollector);
                 ({
                     stakeA,
                     stakeB
@@ -169,6 +191,13 @@ contract('UnoAutoStrategySingleAssetWithdraw', (accounts) => {
                 const { stakeA, stakeB } = await autoStrategy.userStake(DAIHolder)
                 assert.equal(stakeA.toString(), '0', 'Stake not withdrawn')
                 assert.equal(stakeB.toString(), '0', 'Stake not withdrawn')
+            })
+            it('collects fee', async () => {
+                const feeBalanceAfterA = await tokenA.balanceOf(feeCollector)
+                assert.ok(feeBalanceAfterA.gt(feeBalanceBeforeA), 'fee balance not increased')
+
+                const feeBalanceAfterB = await tokenB.balanceOf(feeCollector)
+                assert.ok(feeBalanceAfterB.gt(feeBalanceBeforeB), 'fee balance not increased')
             })
         })
     })

@@ -160,8 +160,9 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
 
         _checkMsgValue(swapData);
 
+        sent = new uint256[](tokens.length);
         uint256[] memory amounts = new uint256[](tokens.length);
-        for (uint256 i = 0; i < tokens.length; i++) {
+        for (uint256 i; i < tokens.length; i++) {
             if (tokens[i] == lpPool) {
                 continue;
             }
@@ -263,9 +264,9 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
         address[] memory tokens = _convertToAddressArray(getTokens(lpPool));
         if (swapData.length != tokens.length) revert INPUT_PARAMS_LENGTHS_NOT_MATCH();
 
+        dust = new uint256[](tokens.length);
         amounts = new uint256[](tokens.length);
         (amounts, liquidity) = farm.withdrawTokens(userData, amounts, msg.sender, address(this));
-
         for (uint256 i = 0; i < tokens.length; i++) {
             if(amounts[i] == 0){
                 continue;
@@ -482,7 +483,7 @@ contract UnoAssetRouterBalancer is Initializable, PausableUpgradeable, UUPSUpgra
 
     function _checkMsgValue(bytes[] calldata swapData) internal view {
         uint256 value;
-        for(uint256 i; i < 0; i++){
+        for(uint256 i; i < swapData.length; i++){
             (,IAggregationRouterV5.SwapDescription memory desc,) = abi.decode(swapData[i][4:], (address, IAggregationRouterV5.SwapDescription, bytes));
             if(address(desc.srcToken) == address(0) || address(desc.srcToken) == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)){
                 value += desc.amount;

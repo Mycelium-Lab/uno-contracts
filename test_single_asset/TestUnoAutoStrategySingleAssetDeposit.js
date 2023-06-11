@@ -17,7 +17,7 @@ const pool1 = '0x4B1F1e2435A9C96f7330FAea190Ef6A7C8D70001' // usdt usdc sushiswa
 const pool2 = '0xc4e595acDD7d12feC385E5dA5D43160e8A0bAC0E' // wmatic-eth sushiswap
 
 const DAIHolder = '0x06959153B974D0D5fDfd87D561db6d8d4FA0bb0B'// has to be unlocked and hold 0xf28164A485B0B2C90639E47b0f377b4a438a16B1
-
+const feeCollector = '0x46a3A41bd932244Dd08186e4c19F1a7E48cbcDf4'
 approxeq = (bn1, bn2, epsilon, message) => {
     const amountDelta = bn1.sub(bn2).add(epsilon)
     assert.ok(!amountDelta.isNeg(), message)
@@ -67,12 +67,14 @@ contract('UnoAutoStrategy', (accounts) => {
             let DAIToken
             let DAIAmount
             let tokenBalanceBefore
+            let feeBalanceBefore
 
             before(async () => {
                 id = await autoStrategy.poolID()
 
                 DAIToken = await IERC20.at('0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063')
                 tokenBalanceBefore = await DAIToken.balanceOf(DAIHolder)
+                feeBalanceBefore = await DAIToken.balanceOf(feeCollector)
                 DAIAmount = new BN('1000000000000000000000') // 1000$
                 await DAIToken.approve(autoStrategy.address, DAIAmount, { from: DAIHolder }) // change
 
@@ -142,6 +144,10 @@ contract('UnoAutoStrategy', (accounts) => {
                     'stakeB is not correct'
                 )
             })
+            it('collects fee', async () => {
+                const feeBalanceAfter = await DAIToken.balanceOf(feeCollector)
+                assert.ok(feeBalanceAfter.gt(feeBalanceBefore), 'fee balance not increased')
+            })
         })
         describe('deposit ETH', () => {
             let id
@@ -151,6 +157,7 @@ contract('UnoAutoStrategy', (accounts) => {
             let ethSpentOnGas
             let tokenAData
             let tokenBData
+            let feeBalanceBefore
 
             before(async () => {
                 id = await autoStrategy.poolID()
@@ -164,6 +171,7 @@ contract('UnoAutoStrategy', (accounts) => {
                 } = await autoStrategy.userStake(DAIHolder))
             })
             it('fires events', async () => {
+                feeBalanceBefore = new BN(await web3.eth.getBalance(feeCollector))
                 ethBalanceBefore = new BN(await web3.eth.getBalance(DAIHolder))
                 const receipt = await autoStrategy.depositWithSwap(id, [tokenAData, tokenBData], DAIHolder, constants.ZERO_ADDRESS, { from: DAIHolder, value: amountETH })
 
@@ -220,6 +228,10 @@ contract('UnoAutoStrategy', (accounts) => {
                     new BN(10),
                     'stakeB is not correct'
                 )
+            })
+            it('collects fee', async () => {
+                const feeBalanceAfter = new BN(await web3.eth.getBalance(feeCollector))
+                assert.ok(feeBalanceAfter.gt(feeBalanceBefore), 'fee balance not increased')
             })
         })
     })

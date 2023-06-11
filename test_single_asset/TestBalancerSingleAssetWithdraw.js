@@ -14,7 +14,7 @@ const AssetRouter = artifacts.require('UnoAssetRouterBalancer')
 
 const pool = '0xaF5E0B5425dE1F5a630A8cB5AA9D97B8141C908D' // WMATIC-stMATIC
 const DAIHolder = '0x06959153B974D0D5fDfd87D561db6d8d4FA0bb0B'// has to be unlocked and hold 0xf28164A485B0B2C90639E47b0f377b4a438a16B1
-
+const feeCollector = '0x46a3A41bd932244Dd08186e4c19F1a7E48cbcDf4'
 // 0xc45092e7e73951c6668f6C46AcFCa9F2B1c69aEf
 // 0xc45092e7e73951c6668f6C46AcFCa9F2B1c69aEf
 contract('UnoAssetRouterBalancerWithSwapWithdraw', (accounts) => {
@@ -22,6 +22,8 @@ contract('UnoAssetRouterBalancerWithSwapWithdraw', (accounts) => {
 
     let accessManager; let assetRouter
     let DAIToken
+    let tokenA
+    let tokenB
 
     before(async () => {
         const implementation = await Farm.new({ from: admin })
@@ -31,12 +33,17 @@ contract('UnoAssetRouterBalancerWithSwapWithdraw', (accounts) => {
         await FarmFactory.new(implementation.address, accessManager.address, assetRouter.address, { from: admin })
 
         DAIToken = await IUniswapV2Pair.at('0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063')
+        const [tokenAaddress, tokenBaddress] = await assetRouter.getTokens(pool)
+        tokenA = await IERC20.at(tokenAaddress)
+        tokenB = await IERC20.at(tokenBaddress)
     })
 
     describe('Single Asset Withdraw', () => {
         describe('withdraw token', () => {
             let stakeLPBefore
             let tokenBalanceBefore
+            let feeBalanceBeforeA
+            let feeBalanceBeforeB
 
             before(async () => {
                 const DAIAmount = new BN('1000000000000000000000') // 1000$
@@ -47,6 +54,8 @@ contract('UnoAssetRouterBalancerWithSwapWithdraw', (accounts) => {
 
                 tokenBalanceBefore = await DAIToken.balanceOf(DAIHolder)
                 stakeLPBefore = await assetRouter.userStake(DAIHolder, pool)
+                feeBalanceBeforeA = await tokenA.balanceOf(feeCollector)
+                feeBalanceBeforeB = await tokenB.balanceOf(feeCollector)
             })
             it('fires events', async () => {
                 const tokenAData = '0x12aa3caf000000000000000000000000cfd674f8731e801a4a15c1ae31770960e1afded10000000000000000000000000d500b1d8e8ef31e21c99d1db9a6444d3adf12700000000000000000000000008f3cf7ad23cd3cadbd9735aff958023239c6a063000000000000000000000000cfd674f8731e801a4a15c1ae31770960e1afded100000000000000000000000006959153b974d0d5fdfd87d561db6d8d4fa0bb0b00000000000000000000000000000000000000000000000ad78ebc5ac6200000000000000000000000000000000000000000000000000002fb5f169484a7eee60000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000001600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000025d00000000000000000000000000000000000000000000023f00006800004e80206c4eca270d500b1d8e8ef31e21c99d1db9a6444d3adf127046a3a41bd932244dd08186e4c19f1a7e48cbcdf40000000000000000000000000000000000000000000000001bc16d674ec800000020d6bdbf780d500b1d8e8ef31e21c99d1db9a6444d3adf127000a0c9e75c48000000000000000007030000000000000000000000000000000000000000000000000001a900008f0c200d500b1d8e8ef31e21c99d1db9a6444d3adf1270eef611894ceae652979c9d0dae1deb597790c6ee6ae40711b8002dc6c0eef611894ceae652979c9d0dae1deb597790c6ee1111111254eeb25477b68fb85ed929f73a960582000000000000000000000000000000000000000000000000e51777b1916e11860d500b1d8e8ef31e21c99d1db9a6444d3adf127000a007e5c0d20000000000000000000000000000000000000000000000000000f600008f0c200d500b1d8e8ef31e21c99d1db9a6444d3adf1270adbf1854e5883eb8aa7baf50705338739e558e5b6ae40711b8002dc6c0adbf1854e5883eb8aa7baf50705338739e558e5b4a35582a710e1f4b2030a3f826da20bfb6703c09000000000000000000000000000000000000000000000000004ef2cee41167010d500b1d8e8ef31e21c99d1db9a6444d3adf127000206ae40711b8002dc6c04a35582a710e1f4b2030a3f826da20bfb6703c091111111254eeb25477b68fb85ed929f73a96058200000000000000000000000000000000000000000000000216479ee2f339dd5f7ceb23fd6bc0add59e62ac25578270cff1b9f619000000b4eb6cb3'
@@ -69,11 +78,20 @@ contract('UnoAssetRouterBalancerWithSwapWithdraw', (accounts) => {
                 const stakeLP = await assetRouter.userStake(DAIHolder, pool)
                 assert.equal(stakeLP.toString(), '0', 'Stake not withdrawn')
             })
+            it('collects fee', async () => {
+                const feeBalanceAfterA = await tokenA.balanceOf(feeCollector)
+                assert.ok(feeBalanceAfterA.gt(feeBalanceBeforeA), 'fee balance not increased')
+
+                const feeBalanceAfterB = await tokenB.balanceOf(feeCollector)
+                assert.ok(feeBalanceAfterB.gt(feeBalanceBeforeB), 'fee balance not increased')
+            })
         })
         describe('withdraw ETH', () => {
             let stakeLPBefore
             let ethBalanceBefore
             let ethSpentOnGas
+            let feeBalanceBeforeA
+            let feeBalanceBeforeB
 
             before(async () => {
                 const DAIAmount = new BN('1000000000000000000000') // 1000$
@@ -84,6 +102,8 @@ contract('UnoAssetRouterBalancerWithSwapWithdraw', (accounts) => {
 
                 ethBalanceBefore = new BN(await web3.eth.getBalance(DAIHolder))
                 stakeLPBefore = await assetRouter.userStake(DAIHolder, pool)
+                feeBalanceBeforeA = await tokenA.balanceOf(feeCollector)
+                feeBalanceBeforeB = await tokenB.balanceOf(feeCollector)
             })
             it('fires events', async () => {
                 const tokenAData = '0x12aa3caf000000000000000000000000cfd674f8731e801a4a15c1ae31770960e1afded10000000000000000000000000d500b1d8e8ef31e21c99d1db9a6444d3adf1270000000000000000000000000eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee000000000000000000000000cfd674f8731e801a4a15c1ae31770960e1afded100000000000000000000000006959153b974d0d5fdfd87d561db6d8d4fa0bb0b00000000000000000000000000000000000000000000000ad78ebc5ac62000000000000000000000000000000000000000000000000000055de6a779bbac0000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000160000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e80000000000000000000000000000000000000000ca0000a400006800004e80206c4eca270d500b1d8e8ef31e21c99d1db9a6444d3adf127046a3a41bd932244dd08186e4c19f1a7e48cbcdf40000000000000000000000000000000000000000000000001bc16d674ec800000020d6bdbf780d500b1d8e8ef31e21c99d1db9a6444d3adf127041210d500b1d8e8ef31e21c99d1db9a6444d3adf127000042e1a7d4d0000000000000000000000000000000000000000000000000000000000000000e0211111111254eeb25477b68fb85ed929f73a960582000000000000000abbcd4ef377580000000000000000000000000000000000000000000000000000b4eb6cb3'
@@ -110,6 +130,13 @@ contract('UnoAssetRouterBalancerWithSwapWithdraw', (accounts) => {
             it('updates stakes', async () => {
                 const stakeLP = await assetRouter.userStake(DAIHolder, pool)
                 assert.equal(stakeLP.toString(), '0', 'Stake not withdrawn')
+            })
+            it('collects fee', async () => {
+                const feeBalanceAfterA = await tokenA.balanceOf(feeCollector)
+                assert.ok(feeBalanceAfterA.gt(feeBalanceBeforeA), 'fee balance not increased')
+
+                const feeBalanceAfterB = await tokenB.balanceOf(feeCollector)
+                assert.ok(feeBalanceAfterB.gt(feeBalanceBeforeB), 'fee balance not increased')
             })
         })
     })

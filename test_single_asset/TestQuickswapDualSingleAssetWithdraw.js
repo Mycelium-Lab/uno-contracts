@@ -16,12 +16,14 @@ const AssetRouter = artifacts.require('UnoAssetRouterQuickswapDual')
 
 const pool = '0x14977e7E263FF79c4c3159F497D9551fbE769625' // WMATIC-USDC
 const DAIHolder = '0x06959153B974D0D5fDfd87D561db6d8d4FA0bb0B'// has to be unlocked and hold 0xf28164A485B0B2C90639E47b0f377b4a438a16B1
-
+const feeCollector = '0x46a3A41bd932244Dd08186e4c19F1a7E48cbcDf4'
 contract('UnoAssetRouterQuickswapDualWithSwapWithdraw', (accounts) => {
     const admin = accounts[0]
 
     let accessManager; let assetRouter
     let DAIToken
+    let tokenA
+    let tokenB
 
     before(async () => {
         const implementation = await Farm.new({ from: admin })
@@ -46,6 +48,8 @@ contract('UnoAssetRouterQuickswapDualWithSwapWithdraw', (accounts) => {
         describe('withdraw token', () => {
             let stakeLPBefore
             let tokenBalanceBefore
+            let feeBalanceBeforeA
+            let feeBalanceBeforeB
 
             before(async () => {
                 const DAIAmount = new BN('1000000000000000000000') // 1000$
@@ -54,7 +58,9 @@ contract('UnoAssetRouterQuickswapDualWithSwapWithdraw', (accounts) => {
                 const tokenBData = `0x12aa3caf000000000000000000000000cfd674f8731e801a4a15c1ae31770960e1afded10000000000000000000000008f3cf7ad23cd3cadbd9735aff958023239c6a0630000000000000000000000002791bca1f2de4661ed88a30c99a7a9449aa84174000000000000000000000000cfd674f8731e801a4a15c1ae31770960e1afded1000000000000000000000000${assetRouter.address.substring(2).toLowerCase()}00000000000000000000000000000000000000000000001b1ae4d6e2ef500000000000000000000000000000000000000000000000000000000000000eb3d9d1000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000160000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001150000000000000000000000000000000000000000000000f700006800004e80206c4eca278f3cf7ad23cd3cadbd9735aff958023239c6a06346a3a41bd932244dd08186e4c19f1a7e48cbcdf40000000000000000000000000000000000000000000000004563918244f400000020d6bdbf788f3cf7ad23cd3cadbd9735aff958023239c6a0630c208f3cf7ad23cd3cadbd9735aff958023239c6a063f04adbf75cdfc5ed26eea4bbbb991db002036bdd6ae4071138002dc6c0f04adbf75cdfc5ed26eea4bbbb991db002036bdd1111111254eeb25477b68fb85ed929f73a960582000000000000000000000000000000000000000000000000000000000eb3d9d18f3cf7ad23cd3cadbd9735aff958023239c6a0630000000000000000000000b4eb6cb3`
                 await assetRouter.depositWithSwap(pool, [tokenAData, tokenBData], DAIHolder, { from: DAIHolder })
 
-                tokenBalanceBefore = await DAIToken.balanceOf(DAIHolder);
+                tokenBalanceBefore = await DAIToken.balanceOf(DAIHolder)
+                feeBalanceBeforeA = await tokenA.balanceOf(feeCollector)
+                feeBalanceBeforeB = await tokenB.balanceOf(feeCollector);
                 ({
                     stakeLP: stakeLPBefore,
                     stakeA,
@@ -85,11 +91,20 @@ contract('UnoAssetRouterQuickswapDualWithSwapWithdraw', (accounts) => {
                 const { totalDepositsLP } = await assetRouter.totalDeposits(pool)
                 assert.equal(totalDepositsLP.toString(), '0', 'Stake not withdrawn')
             })
+            it('collects fee', async () => {
+                const feeBalanceAfterA = await tokenA.balanceOf(feeCollector)
+                assert.ok(feeBalanceAfterA.gt(feeBalanceBeforeA), 'fee balance not increased')
+
+                const feeBalanceAfterB = await tokenB.balanceOf(feeCollector)
+                assert.ok(feeBalanceAfterB.gt(feeBalanceBeforeB), 'fee balance not increased')
+            })
         })
         describe('withdraw ETH', () => {
             let stakeLPBefore
             let ethBalanceBefore
             let ethSpentOnGas
+            let feeBalanceBeforeA
+            let feeBalanceBeforeB
 
             before(async () => {
                 const DAIAmount = new BN('1000000000000000000000') // 1000$
@@ -98,7 +113,9 @@ contract('UnoAssetRouterQuickswapDualWithSwapWithdraw', (accounts) => {
                 const tokenBData = `0x12aa3caf000000000000000000000000cfd674f8731e801a4a15c1ae31770960e1afded10000000000000000000000008f3cf7ad23cd3cadbd9735aff958023239c6a0630000000000000000000000002791bca1f2de4661ed88a30c99a7a9449aa84174000000000000000000000000cfd674f8731e801a4a15c1ae31770960e1afded1000000000000000000000000${assetRouter.address.substring(2).toLowerCase()}00000000000000000000000000000000000000000000001b1ae4d6e2ef500000000000000000000000000000000000000000000000000000000000000eb3d9d1000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000160000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001150000000000000000000000000000000000000000000000f700006800004e80206c4eca278f3cf7ad23cd3cadbd9735aff958023239c6a06346a3a41bd932244dd08186e4c19f1a7e48cbcdf40000000000000000000000000000000000000000000000004563918244f400000020d6bdbf788f3cf7ad23cd3cadbd9735aff958023239c6a0630c208f3cf7ad23cd3cadbd9735aff958023239c6a063f04adbf75cdfc5ed26eea4bbbb991db002036bdd6ae4071138002dc6c0f04adbf75cdfc5ed26eea4bbbb991db002036bdd1111111254eeb25477b68fb85ed929f73a960582000000000000000000000000000000000000000000000000000000000eb3d9d18f3cf7ad23cd3cadbd9735aff958023239c6a0630000000000000000000000b4eb6cb3`
                 await assetRouter.depositWithSwap(pool, [tokenAData, tokenBData], DAIHolder, { from: DAIHolder })
 
-                ethBalanceBefore = new BN(await web3.eth.getBalance(DAIHolder));
+                ethBalanceBefore = new BN(await web3.eth.getBalance(DAIHolder))
+                feeBalanceBeforeA = await tokenA.balanceOf(feeCollector)
+                feeBalanceBeforeB = await tokenB.balanceOf(feeCollector);
                 ({
                     stakeLP: stakeLPBefore
                 } = await assetRouter.userStake(DAIHolder, pool))
@@ -130,6 +147,13 @@ contract('UnoAssetRouterQuickswapDualWithSwapWithdraw', (accounts) => {
             it('updates totalDeposits', async () => {
                 const { totalDepositsLP } = await assetRouter.totalDeposits(pool)
                 assert.equal(totalDepositsLP.toString(), '0', 'Stake not withdrawn')
+            })
+            it('collects fee', async () => {
+                const feeBalanceAfterA = await tokenA.balanceOf(feeCollector)
+                assert.ok(feeBalanceAfterA.gt(feeBalanceBeforeA), 'fee balance not increased')
+
+                const feeBalanceAfterB = await tokenB.balanceOf(feeCollector)
+                assert.ok(feeBalanceAfterB.gt(feeBalanceBeforeB), 'fee balance not increased')
             })
         })
     })

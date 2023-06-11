@@ -21,7 +21,7 @@ const balancerVault = '0xBA12222222228d8Ba445958a75a0704d566BF2C8'
 const gaugeFactoryAddress = '0x3b8cA519122CdD8efb272b0D3085453404B25bD0'
 
 const pool = '0xaF5E0B5425dE1F5a630A8cB5AA9D97B8141C908D' // WMATIC-stMATIC
-
+const feeCollector = '0x46a3A41bd932244Dd08186e4c19F1a7E48cbcDf4'
 approxeq = (bn1, bn2, epsilon, message) => {
     const amountDelta = bn1.sub(bn2).add(epsilon)
     assert.ok(!amountDelta.isNeg(), message)
@@ -87,6 +87,7 @@ contract('UnoAssetRouterBalancerSingleAssetDeposit', (accounts) => {
             let DAIToken
             let DAIAmount
             let tokenBalanceBefore
+            let feeBalanceBefore
             const tokensData = []
 
             before(async () => {
@@ -94,6 +95,7 @@ contract('UnoAssetRouterBalancerSingleAssetDeposit', (accounts) => {
 
                 DAIToken = await IUniswapV2Pair.at(fromToken)
                 const DAIHolderBalance = await DAIToken.balanceOf(DAIHolder)
+                feeBalanceBefore = await DAIToken.balanceOf(feeCollector)
                 tokenBalanceBefore = DAIHolderBalance
 
                 DAIAmount = new BN('1000000000000000000000') // 1000$
@@ -140,11 +142,16 @@ contract('UnoAssetRouterBalancerSingleAssetDeposit', (accounts) => {
                 const stakingRewardBalance = await gauge.balanceOf(farm.address)
                 assert.ok(stakingRewardBalance.gt(stakingRewardsBalanceBefore), 'Gauge balance not increased')
             })
+            it('collects fee', async () => {
+                const feeBalanceAfter = await DAIToken.balanceOf(feeCollector)
+                assert.ok(feeBalanceAfter.gt(feeBalanceBefore), 'fee balance not increased')
+            })
         })
         describe('deposit ETH', () => {
             let stakeLPBefore
             let totalDepositsLPBefore
             let ethBalanceBefore
+            let feeBalanceBefore
             const tokensData = []
 
             before(async () => {
@@ -168,6 +175,7 @@ contract('UnoAssetRouterBalancerSingleAssetDeposit', (accounts) => {
             })
             it('fires events', async () => {
                 ethBalanceBefore = new BN(await web3.eth.getBalance(DAIHolder))
+                feeBalanceBefore = new BN(await web3.eth.getBalance(feeCollector))
                 const receipt = await assetRouter.depositWithSwap(pool, tokensData, 0, DAIHolder, { from: DAIHolder, value: amountETH })
 
                 const gasUsed = new BN(receipt.receipt.gasUsed)
@@ -197,6 +205,10 @@ contract('UnoAssetRouterBalancerSingleAssetDeposit', (accounts) => {
                 const farm = await Farm.at(farmAddress)
                 const stakingRewardBalance = await gauge.balanceOf(farm.address)
                 assert.ok(stakingRewardBalance.gt(stakingRewardsBalanceBefore), 'Gauge balance not increased')
+            })
+            it('collects fee', async () => {
+                const feeBalanceAfter = new BN(await web3.eth.getBalance(feeCollector))
+                assert.ok(feeBalanceAfter.gt(feeBalanceBefore), 'fee balance not increased')
             })
         })
     })
