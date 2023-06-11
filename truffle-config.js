@@ -12,21 +12,23 @@ module.exports = {
         avalanche: {
             provider: new HDWalletProvider({
                 privateKeys: [process.env.PRIVATE_KEY],
-                providerOrUrl: 'https://api.avax.network/ext/bc/C/rpc',
+                providerOrUrl: 'https://rpc.ankr.com/avalanche',
                 chainId: 43114,
                 pollingInterval: 30000
             }),
             networkCheckTimeout: 10000,
-
             network_id: 43114,
-            addressIndex: 0
+            addressIndex: 0,
+            timeoutBlocks: 200
         },
         test: {
             host: '127.0.0.1',
             port: 8545,
             gas: 7500000,
             gasPrice: 70000000000,
-            network_id: 43114
+            network_id: 43114,
+            networkCheckTimeout: 10000,
+            timeoutBlocks: 200
         }
     },
     plugins: ['truffle-contract-size', 'truffle-plugin-verify'],
