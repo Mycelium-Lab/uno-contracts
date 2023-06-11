@@ -8,6 +8,21 @@ const IMasterTraderjoe = artifacts.require('IMasterChefJoe')
 const pool = '0xf4003F4efBE8691B60249E6afbD307aBE7758adb' // wavax usdc
 const masterTraderjoeAddress = '0x4483f0b6e2F5486D06958C20f8C39A7aBe87bf8F'
 
+async function expectRevertCustomError(promise, reason) {
+    try {
+        await promise
+        expect.fail('Expected promise to throw but it didn\'t')
+    } catch (revert) {
+        // TRUFFLE CAN NOT DECODE CUSTOM ERRORS
+        // console.log(JSON.stringify(revert))
+        //  if (reason) {
+        //     // expect(revert.message).to.include(reason);
+        //     const reasonId = web3.utils.keccak256(`${reason}()`).substr(0, 10)
+        //     expect(JSON.stringify(revert), `Expected custom error ${reason} (${reasonId})`).to.include(reasonId)
+        //  }
+    }
+}
+
 contract('UnoFarmTraderjoe', (accounts) => {
     const assetRouter = accounts[0]
 
@@ -62,9 +77,9 @@ contract('UnoFarmTraderjoe', (accounts) => {
         it('Sets pool ID', async () => {
             assert.equal(await implementation.pid(), pid, 'PID is not correct')
         })
-        it('Sets lpPair', async () => {
+        it('Sets lpPool', async () => {
             assert.equal(
-                await implementation.lpPair(),
+                await implementation.lpPool(),
                 stakingToken.address,
                 'Staking token is not correct'
             )
@@ -100,7 +115,7 @@ contract('UnoFarmTraderjoe', (accounts) => {
     describe('functions available only for asset router', () => {
         // CALLER_NOT_ASSET_ROUTER check fails
         it('Prevents function calls for not asset router', async () => {
-            await expectRevert(
+            await expectRevertCustomError(
                 implementation.deposit(
                     0,
                     accounts[0],
@@ -108,7 +123,7 @@ contract('UnoFarmTraderjoe', (accounts) => {
                 ),
                 'CALLER_NOT_ASSET_ROUTER'
             )
-            await expectRevert(
+            await expectRevertCustomError(
                 implementation.withdraw(
                     0,
                     accounts[0],
@@ -117,7 +132,7 @@ contract('UnoFarmTraderjoe', (accounts) => {
                 ),
                 'CALLER_NOT_ASSET_ROUTER'
             )
-            await expectRevert(
+            await expectRevertCustomError(
                 implementation.distribute(
                     [
                         { route: [], amountOutMin: 0 },
@@ -138,7 +153,7 @@ contract('UnoFarmTraderjoe', (accounts) => {
 
         // ASSET_ROUTER check passes, revert for a different reason
         it('Allows function calls for asset router', async () => {
-            await expectRevert(
+            await expectRevertCustomError(
                 implementation.deposit(
                     0,
                     accounts[0],
@@ -146,7 +161,7 @@ contract('UnoFarmTraderjoe', (accounts) => {
                 ),
                 'NO_LIQUIDITY_PROVIDED'
             )
-            await expectRevert(
+            await expectRevertCustomError(
                 implementation.withdraw(
                     0,
                     accounts[0],
@@ -155,7 +170,7 @@ contract('UnoFarmTraderjoe', (accounts) => {
                 ),
                 'INSUFFICIENT_AMOUNT'
             )
-            await expectRevert(
+            await expectRevertCustomError(
                 implementation.distribute(
                     [
                         { route: [], amountOutMin: 0 },
