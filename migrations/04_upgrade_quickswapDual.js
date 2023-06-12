@@ -1,3 +1,5 @@
+global.crypto = require('crypto')
+
 const Farm = artifacts.require('UnoFarmQuickswapDual')
 const AssetRouter = artifacts.require('UnoAssetRouterQuickswapDual')
 
