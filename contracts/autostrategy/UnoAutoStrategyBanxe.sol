@@ -3,12 +3,13 @@ pragma solidity 0.8.10;
 import "../interfaces/IOdosRouter.sol";
 import "../interfaces/IUnoAssetRouter.sol";   
 import "../interfaces/IUnoAutoStrategyFactory.sol";
+import "../interfaces/IAggregationRouterV5.sol";
 import '@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol';
-import '@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol';
+import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
 contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuardUpgradeable {
-    using SafeERC20Upgradeable for IERC20Upgradeable;
+    using SafeERC20 for IERC20;
     /**
      * @dev PoolInfo:
      * {assetRouter} - UnoAssetRouter contract.
@@ -24,8 +25,8 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
     struct PoolInfo {
         address pool;
         IUnoAssetRouter assetRouter;
-        IERC20Upgradeable tokenA;
-        IERC20Upgradeable tokenB;
+        IERC20 tokenA;
+        IERC20 tokenB;
     }
 
     /**
@@ -80,16 +81,14 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
 
     event DepositPairTokens(uint256 indexed poolID, uint256 amountA, uint256 amountB);
     event DepositPairTokensETH(uint256 indexed poolID, uint256 amountToken, uint256 amountETH);
-    event DepositSingleToken(uint256 indexed poolID, address indexed token, uint256 amount);
-    event DepositSingleETH(uint256 indexed poolID, uint256 amountETH);
+    event DepositTokensWithSwap(uint256 indexed poolID, IERC20 indexed token0, IERC20 indexed token1, uint256 sent0, uint256 sent1);
     // Note: amountLP refers to LP tokens used in farms and staking pools, not UNO-LP this contract is.
     // To get info for UNO-LP use mint/burn events
     event Deposit(uint256 indexed poolID, address indexed from, address indexed recipient, uint256 amountLP);
 
     event WithdrawPairTokens(uint256 indexed poolID, uint256 amountA, uint256 amountB);
     event WithdrawPairTokensETH(uint256 indexed poolID, uint256 amountToken, uint256 amountETH);
-    event WithdrawSingleToken(uint256 indexed poolID, address indexed token, uint256 amount, uint256 amountA, uint256 amountB);
-    event WithdrawSingleETH(uint256 indexed poolID, uint256 amountETH, uint256 amountA, uint256 amountB);
+    event WithdrawTokensWithSwap(uint256 indexed poolID, IERC20 indexed token0, IERC20 indexed token1, uint256 amount0, uint256 amount1, uint256 amountA, uint256 amountB);
     // Note: amountLP refers to LP tokens used in farms and staking pools, not UNO-LP this contract is.
     // To get info for UNO-LP use mint/burn events
     event Withdraw(uint256 indexed poolID, address indexed from, address indexed recipient, uint256 amountLP);
@@ -97,45 +96,55 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
     event MoveLiquidity(uint256 indexed previousPoolID, uint256 indexed nextPoolID);
     event BanxeTransferred(address indexed previousBanxe, address indexed newBanxe);
 
+    //To save contract size
+    error PAUSED();
+    error BAD_POOL_ID();
+    error BAD_POOL_COUNT();
+    error CALLER_NOT_LIQUIDITY_MANAGER();
+    error CALLER_NOT_BANXE();
+    error NO_LIQUIDITY();
+    error CANT_CALL_ON_THE_SAME_BLOCK();
+    error BAD_SWAP_A();
+    error BAD_SWAP_B();
+    error INSUFFICIENT_LIQUIDITY();
+    error NOT_ETH_POOL();
+    error TRANSFER_NOT_SUCCESSFUL();
+    error ETH_DEPOSIT_REJECTED();
+    error INVALID_BANXE();
+
     modifier whenNotPaused(){
-        require(factory.paused() == false, 'PAUSABLE: PAUSED');
+        if(factory.paused()) revert PAUSED();
         _;
     }
 
     modifier onlyBanxe(){
-        require(msg.sender == banxe || accessManager.hasRole(0x00, msg.sender), "CALLER_NOT_BANXE");
+        if(msg.sender != banxe && !accessManager.hasRole(0x00, msg.sender)) revert CALLER_NOT_BANXE();
         _;
     }
 
     // ============ Methods ============
     
-    receive() external payable {}
+    receive() external payable {
+        //Reject deposits from EOA
+        if (msg.sender == tx.origin) revert ETH_DEPOSIT_REJECTED();
+    }
 
     function initialize(_PoolInfo[] calldata poolInfos, IUnoAccessManager _accessManager, address _banxe) external initializer {
-        require (_banxe != address(0), "BAD_BANXE_ADDRESS");
-        require ((poolInfos.length >= 2) && (poolInfos.length <= 50), 'BAD_POOL_COUNT');
+        if(_banxe == address(0)) revert INVALID_BANXE();
+        if((poolInfos.length < 2) || (poolInfos.length > 50)) revert BAD_POOL_COUNT();
 
         __ERC20_init("UNO-Banxe-AutoStrategy", "UNO-BANXE-LP");
         __ReentrancyGuard_init();
         
         for (uint256 i = 0; i < poolInfos.length; i++) {
-            address[] memory _tokens = IUnoAssetRouter(poolInfos[i].assetRouter).getTokens(poolInfos[i].pool);
+            IERC20[] memory _tokens = IUnoAssetRouter(poolInfos[i].assetRouter).getTokens(poolInfos[i].pool);
             PoolInfo memory pool = PoolInfo({
                 pool: poolInfos[i].pool,
                 assetRouter: poolInfos[i].assetRouter,
-                tokenA: IERC20Upgradeable(_tokens[0]),
-                tokenB: IERC20Upgradeable(_tokens[1])
+                tokenA: _tokens[0],
+                tokenB: _tokens[1]
             });
             pools.push(pool);
-
-            if (pool.tokenA.allowance(address(this), address(pool.assetRouter)) == 0) {
-                pool.tokenA.approve(address(OdosRouter), type(uint256).max);
-                pool.tokenA.approve(address(pool.assetRouter), type(uint256).max);
-            }
-            if (pool.tokenB.allowance(address(this), address(pool.assetRouter)) == 0) {
-                pool.tokenB.approve(address(OdosRouter), type(uint256).max);
-                pool.tokenB.approve(address(pool.assetRouter), type(uint256).max);
-            }
         }
 
         banxe = _banxe;
@@ -160,11 +169,14 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
      * @return liquidity - Total liquidity minted for the {recipient}.
      */
     function deposit(uint256 pid, uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin, address recipient) onlyBanxe whenNotPaused nonReentrant external returns (uint256 sentA, uint256 sentB, uint256 liquidity) {
-        require (pid == poolID, 'BAD_POOL_ID');
+        if(pid != poolID) revert BAD_POOL_ID();
         PoolInfo memory pool = pools[poolID];
 
         pool.tokenA.safeTransferFrom(msg.sender, address(this), amountA);
+        pool.tokenA.approve(address(pool.assetRouter), amountA);
+
         pool.tokenB.safeTransferFrom(msg.sender, address(this), amountB);
+        pool.tokenB.approve(address(pool.assetRouter), amountB);
 
         uint256 amountLP;
         (sentA, sentB, amountLP) = pool.assetRouter.deposit(pool.pool, amountA, amountB, amountAMin, amountBMin, address(this));
@@ -194,18 +206,18 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
      * @return liquidity - Total liquidity minted for the {recipient}.
      */
     function depositETH(uint256 pid, uint256 amountToken, uint256 amountTokenMin, uint256 amountETHMin, address recipient) onlyBanxe whenNotPaused nonReentrant external payable returns (uint256 sentToken, uint256 sentETH, uint256 liquidity) {
-        require (pid == poolID, 'BAD_POOL_ID');
+        if(pid != poolID) revert BAD_POOL_ID();
         PoolInfo memory pool = pools[poolID];
 
-        IERC20Upgradeable token;
+        IERC20 token;
         if (address(pool.tokenA) == WMATIC) {
             token = pool.tokenB;
         } else if (address(pool.tokenB) == WMATIC) {
             token = pool.tokenA;
-        } else {
-            revert("NOT_WMATIC_POOL");
-        }
+        } else revert NOT_ETH_POOL();
+
         token.safeTransferFrom(msg.sender, address(this), amountToken);
+        token.approve(address(pool.assetRouter), amountToken);
 
         uint256 amountLP;
         (sentToken, sentETH, amountLP) = pool.assetRouter.depositETH{value: msg.value}(pool.pool, amountToken, amountTokenMin, amountETHMin, address(this));
@@ -225,78 +237,50 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
     /**
      * @dev Deposits tokens in the pools[poolID] pool. Mints tokens representing user share. Emits {Deposit} event.
      * @param pid - Current poolID. Throws revert if moveLiquidity() has been called before the transaction has been mined.
-     * @param token - Token to deposit.
-     * @param amount - {token} amount to deposit.
      * @param swapData - Parameter with which 1inch router is being called with.
-     * @param amountAMin - Bounds the extent to which the B/A price can go up before the transaction reverts.
-     * @param amountBMin - Bounds the extent to which the A/B price can go up before the transaction reverts.
      * @param recipient - Address which will receive the deposit.
      
-     * @return sent - Total {token} amount sent to the farm. NOTE: Returns dust left from swap in {token}, but if A/B amounts are not correct also returns dust in pool's tokens.
+     * @return sent0 - Tokens sent to the farm from the {swapData[0]}.
+     * @return sent1 - Tokens sent to the farm from the {swapData[1]}.
+     * @return dustA - {pool.tokenA} dust sent to the {msg.sender}.
+     * @return dustB - {pool.tokenB} dust sent to the {msg.sender}.
      * @return liquidity - Total liquidity minted for the {recipient}.
      */
-    function depositSingleAsset(uint256 pid, address token, uint256 amount, bytes[2] calldata swapData, uint256 amountAMin, uint256 amountBMin, address recipient) onlyBanxe whenNotPaused nonReentrant external returns (uint256 sent, uint256 liquidity) {
-        require (pid == poolID, 'BAD_POOL_ID');
+    function depositWithSwap(uint256 pid, bytes[2] calldata swapData, address recipient) whenNotPaused nonReentrant payable external returns (uint256 sent0, uint256 sent1, uint256 dustA, uint256 dustB, uint256 liquidity) {
+        if(pid != poolID) revert BAD_POOL_ID();
         PoolInfo memory pool = pools[poolID];
 
-        uint256 balanceA = pool.tokenA.balanceOf(address(this));
-        uint256 balanceB = pool.tokenB.balanceOf(address(this));
-
-        IERC20Upgradeable(token).safeTransferFrom(msg.sender, address(this), amount);
-        IERC20Upgradeable(token).approve(address(pool.assetRouter), amount);
+        _transferSwapTokens(address(pool.assetRouter), swapData);
 
         uint256 amountLP;
-        (sent, amountLP) = pool.assetRouter.depositSingleAsset(pool.pool, token, amount, swapData, amountAMin, amountBMin, address(this));
+        (sent0, sent1, dustA, dustB, amountLP) = pool.assetRouter.depositWithSwap{value: msg.value}(pool.pool, swapData, address(this));
         liquidity = mint(recipient);
 
-        IERC20Upgradeable(token).safeTransfer(msg.sender, amount - sent);
-        uint256 _balanceA = pool.tokenA.balanceOf(address(this));
-        uint256 _balanceB = pool.tokenB.balanceOf(address(this));
-        if(_balanceA > balanceA){
-            pool.tokenA.safeTransfer(msg.sender, _balanceA - balanceA);
+        pool.tokenA.safeTransfer(msg.sender, dustA);
+        pool.tokenB.safeTransfer(msg.sender, dustB);
+
+        (IERC20 token0, uint256 amount0) = _getSwapParams(swapData[0]);//Could have done it in _transferSwapTokens to save gas, but can't because of Stack too deep error
+        (IERC20 token1, uint256 amount1) = _getSwapParams(swapData[1]);//Could have done it in _transferSwapTokens to save gas, but can't because of Stack too deep error
+
+        if(amount0 > sent0){
+            if(_isETH(token0)){
+                (bool success, ) = msg.sender.call{value: amount0 - sent0}("");
+                if(!success) revert TRANSFER_NOT_SUCCESSFUL();
+            }else{
+                token0.safeTransfer(msg.sender, amount0 - sent0);
+            }
         }
-        if(_balanceB > balanceB){
-            pool.tokenB.safeTransfer(msg.sender, _balanceB - balanceB);
+        if(amount1 > sent1){
+            if(_isETH(token1)){
+                (bool success, ) = msg.sender.call{value: amount1 - sent1}("");
+                if(!success) revert TRANSFER_NOT_SUCCESSFUL();
+            }else{
+                token1.safeTransfer(msg.sender, amount1 - sent1);
+            }
         }
 
-        emit DepositSingleToken(poolID, token, sent);
+        emit DepositTokensWithSwap(poolID, token0, token1, sent0, sent1);
         emit Deposit(poolID, msg.sender, recipient, amountLP);
-    }
-
-    /**
-     * @dev Deposits tokens in the pools[poolID] pool. Mints tokens representing user share. Emits {Deposit} event.
-     * @param pid - Current poolID. Throws revert if moveLiquidity() has been called before the transaction has been mined.
-     * @param swapData - Parameter with which 1inch router is being called with. NOTE: Use WMATIC as toToken.
-     * @param amountAMin - Bounds the extent to which the B/A price can go up before the transaction reverts.
-     * @param amountBMin - Bounds the extent to which the A/B price can go up before the transaction reverts.
-     * @param recipient - Address which will receive the deposit.
-     
-     * @return sentETH - Total MATIC amount sent to the farm. NOTE: Returns dust left from swap in MATIC, but if A/B amount are not correct also returns dust in pool's tokens.
-     * @return liquidity - Total liquidity minted for the {recipient}.
-     */
-    function depositSingleETH(uint256 pid, bytes[2] calldata swapData, uint256 amountAMin, uint256 amountBMin, address recipient) onlyBanxe whenNotPaused nonReentrant external payable returns (uint256 sentETH, uint256 liquidity) {
-        require (pid == poolID, 'BAD_POOL_ID');
-        PoolInfo memory pool = pools[poolID];
-
-        uint256 balanceA = pool.tokenA.balanceOf(address(this));
-        uint256 balanceB = pool.tokenB.balanceOf(address(this));
-
-        uint256 amountLP;
-        (sentETH, amountLP) = pool.assetRouter.depositSingleETH{value: msg.value}(pool.pool, swapData, amountAMin, amountBMin, address(this));
-        liquidity = mint(recipient);
-
-        payable(msg.sender).transfer(msg.value - sentETH);
-        uint256 _balanceA = pool.tokenA.balanceOf(address(this));
-        uint256 _balanceB = pool.tokenB.balanceOf(address(this));
-        if(_balanceA > balanceA){
-            pool.tokenA.safeTransfer(msg.sender, _balanceA - balanceA);
-        }
-        if(_balanceB > balanceB){
-            pool.tokenB.safeTransfer(msg.sender, _balanceB - balanceB);
-        }
-
-        emit DepositSingleETH(poolID, sentETH);
-        emit Deposit(poolID, msg.sender, recipient, amountLP); 
     }
 
     /**
@@ -311,7 +295,7 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
      * @return amountB - Token B amount sent to the {recipient}.
      */
     function withdraw(uint256 pid, uint256 liquidity, uint256 amountAMin, uint256 amountBMin, address recipient) whenNotPaused nonReentrant external returns (uint256 amountA, uint256 amountB) {
-        require (pid == poolID, 'BAD_POOL_ID');
+        if(pid != poolID) revert BAD_POOL_ID();
         PoolInfo memory pool = pools[poolID];
 
         (uint256 leftoverA, uint256 leftoverB) = collectLeftovers(liquidity, recipient);
@@ -338,7 +322,7 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
      * @return amountETH - MATIC amount sent to the {recipient}.
      */
     function withdrawETH(uint256 pid, uint256 liquidity, uint256 amountTokenMin, uint256 amountETHMin, address recipient) whenNotPaused nonReentrant external returns (uint256 amountToken, uint256 amountETH) {
-        require (pid == poolID, 'BAD_POOL_ID');
+        if(pid != poolID) revert BAD_POOL_ID();
         PoolInfo memory pool = pools[poolID];
 
         (uint256 leftoverA, uint256 leftoverB) = collectLeftovers(liquidity, recipient);
@@ -352,9 +336,7 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
         } else if (address(pool.tokenB) == WMATIC) {
             amountToken += leftoverA;
             amountETH += leftoverB;
-        } else {
-            revert("NOT_WMATIC_POOL");
-        }
+        } else revert NOT_ETH_POOL();
         
         emit WithdrawPairTokensETH(poolID, amountToken, amountETH);
         emit Withdraw(poolID, msg.sender, recipient, amountLP); 
@@ -364,54 +346,27 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
      * @dev Withdraws tokens from the {pools[poolID]} pool and sends them to the recipient. Burns tokens representing user share. Emits {Withdraw} event.
      * @param pid - Current poolID. Throws revert if moveLiquidity() has been called before the transaction has been mined.
      * @param liquidity - Liquidity to burn from this user.
-     * @param token - Address of a token to exit the pool with.
      * @param swapData - Parameter with which 1inch router is being called with.
      * @param recipient - Address which will receive withdrawn tokens.
      
-     * @return amountToken - {token} amount sent to the {recipient}.
+     * @return amount0 - Amount sent to the {recipient} from swapData[0].
+     * @return amount1 - Amount sent to the {recipient} from swapData[1].
      * @return amountA - Token A dust sent to the {recipient}.
      * @return amountB - Token B dust sent to the {recipient}.
      */
-    function withdrawSingleAsset(uint256 pid, uint256 liquidity, address token, bytes[2] calldata swapData, address recipient) whenNotPaused nonReentrant external returns (uint256 amountToken, uint256 amountA, uint256 amountB) {
-        require (pid == poolID, 'BAD_POOL_ID');
+    function withdrawWithSwap(uint256 pid, uint256 liquidity, bytes[2] calldata swapData, address recipient) whenNotPaused nonReentrant external returns (uint256 amount0, uint256 amount1, uint256 amountA, uint256 amountB) {
+        if(pid != poolID) revert BAD_POOL_ID();
         PoolInfo memory pool = pools[poolID];
 
         (uint256 leftoverA, uint256 leftoverB) = collectLeftovers(liquidity, recipient);
 
         uint256 amountLP = burn(liquidity);
-        (amountToken, amountA, amountB) = pool.assetRouter.withdrawSingleAsset(pool.pool, amountLP, token, swapData, recipient);
+        (amount0, amount1, amountA, amountB) = pool.assetRouter.withdrawWithSwap(pool.pool, amountLP, swapData, recipient);
 
         amountA += leftoverA;
         amountB += leftoverB;
 
-        emit WithdrawSingleToken(poolID, token, amountToken, amountA, amountB);
-        emit Withdraw(poolID, msg.sender, recipient, amountLP); 
-    }
-
-    /**
-     * @dev Withdraws tokens from the {pools[poolID]} pool and sends them to the recipient. Burns tokens representing user share. Emits {Withdraw} event.
-     * @param pid - Current poolID. Throws revert if moveLiquidity() has been called before the transaction has been mined.
-     * @param liquidity - Liquidity to burn from this user.
-     * @param swapData - Parameter with which 1inch router is being called with.
-     * @param recipient - Address which will receive withdrawn tokens.
-     
-     * @return amountETH - MATIC amount sent to the {recipient}.
-     * @return amountA - Token A dust sent to the {recipient}.
-     * @return amountB - Token B dust sent to the {recipient}.
-     */
-    function withdrawSingleETH(uint256 pid, uint256 liquidity, bytes[2] calldata swapData, address recipient) whenNotPaused nonReentrant external returns (uint256 amountETH, uint256 amountA, uint256 amountB) {
-        require (pid == poolID, 'BAD_POOL_ID');
-        PoolInfo memory pool = pools[poolID];
-
-        (uint256 leftoverA, uint256 leftoverB) = collectLeftovers(liquidity, recipient);
-
-        uint256 amountLP = burn(liquidity);
-        (amountETH, amountA, amountB) = pool.assetRouter.withdrawSingleETH(pool.pool, amountLP, swapData, recipient);
-
-        amountA += leftoverA;
-        amountB += leftoverB;
-
-        emit WithdrawSingleETH(poolID, amountETH, amountA, amountB);
+        emit WithdrawTokensWithSwap(poolID, _getSwapDstToken(swapData[0]), _getSwapDstToken(swapData[1]), amount0, amount1, amountA, amountB);
         emit Withdraw(poolID, msg.sender, recipient, amountLP); 
     }
 
@@ -455,10 +410,10 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
      * Note: This function can only be called by LiquidityManager.
      */
     function moveLiquidity(uint256 _poolID, bytes calldata swapAData, bytes calldata swapBData, uint256 amountAMin, uint256 amountBMin) whenNotPaused nonReentrant external {
-        require(accessManager.hasRole(LIQUIDITY_MANAGER_ROLE, msg.sender), 'CALLER_NOT_LIQUIDITY_MANAGER');
-        require(totalSupply() != 0, 'NO_LIQUIDITY');
-        require(lastMoveInfo.block != block.number, 'CANT_CALL_ON_THE_SAME_BLOCK');
-        require((_poolID < pools.length) && (_poolID != poolID), 'BAD_POOL_ID');
+        if(!accessManager.hasRole(LIQUIDITY_MANAGER_ROLE, msg.sender)) revert CALLER_NOT_LIQUIDITY_MANAGER();
+        if(totalSupply() == 0) revert NO_LIQUIDITY();
+        if(lastMoveInfo.block == block.number) revert CANT_CALL_ON_THE_SAME_BLOCK();
+        if((_poolID >= pools.length) || (_poolID == poolID)) revert BAD_POOL_ID();
 
         PoolInfo memory currentPool = pools[poolID];
         PoolInfo memory newPool = pools[_poolID];
@@ -479,11 +434,15 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
                 bytes memory pathDefinition
             ) = abi.decode(swapAData[4:], (IOdosRouter.inputToken[],IOdosRouter.outputToken[],uint256,uint256,address,bytes));
 
-            require((inputs.length == 1) && (outputs.length == 1), 'BAD_SWAP_A_TOKENS_LENGTH');
-            require(inputs[0].tokenAddress == address(currentPool.tokenA), 'BAD_SWAP_A_INPUT_TOKEN');
-            require(outputs[0].tokenAddress == address(newPool.tokenA), 'BAD_SWAP_A_OUTPUT_TOKEN');
+            // More descriptive errors would be nice but our contract size is very limited
+            if(
+                ((inputs.length != 1) || (outputs.length != 1)) ||
+                (inputs[0].tokenAddress != address(currentPool.tokenA)) ||
+                (outputs[0].tokenAddress != address(newPool.tokenA))
+            ) revert BAD_SWAP_A();
 
             inputs[0].amountIn = tokenABalance;
+            currentPool.tokenA.approve(address(OdosRouter), tokenABalance);
             OdosRouter.swap(inputs, outputs, type(uint256).max, valueOutMin, executor, pathDefinition);
         }
 
@@ -497,15 +456,24 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
                 bytes memory pathDefinition
             ) = abi.decode(swapBData[4:], (IOdosRouter.inputToken[],IOdosRouter.outputToken[],uint256,uint256,address,bytes));
 
-            require((inputs.length == 1) && (outputs.length == 1), 'BAD_SWAP_B_TOKENS_LENGTH');
-            require(inputs[0].tokenAddress == address(currentPool.tokenB), 'BAD_SWAP_B_INPUT_TOKEN');
-            require(outputs[0].tokenAddress == address(newPool.tokenB), 'BAD_SWAP_B_OUTPUT_TOKEN');
+            // More descriptive errors would be nice but our contract size is very limited
+            if(
+                ((inputs.length != 1) || (outputs.length != 1)) ||
+                (inputs[0].tokenAddress != address(currentPool.tokenB)) ||
+                (outputs[0].tokenAddress != address(newPool.tokenB))
+            ) revert BAD_SWAP_B();
 
             inputs[0].amountIn = tokenBBalance;
+            currentPool.tokenB.approve(address(OdosRouter), tokenBBalance);
             OdosRouter.swap(inputs, outputs, type(uint256).max, valueOutMin, executor, pathDefinition);
         }
+
+        uint256 newTokenABalance = newPool.tokenA.balanceOf(address(this));
+        uint256 newTokenBBalance = newPool.tokenB.balanceOf(address(this));
         
-        (,,reserveLP) = newPool.assetRouter.deposit(newPool.pool, newPool.tokenA.balanceOf(address(this)), newPool.tokenB.balanceOf(address(this)), amountAMin, amountBMin, address(this));
+        newPool.tokenB.approve(address(newPool.assetRouter), newTokenBBalance);
+        newPool.tokenA.approve(address(newPool.assetRouter), newTokenABalance);
+        (,,reserveLP) = newPool.assetRouter.deposit(newPool.pool, newTokenABalance, newTokenBBalance, amountAMin, amountBMin, address(this));
        
         lastMoveInfo = MoveLiquidityInfo({
             leftoverA: newPool.tokenA.balanceOf(address(this)),
@@ -583,7 +551,7 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
             liquidity = amountLP * _totalSupply / reserveLP;
         }
 
-        require(liquidity > 0, 'INSUFFICIENT_LIQUIDITY_MINTED');
+        if(liquidity == 0) revert INSUFFICIENT_LIQUIDITY();
         _mint(to, liquidity);
 
         reserveLP = balanceLP;
@@ -594,10 +562,46 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
         (uint256 balanceLP,,) = pool.assetRouter.userStake(address(this), pool.pool);
 
         amountLP = liquidity * balanceLP / totalSupply(); 
-        require(amountLP > 0, 'INSUFFICIENT_LIQUIDITY_BURNED');
+        if(amountLP == 0) revert INSUFFICIENT_LIQUIDITY();
         _burn(msg.sender, liquidity);
 
         reserveLP = balanceLP - amountLP;
+    }
+
+    function _transferSwapTokens(address assetRouter, bytes[2] calldata swapData) internal {
+        (,IAggregationRouterV5.SwapDescription memory desc0,) = abi.decode(swapData[0][4:], (address, IAggregationRouterV5.SwapDescription, bytes));
+        (,IAggregationRouterV5.SwapDescription memory desc1,) = abi.decode(swapData[1][4:], (address, IAggregationRouterV5.SwapDescription, bytes));
+
+        if(desc0.srcToken == desc1.srcToken){
+            if(!_isETH(desc0.srcToken)){
+                uint256 amount = desc0.amount + desc1.amount;
+                desc0.srcToken.safeTransferFrom(msg.sender, address(this), amount);
+                desc0.srcToken.approve(assetRouter, amount);
+            }
+        }else{
+            if(!_isETH(desc0.srcToken)){
+                desc0.srcToken.safeTransferFrom(msg.sender, address(this), desc0.amount);
+                desc0.srcToken.approve(assetRouter, desc0.amount);
+            }
+            if(!_isETH(desc1.srcToken)){
+                desc1.srcToken.safeTransferFrom(msg.sender, address(this), desc1.amount);
+                desc1.srcToken.approve(assetRouter, desc1.amount);
+            }
+        }
+    }
+
+    function _getSwapParams(bytes calldata swapData) internal pure returns(IERC20, uint256){
+        (,IAggregationRouterV5.SwapDescription memory desc,) = abi.decode(swapData[4:], (address, IAggregationRouterV5.SwapDescription, bytes));
+        return (desc.srcToken, desc.amount);
+    }
+
+    function _isETH(IERC20 token) internal pure returns(bool){
+        return (address(token) == address(0) || address(token) == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
+    }
+
+    function _getSwapDstToken(bytes calldata swapData) internal pure returns(IERC20){
+        (,IAggregationRouterV5.SwapDescription memory desc,) = abi.decode(swapData[4:], (address, IAggregationRouterV5.SwapDescription, bytes));
+        return desc.dstToken;
     }
 
     function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual override {
@@ -620,7 +624,7 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
      * Note: This function can only be called by Banxe.
      */
     function transferBanxe(address _banxe) external onlyBanxe {
-        require(_banxe != address(0), "TRANSFER_TO_ZERO_ADDRESS");
+        if(_banxe == address(0)) revert INVALID_BANXE();
         emit BanxeTransferred(banxe, _banxe);
         banxe = _banxe;
     }

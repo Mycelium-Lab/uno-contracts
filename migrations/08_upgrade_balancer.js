@@ -1,3 +1,5 @@
+global.crypto = require('crypto')
+
 const Farm = artifacts.require('UnoFarmBalancer')
 const AssetRouter = artifacts.require('UnoAssetRouterBalancer')
 

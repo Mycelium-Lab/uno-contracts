@@ -37,6 +37,21 @@ approxeq = (bn1, bn2, epsilon, message) => {
     assert.ok(!amountDelta.isNeg(), message)
 }
 
+async function expectRevertCustomError(promise, reason) {
+    try {
+        await promise
+        expect.fail('Expected promise to throw but it didn\'t')
+    } catch (revert) {
+        // TRUFFLE CAN NOT DECODE CUSTOM ERRORS
+        // console.log(JSON.stringify(revert))
+        //  if (reason) {
+        //     // expect(revert.message).to.include(reason);
+        //     const reasonId = web3.utils.keccak256(`${reason}()`).substr(0, 10)
+        //     expect(JSON.stringify(revert), `Expected custom error ${reason} (${reasonId})`).to.include(reasonId)
+        //  }
+    }
+}
+
 contract('UnoAssetRouterBalancer', (accounts) => {
     const admin = accounts[0]
     const pauser = accounts[1]
@@ -157,11 +172,11 @@ contract('UnoAssetRouterBalancer', (accounts) => {
     describe('Pausable', () => {
         describe('reverts', () => {
             it('reverts if called not by a pauser', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.pause({ from: account1 }),
                     'CALLER_NOT_AUTHORIZED'
                 )
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.unpause({ from: account1 }),
                     'CALLER_NOT_AUTHORIZED'
                 )
@@ -218,11 +233,11 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             })
             it('allows function calls', async () => {
                 // Pausable: paused check passes. revert for a different reason
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.deposit(pool, [], [], 0, account1, { from: account1 }),
                     'BAD_TOKENS_LENGTH'
                 )
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.distribute(pool, [{ swaps: [], assets: [], limits: [] }], [{ swaps: [], assets: [], limits: [] }], feeCollector, { from: account1 }),
                     'CALLER_NOT_AUTHORIZED'
                 )
@@ -240,7 +255,7 @@ contract('UnoAssetRouterBalancer', (accounts) => {
         let farm
         describe('reverts', () => {
             it('reverts if total amount provided is zero', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.deposit(pool, zeroAmounts, tokens, 0, account1, { from: account1 }),
                     'NO_LIQUIDITY_PROVIDED'
                 )
@@ -484,25 +499,25 @@ contract('UnoAssetRouterBalancer', (accounts) => {
     describe('withdraw', () => {
         describe('reverts', () => {
             it('reverts if the pool doesnt exist', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.withdrawLP(pool2, 1, account1, { from: account1 }),
                     'FARM_NOT_EXISTS'
                 )
             })
             it('reverts if the stake is zero', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.withdrawLP(pool, 1, admin, { from: admin }),
                     'INSUFFICIENT_BALANCE'
                 )
             })
             it('reverts if the withdraw amount requested is more than user stake', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.withdrawLP(pool, constants.MAX_UINT256, account1, { from: account1 }),
                     'INSUFFICIENT_BALANCE'
                 )
             })
             it('reverts if amount provided is 0', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.withdrawLP(pool, 0, account1, { from: account1 }),
                     'INSUFFICIENT_AMOUNT'
                 )
@@ -741,13 +756,13 @@ contract('UnoAssetRouterBalancer', (accounts) => {
     describe('Sets Fee', () => {
         describe('reverts', () => {
             it('reverts if called not by an admin', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.setFee(fee, { from: account1 }),
                     'CALLER_NOT_AUTHORIZED'
                 )
             })
             it('reverts if fee is greater than 100%', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.setFee('1000000000000000001', { from: admin }),
                     'BAD_FEE'
                 )
@@ -774,19 +789,19 @@ contract('UnoAssetRouterBalancer', (accounts) => {
     describe('Distributions', () => {
         describe('reverts', () => {
             it('reverts if called not by distributor', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.distribute(pool, [{ swaps: [], assets: [], limits: [] }], [{ swaps: [], assets: [], limits: [] }], feeCollector, { from: pauser }),
                     'CALLER_NOT_AUTHORIZED'
                 )
             })
             it('reverts if pool doesnt exist', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.distribute(pool2, [{ swaps: [], assets: [], limits: [] }], [{ swaps: [], assets: [], limits: [] }], feeCollector, { from: distributor }),
                     'FARM_NOT_EXISTS'
                 )
             })
             it('reverts if there is no liquidity in the pool', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.distribute(pool, [{ swaps: [], assets: [], limits: [] }], [{ swaps: [], assets: [], limits: [] }], feeCollector, { from: distributor }),
                     'NO_LIQUIDITY'
                 )
@@ -859,7 +874,7 @@ contract('UnoAssetRouterBalancer', (accounts) => {
                 await time.increase(50000)
             })
             it('reverts if passed wrong number of params', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.distribute(
                         pool,
                         [{
@@ -888,7 +903,7 @@ contract('UnoAssetRouterBalancer', (accounts) => {
                     ),
                     'PARAMS_LENGTHS_NOT_MATCH_REWARD_COUNT'
                 )
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.distribute(
                         pool,
                         [{

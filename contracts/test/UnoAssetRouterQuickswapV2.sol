@@ -2,6 +2,7 @@
 pragma solidity 0.8.10;
 
 import {IUnoFarmQuickswap as Farm} from '../apps/quickswap/interfaces/IUnoFarmQuickswap.sol'; 
+import '../interfaces/IUnoFarm.sol';
 import '../interfaces/IUniswapV2Router.sol';
 import '../interfaces/IUnoFarmFactory.sol';
 import '../interfaces/IUnoAccessManager.sol'; 
@@ -259,7 +260,7 @@ contract UnoAssetRouterQuickswapV2 is Initializable, PausableUpgradeable, UUPSUp
             farm = Farm(farmFactory.createFarm(lpStakingPool));
         }
 
-        IERC20Upgradeable(farm.lpPair()).safeTransferFrom(msg.sender, address(farm), amount);
+        IERC20Upgradeable(farm.lpPool()).safeTransferFrom(msg.sender, address(farm), amount);
         farm.deposit(amount, recipient);
 
         emit Deposit(lpStakingPool, msg.sender, recipient, amount); 
@@ -281,7 +282,7 @@ contract UnoAssetRouterQuickswapV2 is Initializable, PausableUpgradeable, UUPSUp
         require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
         
         farm.withdraw(amount, msg.sender, address(this));
-        (amountA, amountB) = _removeLiquidity(farm.lpPair(), farm.tokenA(), farm.tokenB(), amount, amountAMin, amountBMin, recipient);
+        (amountA, amountB) = _removeLiquidity(farm.lpPool(), farm.tokenA(), farm.tokenB(), amount, amountAMin, amountBMin, recipient);
 
         emit Withdraw(lpStakingPool, msg.sender, recipient, amount);  
     }
@@ -303,7 +304,7 @@ contract UnoAssetRouterQuickswapV2 is Initializable, PausableUpgradeable, UUPSUp
 
         address tokenA = farm.tokenA();
         address tokenB = farm.tokenB();
-        address lpPair = farm.lpPair();
+        address lpPair = farm.lpPool();
 
         farm.withdraw(amount, msg.sender, address(this));
         if (tokenA == WMATIC) {
@@ -337,7 +338,7 @@ contract UnoAssetRouterQuickswapV2 is Initializable, PausableUpgradeable, UUPSUp
 
         address tokenA = farm.tokenA();
         address tokenB = farm.tokenB();
-        (amountA, amountB) = _removeLiquidity(farm.lpPair(), tokenA, tokenB, amount, 0, 0, address(this));
+        (amountA, amountB) = _removeLiquidity(farm.lpPool(), tokenA, tokenB, amount, 0, 0, address(this));
 
         if (tokenA != token) {
             IERC20Upgradeable(tokenA).approve(OneInchRouter, amountA);
@@ -385,7 +386,7 @@ contract UnoAssetRouterQuickswapV2 is Initializable, PausableUpgradeable, UUPSUp
 
         address tokenA = farm.tokenA();
         address tokenB = farm.tokenB();
-        (amountA, amountB) = _removeLiquidity(farm.lpPair(), tokenA, tokenB, amount, 0, 0, address(this));
+        (amountA, amountB) = _removeLiquidity(farm.lpPool(), tokenA, tokenB, amount, 0, 0, address(this));
 
         if (tokenA != WMATIC) {
             IERC20Upgradeable(tokenA).approve(OneInchRouter, amountA);
@@ -447,7 +448,7 @@ contract UnoAssetRouterQuickswapV2 is Initializable, PausableUpgradeable, UUPSUp
         Farm farm = Farm(farmFactory.Farms(lpStakingPool));
         require(farm != Farm(address(0)), 'FARM_NOT_EXISTS');
 
-        uint256 reward = farm.distribute(swapInfos, feeSwapInfo, Farm.FeeInfo(feeTo, fee));
+        uint256 reward = farm.distribute(swapInfos, feeSwapInfo, IUnoFarm.FeeInfo(feeTo, fee));
         emit Distribute(lpStakingPool, reward);
     }
 
@@ -464,7 +465,7 @@ contract UnoAssetRouterQuickswapV2 is Initializable, PausableUpgradeable, UUPSUp
         Farm farm = Farm(farmFactory.Farms(lpStakingPool));
         if (farm != Farm(address(0))) {
             stakeLP = farm.userBalance(_address);
-            address lpPair = farm.lpPair();
+            address lpPair = farm.lpPool();
             (stakeA, stakeB) = _getTokenStake(lpPair, stakeLP);
         }
     }
@@ -481,7 +482,7 @@ contract UnoAssetRouterQuickswapV2 is Initializable, PausableUpgradeable, UUPSUp
         Farm farm = Farm(farmFactory.Farms(lpStakingPool));
         if (farm != Farm(address(0))) {
             totalDepositsLP = farm.getTotalDeposits();
-            address lpPair = farm.lpPair();
+            address lpPair = farm.lpPool();
             (totalDepositsA, totalDepositsB) = _getTokenStake(lpPair, totalDepositsLP);
         }
     }

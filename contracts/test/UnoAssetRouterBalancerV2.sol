@@ -2,6 +2,7 @@
 pragma solidity 0.8.10;
 
 import {IUnoFarmBalancer as Farm} from '../apps/balancer/interfaces/IUnoFarmBalancer.sol'; 
+import '../interfaces/IUnoFarm.sol';
 import '../interfaces/IUnoFarmFactory.sol';
 import '../interfaces/IUnoAccessManager.sol'; 
 import '../interfaces/IVault.sol'; 
@@ -449,7 +450,7 @@ contract UnoAssetRouterBalancerV2 is Initializable, PausableUpgradeable, UUPSUpg
         Farm farm = Farm(farmFactory.Farms(lpPool));
         require(farm != Farm(address(0)), 'FARM_NOT_EXISTS');
 
-        uint256 reward = farm.distribute(swapInfos, feeSwapInfos, Farm.FeeInfo(feeTo, fee));
+        uint256 reward = farm.distribute(swapInfos, feeSwapInfos, IUnoFarm.FeeInfo(feeTo, fee));
         emit Distribute(lpPool, reward);
     }
 

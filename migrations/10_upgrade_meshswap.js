@@ -1,3 +1,5 @@
+global.crypto = require('crypto')
+
 const Farm = artifacts.require('UnoFarmMeshswap')
 const AssetRouter = artifacts.require('UnoAssetRouterMeshswap')
 

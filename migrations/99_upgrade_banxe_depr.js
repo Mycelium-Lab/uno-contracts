@@ -1,3 +1,5 @@
+global.crypto = require('crypto')
+
 const AutoStrategy = artifacts.require('UnoAutoStrategyBanxeDeprecated')
 const fs = require('fs/promises')
 const path = require('path')

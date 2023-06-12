@@ -1,5 +1,5 @@
 const {
-    expectRevert, expectEvent, BN, constants, time
+    expectEvent, BN, constants, time
 } = require('@openzeppelin/test-helpers')
 // const { expectRevertCustomError } = require('custom-error-test-helper')
 const { deployProxy } = require('@openzeppelin/truffle-upgrades')
