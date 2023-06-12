@@ -1,3 +1,5 @@
+global.crypto = require('crypto')
+
 const Farm = artifacts.require('UnoFarmTrisolarisStable')
 const AssetRouter = artifacts.require('UnoAssetRouterTrisolarisStable')
 
