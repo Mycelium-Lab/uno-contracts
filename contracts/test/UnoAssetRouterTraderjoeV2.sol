@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
 
+import '../interfaces/IUnoFarm.sol';
 import { IUnoFarmTraderjoe as Farm } from "../apps/traderjoe/interfaces/IUnoFarmTraderjoe.sol";
 import "../interfaces/IUniswapV2Router.sol";
 import "../interfaces/IUnoFarmFactory.sol";
@@ -456,7 +457,7 @@ contract UnoAssetRouterTraderjoeV2 is
 		Farm farm = Farm(farmFactory.Farms(lpPair));
 		require(farm != Farm(address(0)), "FARM_NOT_EXISTS");
 
-		uint256 reward = farm.distribute(swapInfos, feeSwapInfo, Farm.FeeInfo(feeTo, fee));
+		uint256 reward = farm.distribute(swapInfos, feeSwapInfo, IUnoFarm.FeeInfo(feeTo, fee));
 		emit Distribute(lpPair, reward);
 	}
 
