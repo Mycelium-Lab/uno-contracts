@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
 
+import '../../../interfaces/IUnoFarm.sol';
 import { IUnoFarmTrisolarisStable as Farm } from "../interfaces/IUnoFarmTrisolarisStable.sol";
 import "../../../interfaces/IUnoFarmFactory.sol";
 import "../../../interfaces/IUnoAccessManager.sol";
@@ -245,7 +246,7 @@ contract UnoAssetRouterTrisolarisStableV2 is Initializable, PausableUpgradeable,
     }
 
     /**
-     * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpPair} and deposits tokens in it. Emits a {Deposit} event.
+     * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpPool} and deposits tokens in it. Emits a {Deposit} event.
      * @param swap - Address of the pool to deposit tokens in.
      * @param amount - LP Token amount to deposit.
      * @param recipient - Address which will receive the deposit.
@@ -257,7 +258,7 @@ contract UnoAssetRouterTrisolarisStableV2 is Initializable, PausableUpgradeable,
             farm = Farm(farmFactory.createFarm(swap));
         }
 
-        IERC20Upgradeable(farm.lpPair()).safeTransferFrom(msg.sender, address(farm), amount);
+        IERC20Upgradeable(farm.lpPool()).safeTransferFrom(msg.sender, address(farm), amount);
         farm.deposit(amount, recipient);
 
         emit Deposit(swap, msg.sender, recipient, amount); 
@@ -436,7 +437,7 @@ contract UnoAssetRouterTrisolarisStableV2 is Initializable, PausableUpgradeable,
             rewardSwapInfos,
             rewarderSwapInfos,
             feeSwapInfos,
-            Farm.FeeInfo(feeTo, fee)
+            IUnoFarm.FeeInfo(feeTo, fee)
         );
         emit Distribute(swap, reward);
     }
@@ -489,7 +490,7 @@ contract UnoAssetRouterTrisolarisStableV2 is Initializable, PausableUpgradeable,
         }
         require (joinPool, 'NO_LIQUIDITY_PROVIDED');
         liquidity = ISwap(swap).addLiquidity(amounts, minAmountLP, block.timestamp);
-        IERC20Upgradeable(farm.lpPair()).safeTransfer(address(farm), liquidity);
+        IERC20Upgradeable(farm.lpPool()).safeTransfer(address(farm), liquidity);
     }
 
     /**
