@@ -1,3 +1,5 @@
+global.crypto = require('crypto')
+
 const Farm = artifacts.require('UnoFarmPancakeswap')
 const AssetRouter = artifacts.require('UnoAssetRouterPancakeswap')
 
