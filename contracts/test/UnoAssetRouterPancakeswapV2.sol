@@ -3,6 +3,7 @@ pragma solidity 0.8.10;
 
 import {IUnoFarmPancakeswap as Farm} from '../apps/pancakeswap/interfaces/IUnoFarmPancakeswap.sol'; 
 import '../interfaces/IUniswapV2Router.sol';
+import '../interfaces/IUnoFarm.sol';
 import '../interfaces/IUnoFarmFactory.sol';
 import '../interfaces/IUnoAccessManager.sol'; 
 import '../interfaces/IUniswapV2Pair.sol';
@@ -449,7 +450,7 @@ contract UnoAssetRouterPancakeswapV2 is Initializable, PausableUpgradeable, UUPS
         Farm farm = Farm(farmFactory.Farms(lpPair));
         require(farm != Farm(address(0)), 'FARM_NOT_EXISTS');
 
-        uint256 reward = farm.distribute(swapInfos, feeSwapInfo, Farm.FeeInfo(feeTo, fee));
+        uint256 reward = farm.distribute(swapInfos, feeSwapInfo, IUnoFarm.FeeInfo(feeTo, fee));
         emit Distribute(lpPair, reward);
     }
 
