@@ -1,43 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
 
-interface IUnoFarmTraderjoe {
-	struct SwapInfo {
-		address[] route;
-		uint256 amountOutMin;
-	}
-	struct FeeInfo {
-		address feeTo;
-		uint256 fee;
-	}
+import '../../../interfaces/IUnoFarm.sol';
+import "../../../interfaces/IMasterChefJoe.sol";
 
-	function rewardToken() external view returns (address);
-
-	function lpPair() external view returns (address);
-
-	function tokenA() external view returns (address);
-
-	function tokenB() external view returns (address);
-
-	function assetRouter() external view returns (address);
-
-	function initialize(address _lpStakingPool, address _assetRouter) external;
-
-	function deposit(uint256 amount, address recipient) external;
-
-	function withdraw(
-		uint256 amount,
-		address origin,
-		address recipient
-	) external;
-
+interface IUnoFarmTraderjoe is IUnoFarm {
+	error PID_NOT_EXISTS();
+	function pid() external returns (uint256);
+	function MasterChef() external returns (IMasterChefJoe);
 	function distribute(
 		SwapInfo[4] calldata swapInfos,
 		SwapInfo[2] calldata feeSwapInfo,
 		FeeInfo calldata feeInfo
 	) external returns (uint256 reward);
-
-	function userBalance(address _address) external view returns (uint256);
-
-	function getTotalDeposits() external view returns (uint256);
 }
