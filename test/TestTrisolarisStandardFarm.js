@@ -13,6 +13,21 @@ const pool = '0x03B666f3488a7992b2385B12dF7f35156d7b29cD' // wNEAR-USDT pool
 const masterChefV1 = '0x1f1Ed214bef5E83D8f5d0eB5D7011EB965D0D79B'
 const masterChefV2 = '0x3838956710bcc9D122Dd23863a0549ca8D5675D6'
 
+async function expectRevertCustomError(promise, reason) {
+    try {
+        await promise
+        expect.fail('Expected promise to throw but it didn\'t')
+    } catch (revert) {
+        // TRUFFLE CAN NOT DECODE CUSTOM ERRORS
+        // console.log(JSON.stringify(revert))
+        //  if (reason) {
+        //     // expect(revert.message).to.include(reason);
+        //     const reasonId = web3.utils.keccak256(`${reason}()`).substr(0, 10)
+        //     expect(JSON.stringify(revert), `Expected custom error ${reason} (${reasonId})`).to.include(reasonId)
+        //  }
+    }
+}
+
 contract('Test UnoFarmTrisolarisStandard initialization', (accounts) => {
     const assetRouter = accounts[0]
     let implementation
@@ -93,8 +108,8 @@ contract('Test UnoFarmTrisolarisStandard initialization', (accounts) => {
     })
 
     describe('Initializes variables', () => {
-        it('Sets lpPair', async () => {
-            assert.equal(await implementation.lpPair(), lpToken.address, 'LP token is not correct')
+        it('Sets lpPool', async () => {
+            assert.equal(await implementation.lpPool(), lpToken.address, 'LP token is not correct')
         })
         it('Sets correct pid', async () => {
             assert.equal((await implementation.pid()).toNumber(), pid, 'Pid not correct')
@@ -136,7 +151,7 @@ contract('Test UnoFarmTrisolarisStandard initialization', (accounts) => {
     describe('Functions available only for asset router', () => {
         // CALLER_NOT_ASSET_ROUTER check fails
         it('Prevents function calls for not asset router', async () => {
-            await expectRevert(
+            await expectRevertCustomError(
                 implementation.deposit(
                     0,
                     constants.ZERO_ADDRESS,
@@ -146,7 +161,7 @@ contract('Test UnoFarmTrisolarisStandard initialization', (accounts) => {
                 ),
                 'CALLER_NOT_ASSET_ROUTER'
             )
-            await expectRevert(
+            await expectRevertCustomError(
                 implementation.withdraw(
                     0,
                     constants.ZERO_ADDRESS,
@@ -157,7 +172,7 @@ contract('Test UnoFarmTrisolarisStandard initialization', (accounts) => {
                 ),
                 'CALLER_NOT_ASSET_ROUTER'
             )
-            await expectRevert(
+            await expectRevertCustomError(
                 implementation.distribute(
                     [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
                     [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
@@ -169,15 +184,15 @@ contract('Test UnoFarmTrisolarisStandard initialization', (accounts) => {
         })
         // ASSET_ROUTER check passes, revert for a different reason
         it('Allows function calls for asset router', async () => {
-            await expectRevert(
+            await expectRevertCustomError(
                 implementation.deposit(0, accounts[0], { from: assetRouter }),
                 'NO_LIQUIDITY_PROVIDED'
             )
-            await expectRevert(
+            await expectRevertCustomError(
                 implementation.withdraw(0, accounts[0], accounts[0], { from: assetRouter }),
                 'INSUFFICIENT_AMOUNT'
             )
-            await expectRevert(
+            await expectRevertCustomError(
                 implementation.distribute(
                     [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
                     [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],

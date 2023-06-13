@@ -1,0 +1,122 @@
+const {
+    expectRevert, expectEvent, BN, constants
+} = require('@openzeppelin/test-helpers')
+const { deployProxy } = require('@openzeppelin/truffle-upgrades')
+
+const IUniversalMasterChef = artifacts.require('IUniversalMasterChef')
+const IERC20 = artifacts.require('IERC20')
+
+const AccessManager = artifacts.require('UnoAccessManager')
+const FarmFactory = artifacts.require('UnoFarmFactory')
+
+const Farm = artifacts.require('UnoFarmTrisolarisStable')
+const AssetRouter = artifacts.require('UnoAssetRouterTrisolarisStable')
+
+const pool = '0x458459E48dbAC0C8Ca83F8D0b7b29FEfE60c3970' // USDC-USDT-USN
+const lpTokenAddress = '0x87BCC091d0A7F9352728100268Ac8D25729113bB'
+
+const masterChefV2 = '0x3838956710bcc9D122Dd23863a0549ca8D5675D6'
+const DAIHolder = '0x456325F2AC7067234dD71E01bebe032B0255e039'// has to be unlocked and hold 0xe3520349F477A5F6EB06107066048508498A291b
+approxeq = (bn1, bn2, epsilon, message) => {
+    const amountDelta = bn1.sub(bn2).add(epsilon)
+    assert.ok(!amountDelta.isNeg(), message)
+}
+
+contract('UnoAssetRouterTrisolarisStableSingleAssetDeposit', (accounts) => {
+    const admin = accounts[0]
+
+    let accessManager; let assetRouter; let
+        factory
+
+    let tokens
+    const tokenContracts = []
+    let MasterChef
+    let pid
+
+    before(async () => {
+        const implementation = await Farm.new({ from: admin })
+        accessManager = await AccessManager.new({ from: admin })
+        assetRouter = await deployProxy(AssetRouter, { kind: 'uups', initializer: false })
+        factory = await FarmFactory.new(implementation.address, accessManager.address, assetRouter.address, { from: admin })
+
+        tokens = await assetRouter.getTokens(pool)
+        for (let i = 0; i < tokens.length; i++) {
+            tokenContracts.push(await IERC20.at(tokens[i]))
+        }
+
+        MasterChef = await IUniversalMasterChef.at(masterChefV2)
+        const poolLength = (await MasterChef.poolLength()).toNumber()
+        for (let i = 0; i < poolLength; i++) {
+            const _lpToken = await MasterChef.lpToken(i)
+            if (_lpToken.toString().toLowerCase() === lpTokenAddress.toLowerCase()) {
+                pid = i
+                break
+            }
+        }
+    })
+
+    describe('Single Asset Deposit', () => {
+        describe('deposit token', () => {
+            let stakeLPBefore
+            let totalDepositsLPBefore
+            let DAIToken
+            let DAIAmount
+            let tokenBalanceBefore
+            const tokensData = []
+
+            before(async () => {
+                const fromToken = '0xe3520349F477A5F6EB06107066048508498A291b'
+
+                DAIToken = await IERC20.at(fromToken)
+                const DAIHolderBalance = await DAIToken.balanceOf(DAIHolder)
+                tokenBalanceBefore = DAIHolderBalance
+
+                DAIAmount = new BN('1500000000000000000000') // 1000$
+
+                await DAIToken.approve(assetRouter.address, DAIAmount, { from: DAIHolder }) // change
+
+                tokensData[0] = `0x12aa3caf0000000000000000000000007731f8df999a9441ae10519617c24568dc82f697000000000000000000000000e3520349f477a5f6eb06107066048508498a291b000000000000000000000000b12bfca5a55806aaf64e99521918a4bf0fc408020000000000000000000000007731f8df999a9441ae10519617c24568dc82f697000000000000000000000000${assetRouter.address.substring(2).toLowerCase()}00000000000000000000000000000000000000000000001b1ae4d6e2ef500000000000000000000000000000000000000000000000000000000000000eb74b330000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000001600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000017e00000000000000000000000000000000016000013200011800006800004e80206c4eca27e3520349f477a5f6eb06107066048508498a291b46a3a41bd932244dd08186e4c19f1a7e48cbcdf40000000000000000000000000000000000000000000000004563918244f400000020d6bdbf78e3520349f477a5f6eb06107066048508498a291b5120c90db0d8713414d78523436dc347419164544a3fe3520349f477a5f6eb06107066048508498a291b00443df02124000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000eb74b330020d6bdbf78b12bfca5a55806aaf64e99521918a4bf0fc4080280a06c4eca27b12bfca5a55806aaf64e99521918a4bf0fc408021111111254eeb25477b68fb85ed929f73a9605820000b4eb6cb3`// await fetchData(tokenASwapParams)
+                tokensData[1] = `0x12aa3caf0000000000000000000000007731f8df999a9441ae10519617c24568dc82f697000000000000000000000000e3520349f477a5f6eb06107066048508498a291b0000000000000000000000004988a896b1227218e4a686fde5eabdcabd91571f0000000000000000000000007731f8df999a9441ae10519617c24568dc82f697000000000000000000000000${assetRouter.address.substring(2).toLowerCase()}00000000000000000000000000000000000000000000001b1ae4d6e2ef500000000000000000000000000000000000000000000000000000000000000eb4fbfc0000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000001600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000017e00000000000000000000000000000000016000013200011800006800004e80206c4eca27e3520349f477a5f6eb06107066048508498a291b46a3a41bd932244dd08186e4c19f1a7e48cbcdf40000000000000000000000000000000000000000000000004563918244f400000020d6bdbf78e3520349f477a5f6eb06107066048508498a291b5120c90db0d8713414d78523436dc347419164544a3fe3520349f477a5f6eb06107066048508498a291b00443df02124000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000eb4fbfc0020d6bdbf784988a896b1227218e4a686fde5eabdcabd91571f80a06c4eca274988a896b1227218e4a686fde5eabdcabd91571f1111111254eeb25477b68fb85ed929f73a9605820000b4eb6cb3`
+                tokensData[2] = `0x12aa3caf0000000000000000000000007731f8df999a9441ae10519617c24568dc82f697000000000000000000000000e3520349f477a5f6eb06107066048508498a291b0000000000000000000000005183e1b1091804bc2602586919e6880ac1cf28960000000000000000000000007731f8df999a9441ae10519617c24568dc82f697000000000000000000000000${assetRouter.address.substring(2).toLowerCase()}00000000000000000000000000000000000000000000001b1ae4d6e2ef50000000000000000000000000000000000000000000000000000d5d91e1303df110b30000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000001600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000027200000000000000000000000000000000000000025400022600006800004e80206c4eca27e3520349f477a5f6eb06107066048508498a291b46a3a41bd932244dd08186e4c19f1a7e48cbcdf40000000000000000000000000000000000000000000000004563918244f400000020d6bdbf78e3520349f477a5f6eb06107066048508498a291b00a007e5c0d200000000000000000000000000000000000000000000019a0000ca0000b05120c90db0d8713414d78523436dc347419164544a3fe3520349f477a5f6eb06107066048508498a291b00443df02124000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000eb4fbfc0020d6bdbf784988a896b1227218e4a686fde5eabdcabd91571f5120458459e48dbac0c8ca83f8d0b7b29fefe60c39704988a896b1227218e4a686fde5eabdcabd91571f00449169558600000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000d5d91e1303df110b300000000000000000000000000000000000000000000000000000000648cabfe80a06c4eca275183e1b1091804bc2602586919e6880ac1cf28961111111254eeb25477b68fb85ed929f73a9605820000000000000000000000000000b4eb6cb3`
+
+                const farmAddress = await factory.Farms(pool)
+
+                if (farmAddress === constants.ZERO_ADDRESS) {
+                    stakingRewardsBalanceBefore = new BN(0)
+                } else {
+                    const farm = await Farm.at(farmAddress)
+                    stakingRewardsBalanceBefore = (await MasterChef.userInfo(pid, farm.address)).amount
+                }
+                stakeLPBefore = await assetRouter.userStake(DAIHolder, pool)
+
+                totalDepositsLPBefore = await assetRouter.totalDeposits(pool)
+            })
+            it('fires events', async () => {
+                const receipt = await assetRouter.depositWithSwap(pool, tokensData, 0, DAIHolder, { from: DAIHolder })
+
+                expectEvent(receipt, 'Deposit', { lpPool: pool, sender: DAIHolder, recipient: DAIHolder })
+            })
+            it('withdraws tokens from balance', async () => {
+                const tokenBalanceAfter = await DAIToken.balanceOf(DAIHolder)
+                const tokenDiff = tokenBalanceBefore.sub(tokenBalanceAfter)
+
+                approxeq(tokenDiff, DAIAmount, new BN(0), 'Amount Tokens Sent is not correct')
+            })
+            it('updates stakes', async () => {
+                const stakeLP = await assetRouter.userStake(DAIHolder, pool)
+                assert.ok(stakeLP.gt(stakeLPBefore), 'LP stake not increased')
+            })
+            it('updates totalDeposits', async () => {
+                const totalDepositsLP = await assetRouter.totalDeposits(pool)
+                assert.ok(totalDepositsLP.gt(totalDepositsLPBefore), 'totalDeposits not increased')
+            })
+            it('stakes tokens in MasterChef contract', async () => {
+                const farmAddress = await factory.Farms(pool)
+                const farm = await Farm.at(farmAddress)
+
+                const stakingRewardBalance = new BN((await MasterChef.userInfo(pid, farm.address)).amount)
+                assert.ok(stakingRewardBalance.gt(stakingRewardsBalanceBefore), 'MasterChef balance not increased')
+            })
+        })
+    })
+})

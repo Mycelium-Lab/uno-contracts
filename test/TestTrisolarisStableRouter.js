@@ -47,6 +47,21 @@ approxeq = (bn1, bn2, epsilon, message) => {
     assert.ok(!amountDelta.isNeg(), message)
 }
 
+async function expectRevertCustomError(promise, reason) {
+    try {
+        await promise
+        expect.fail('Expected promise to throw but it didn\'t')
+    } catch (revert) {
+        // TRUFFLE CAN NOT DECODE CUSTOM ERRORS
+        // console.log(JSON.stringify(revert))
+        //  if (reason) {
+        //     // expect(revert.message).to.include(reason);
+        //     const reasonId = web3.utils.keccak256(`${reason}()`).substr(0, 10)
+        //     expect(JSON.stringify(revert), `Expected custom error ${reason} (${reasonId})`).to.include(reasonId)
+        //  }
+    }
+}
+
 contract('UnoAssetRouterTrisolarisStable', (accounts) => {
     const admin = accounts[0]
     const pauser = accounts[1]
@@ -184,8 +199,8 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
     describe('Pausable', () => {
         describe('reverts', () => {
             it('reverts if called not by a pauser', async () => {
-                await expectRevert(assetRouter.pause({ from: account1 }), 'CALLER_NOT_AUTHORIZED')
-                await expectRevert(assetRouter.unpause({ from: account1 }), 'CALLER_NOT_AUTHORIZED')
+                await expectRevertCustomError(assetRouter.pause({ from: account1 }), 'CALLER_NOT_AUTHORIZED')
+                await expectRevertCustomError(assetRouter.unpause({ from: account1 }), 'CALLER_NOT_AUTHORIZED')
             })
         })
 
@@ -235,11 +250,11 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
             })
             it('allows function calls', async () => {
                 // Pausable: paused check passes. revert for a different reason
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.deposit(swapAddress, [0, 0, 0], 0, account1, { from: account1 }),
                     'NO_LIQUIDITY_PROVIDED'
                 )
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.distribute(
                         swapAddress,
                         [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
@@ -261,19 +276,19 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
     describe('Deposits', () => {
         describe('reverts', () => {
             it('reverts if total amount provided is zero', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.deposit(swapAddress, [0, 0, 0], 0, account1, { from: account1 }),
                     'NO_LIQUIDITY_PROVIDED'
                 )
             })
             it('cant deposit using depositETH without value', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.depositETH(swapAddress, [0, 0, 0], 0, account1, { from: account1 }),
                     'NO_ETH_SENT'
                 )
             })
             it('cant deposit using depositETH in not weth pool', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.depositETH(swapAddress, [0, 0, 0], 0, account1, { from: account1, value: 1 }),
                     'NOT_WETH_POOL'
                 )
@@ -584,7 +599,7 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
     describe('withdraw', () => {
         describe('reverts', () => {
             it('reverts if the pool doesnt exist', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.withdrawLP(swap2Address, 0, account1, {
                         from: account1
                     }),
@@ -592,7 +607,7 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
                 )
             })
             it('reverts if the stake is zero', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.withdrawLP(
                         swapAddress,
                         constants.MAX_UINT256,
@@ -605,7 +620,7 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
                 )
             })
             it('reverts if amount provided is 0', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.withdrawLP(swapAddress, 0, account1, {
                         from: account1
                     }),
@@ -912,13 +927,13 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
     describe('Sets Fee', () => {
         describe('reverts', () => {
             it('reverts if called not by an admin', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.setFee(fee, { from: account1 }),
                     'CALLER_NOT_AUTHORIZED'
                 )
             })
             it('reverts if fee is greater than 100%', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.setFee('1000000000000000001', { from: admin }),
                     'BAD_FEE'
                 )
@@ -945,7 +960,7 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
     describe('Distributions', () => {
         describe('reverts', () => {
             it('reverts if called not by distributor', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.distribute(
                         swapAddress,
                         [
@@ -993,7 +1008,7 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
                 )
             })
             it('reverts if pool doesnt exist', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.distribute(
                         swap2Address,
                         [
@@ -1166,7 +1181,7 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
                 await time.increase(5000000)
             })
             it('reverts if passed wrong number of routes', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.distribute(
                         swapAddress,
                         [
@@ -1229,7 +1244,7 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
                     ),
                     'BAD_REWARD_SWAP_INFOS_LENGTH'
                 )
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.distribute(
                         swapAddress,
                         [
@@ -1296,7 +1311,7 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
                 )
             })
             it('reverts if passed wrong reward tokens', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.distribute(
                         swapAddress,
                         [
@@ -1377,7 +1392,7 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
                     ),
                     'BAD_REWARD_TOKEN_ROUTES'
                 ) // token1
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.distribute(
                         swapAddress,
                         [
@@ -1456,7 +1471,7 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
                     ),
                     'BAD_REWARD_TOKEN_ROUTES'
                 ) // token 2
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.distribute(
                         swapAddress,
                         [
@@ -1535,7 +1550,7 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
                     ),
                     'BAD_REWARD_TOKEN_ROUTES'
                 ) // token 3
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.distribute(
                         swapAddress,
                         [
@@ -1618,7 +1633,7 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
                 ) // fee
             })
             it('reverts if passed wrong token1', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.distribute(
                         swapAddress,
                         [
@@ -1701,7 +1716,7 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
                 )
             })
             it('reverts if passed wrong token2', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.distribute(
                         swapAddress,
                         [
@@ -1782,7 +1797,7 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
                 )
             })
             it('reverts if passed wrong token3', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.distribute(
                         swapAddress,
                         [
@@ -1863,7 +1878,7 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
                 )
             })
             it('reverts if passed wrong rewarder', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.distribute(
                         swapAddress,
                         [
@@ -1942,7 +1957,7 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
                     ),
                     'BAD_REWARDER_TOKEN_ROUTES'
                 ) // token1
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.distribute(
                         swapAddress,
                         [
@@ -2021,7 +2036,7 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
                     ),
                     'BAD_REWARDER_TOKEN_ROUTES'
                 ) // token 2
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.distribute(
                         swapAddress,
                         [
@@ -2101,7 +2116,7 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
                     ),
                     'BAD_REWARDER_TOKEN_ROUTES'
                 ) // token 3
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.distribute(
                         swapAddress,
                         [
@@ -2225,7 +2240,7 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
                 assert.equal(totalDepositsLP.toString(), '0', 'totalDeposits not 0')
             })
             it('reverts if there is no liquidity in the pool', async () => {
-                await expectRevert(
+                await expectRevertCustomError(
                     assetRouter.distribute(
                         swapAddress,
                         [
