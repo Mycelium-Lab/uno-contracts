@@ -22,7 +22,6 @@ interface IUnoFarmBalancer is IUnoFarm {
 
     function distribute(
         SwapInfo[] calldata swapInfos,
-        SwapInfo[] calldata feeSwapInfos,
         FeeInfo calldata feeInfo
     ) external returns(uint256 reward);
 }

@@ -53,7 +53,6 @@ interface IUnoAssetRouterBalancer {
     function distribute(
       address lpPool,
       Farm.SwapInfo[] calldata swapInfos,
-      Farm.SwapInfo[] calldata feeSwapInfos,
       address feeTo
     ) external returns(uint256 reward);
 

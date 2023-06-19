@@ -81,8 +81,6 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
     let tokenB
     let rewardToken
 
-    let USDC
-
     const initReceipt = {}
     before(async () => {
         const snapshot = await timeMachine.takeSnapshot()
@@ -243,7 +241,6 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 }
                         ],
-                        { route: [], amountOutMin: 0 },
                         feeCollector,
                         { from: account1 }
                     ),
@@ -284,7 +281,6 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 }
                         ],
-                        { route: [], amountOutMin: 0 },
                         feeCollector,
                         { from: account1 }
                     ),
@@ -1071,7 +1067,6 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 }
                         ],
-                        { route: [], amountOutMin: 0 },
                         feeCollector,
                         { from: pauser }
                     ),
@@ -1086,7 +1081,6 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 }
                         ],
-                        { route: [], amountOutMin: 0 },
                         feeCollector,
                         { from: distributor }
                     ),
@@ -1101,7 +1095,6 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 }
                         ],
-                        { route: [], amountOutMin: 0 },
                         feeCollector,
                         { from: distributor }
                     ),
@@ -1113,7 +1106,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
             let receipt
             let balance1
             let balance2
-            let feeCollectorBalanceBefore
+            let feeCollectorRewardBalanceBefore
 
             before(async () => {
                 balance1 = await stakingToken.balanceOf(account1)
@@ -1126,7 +1119,7 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                     account1,
                     { from: account1 }
                 )
-                USDC = await IUniswapV2Pair.at('0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174')
+
                 balance2 = await stakingToken.balanceOf(account2)
                 await stakingToken.approve(assetRouter.address, balance2, {
                     from: account2
@@ -1137,9 +1130,11 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                     account2,
                     { from: account2 }
                 )
-                feeCollectorBalanceBefore = await USDC.balanceOf(feeCollector)
+                const reward = await IERC20.at(rewardToken)
+                feeCollectorRewardBalanceBefore = await reward.balanceOf(feeCollector)
 
                 await time.increase(5000000)
+
                 receipt = await assetRouter.distribute(
                     pool,
                     [
@@ -1159,13 +1154,6 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                             amountOutMin: 0
                         }
                     ],
-                    {
-                        route: [
-                            rewardToken,
-                            '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'
-                        ],
-                        amountOutMin: 0
-                    },
                     feeCollector,
                     { from: distributor }
                 )
@@ -1187,11 +1175,10 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                 assert.ok(stake2.gt(balance2), 'Stake2 not increased')
             })
             it('collects fees', async () => {
-                const feeCollectorBalanceAfter = await USDC.balanceOf(
-                    feeCollector
-                )
+                const reward = await IERC20.at(rewardToken)
+                const feeCollectorRewardBalanceAfter = await reward.balanceOf(feeCollector)
                 assert.ok(
-                    feeCollectorBalanceAfter.gt(feeCollectorBalanceBefore),
+                    feeCollectorRewardBalanceAfter.gt(feeCollectorRewardBalanceBefore),
                     'Fee collector balance not increased'
                 )
             })
@@ -1221,13 +1208,6 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                                 amountOutMin: 0
                             }
                         ],
-                        {
-                            route: [
-                                rewardToken,
-                                '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'
-                            ],
-                            amountOutMin: 0
-                        },
                         feeCollector,
                         { from: distributor }
                     ),
@@ -1253,49 +1233,10 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                                 amountOutMin: 0
                             }
                         ],
-                        {
-                            route: [
-                                rewardToken,
-                                USDC.address
-                            ],
-                            amountOutMin: 0
-                        },
                         feeCollector,
                         { from: distributor }
                     ),
                     'BAD_REWARD_TOKEN_B_ROUTE'
-                )
-                await expectRevertCustomError(
-                    assetRouter.distribute(
-                        pool,
-                        [
-                            {
-                                route: [
-                                    rewardToken,
-                                    '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174',
-                                    tokenA.address
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [
-                                    rewardToken,
-                                    tokenB.address
-                                ],
-                                amountOutMin: 0
-                            }
-                        ],
-                        {
-                            route: [
-                                constants.ZERO_ADDRESS,
-                                USDC.address
-                            ],
-                            amountOutMin: 0
-                        },
-                        feeCollector,
-                        { from: distributor }
-                    ),
-                    'BAD_FEE_TOKEN_ROUTE'
                 )
             })
             it('reverts if passed wrong tokenA in reward route', async () => {
@@ -1319,13 +1260,6 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                                 amountOutMin: 0
                             }
                         ],
-                        {
-                            route: [
-                                rewardToken,
-                                USDC.address
-                            ],
-                            amountOutMin: 0
-                        },
                         feeCollector,
                         { from: distributor }
                     ),
@@ -1353,13 +1287,6 @@ contract('UnoAssetRouterMeshswap', (accounts) => {
                                 amountOutMin: 0
                             }
                         ],
-                        {
-                            route: [
-                                rewardToken,
-                                USDC.address
-                            ],
-                            amountOutMin: 0
-                        },
                         feeCollector,
                         { from: distributor }
                     ),

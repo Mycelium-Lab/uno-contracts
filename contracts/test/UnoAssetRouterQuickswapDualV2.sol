@@ -434,7 +434,6 @@ contract UnoAssetRouterQuickswapDualV2 is Initializable, PausableUpgradeable, UU
      * @dev Distributes tokens between users.
      * @param lpStakingPool - LP pool to distribute tokens in.
      * @param swapInfos - Arrays of structs with token arrays describing swap routes (rewardTokenAToTokenA, rewardTokenAToTokenB, rewardTokenBToTokenA, rewardTokenBToTokenB) and minimum amounts of output tokens that must be received for the transaction not to revert.
-     * @param feeSwapInfos - Arrays of structs with token arrays describing swap routes (rewardTokenAToFeeToken, rewardTokenBToFeeToken) and minimum amounts of output tokens that must be received for the transaction not to revert.
      * @param feeTo - Address to collect fees to.
      *
      * Note: This function can only be called by the distributor.
@@ -442,13 +441,12 @@ contract UnoAssetRouterQuickswapDualV2 is Initializable, PausableUpgradeable, UU
     function distribute(
         address lpStakingPool,
         Farm.SwapInfo[4] calldata swapInfos,
-        Farm.SwapInfo[2] calldata feeSwapInfos,
         address feeTo
     ) external whenNotPaused onlyRole(DISTRIBUTOR_ROLE) {
         Farm farm = Farm(farmFactory.Farms(lpStakingPool));
         require(farm != Farm(address(0)), 'FARM_NOT_EXISTS');
 
-        uint256 reward = farm.distribute(swapInfos, feeSwapInfos, IUnoFarm.FeeInfo(feeTo, fee));
+        uint256 reward = farm.distribute(swapInfos, IUnoFarm.FeeInfo(feeTo, fee));
         emit Distribute(lpStakingPool, reward);
     }
 

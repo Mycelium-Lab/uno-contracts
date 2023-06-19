@@ -436,7 +436,6 @@ contract UnoAssetRouterBalancerV2 is Initializable, PausableUpgradeable, UUPSUpg
      * @dev Distributes tokens between users for a single {Farms[lpPool]}.
      * @param lpPool - The pool to distribute. 
      * @param swapInfos - The data used to swap reward tokens for the needed tokens.
-     * @param feeSwapInfos - The data used to swap reward tokens for fees.
      * @param feeTo - Address to collect fees to.
      *
      * Note: This function can only be called by the distributor.
@@ -444,13 +443,12 @@ contract UnoAssetRouterBalancerV2 is Initializable, PausableUpgradeable, UUPSUpg
     function distribute(
         address lpPool,
         Farm.SwapInfo[] calldata swapInfos,
-        Farm.SwapInfo[] calldata feeSwapInfos,
         address feeTo
     ) external whenNotPaused onlyRole(DISTRIBUTOR_ROLE) {
         Farm farm = Farm(farmFactory.Farms(lpPool));
         require(farm != Farm(address(0)), 'FARM_NOT_EXISTS');
 
-        uint256 reward = farm.distribute(swapInfos, feeSwapInfos, IUnoFarm.FeeInfo(feeTo, fee));
+        uint256 reward = farm.distribute(swapInfos, IUnoFarm.FeeInfo(feeTo, fee));
         emit Distribute(lpPool, reward);
     }
 

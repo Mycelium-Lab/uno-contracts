@@ -144,19 +144,26 @@ contract UnoFarmQuickswapDual is Initializable, ReentrancyGuardUpgradeable, IUno
      */
     function distribute(
         SwapInfo[4] calldata swapInfos,
-        SwapInfo[2] calldata feeSwapInfos,
         FeeInfo calldata feeInfo
     ) external onlyAssetRouter nonReentrant returns(uint256 reward){
         if(totalDeposits == 0) revert NO_LIQUIDITY();
         if(distributionInfo[distributionID - 1].block == block.number) revert CALL_ON_THE_SAME_BLOCK();
 
         lpStakingPool.getReward();
-
-        _collectFees(feeSwapInfos[0], feeInfo, rewardTokenA);
-        _collectFees(feeSwapInfos[1], feeInfo, rewardTokenB);
         { // scope to avoid stack too deep errors
-        uint256 rewardTokenAHalf = IERC20(rewardTokenA).balanceOf(address(this)) / 2;
-        uint256 rewardTokenBHalf = IERC20(rewardTokenB).balanceOf(address(this)) / 2;
+        uint256 rewardTokenAHalf;
+        {
+            uint256 balance = IERC20(rewardTokenA).balanceOf(address(this));
+            balance -= _collectFees(IERC20(rewardTokenA), balance, feeInfo);
+            rewardTokenAHalf = balance / 2;
+        }
+        uint256 rewardTokenBHalf;
+        {
+            uint256 balance = IERC20(rewardTokenB).balanceOf(address(this));
+            balance -= _collectFees(IERC20(rewardTokenB), balance, feeInfo);
+            rewardTokenBHalf = balance / 2;
+        }
+
         if (rewardTokenAHalf > 0) {
             if (tokenA != rewardTokenA) {
                 address[] calldata route = swapInfos[0].route;
@@ -204,22 +211,16 @@ contract UnoFarmQuickswapDual is Initializable, ReentrancyGuardUpgradeable, IUno
     }
 
     /**
-     * @dev Swaps and sends fees to feeTo.
-     */
-    function _collectFees(SwapInfo calldata feeSwapInfo, FeeInfo calldata feeInfo, address token) internal {
-        if(token != address(0) && feeInfo.feeTo != address(0)){
-            uint256 feeAmount = IERC20(token).balanceOf(address(this)) * feeInfo.fee / fractionMultiplier;
-            if(feeAmount > 0){
-                address[] calldata route = feeSwapInfo.route;
-                if(route.length > 0 && route[0] != route[route.length - 1]){
-                    if(route[0] != token) revert INVALID_FEE_ROUTE(token);
-                    quickswapRouter.swapExactTokensForTokens(feeAmount, feeSwapInfo.amountOutMin, route, feeInfo.feeTo, block.timestamp);
-                    return;
-                }
-                IERC20(token).safeTransfer(feeInfo.feeTo, feeAmount);
-            }
-        }
-    }
+	 * @dev Sends fees to feeTo.
+	 */
+	function _collectFees(IERC20 token, uint256 balance, FeeInfo calldata feeInfo) internal returns(uint256 feeAmount) {
+		if (feeInfo.feeTo != address(0)) {
+			feeAmount = balance * feeInfo.fee / fractionMultiplier;
+			if (feeAmount > 0) {
+				token.safeTransfer(feeInfo.feeTo, feeAmount);
+			}
+		}
+	}
 
     /**
      * @dev Returns total funds staked by the {_address}.

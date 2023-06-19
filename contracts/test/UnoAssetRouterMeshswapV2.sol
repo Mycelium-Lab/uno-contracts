@@ -432,7 +432,6 @@ contract UnoAssetRouterMeshswapV2 is Initializable, PausableUpgradeable, UUPSUpg
 	 * @dev Distributes tokens between users.
 	 * @param lpPair - LP pool to distribute tokens in.
 	 * @param swapInfos - Arrays of structs with token arrays describing swap routes (rewardTokenToTokenA, rewardTokenToTokenB, rewarderTokenToTokenA, rewarderTokenToTokenB) and minimum amounts of output tokens that must be received for the transaction not to revert.
-	 * @param feeSwapInfo - Struct with token arrays describing swap route (rewardTokenToFeeToken, rewarderTokenToFeeToken) and minimum amounts of output tokens that must be received for the transaction not to revert.
 	 * @param feeTo - Address to collect fees to.
 	 *
 	 * Note: This function can only be called by the distributor.
@@ -440,7 +439,6 @@ contract UnoAssetRouterMeshswapV2 is Initializable, PausableUpgradeable, UUPSUpg
 	function distribute(
 		address lpPair,
 		Farm.SwapInfo[2] calldata swapInfos,
-		Farm.SwapInfo calldata feeSwapInfo,
 		address feeTo
 	) external whenNotPaused onlyRole(DISTRIBUTOR_ROLE) {
 		Farm farm = Farm(farmFactory.Farms(lpPair));
@@ -448,7 +446,6 @@ contract UnoAssetRouterMeshswapV2 is Initializable, PausableUpgradeable, UUPSUpg
 
 		uint256 reward = farm.distribute(
 			swapInfos,
-			feeSwapInfo,
 			IUnoFarm.FeeInfo(feeTo, fee)
 		);
 		emit Distribute(lpPair, reward);

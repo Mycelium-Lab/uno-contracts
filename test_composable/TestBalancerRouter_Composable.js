@@ -207,7 +207,7 @@ contract('UnoAssetRouterBalancer', (accounts) => {
                     'Pausable: paused'
                 )
                 await expectRevert(
-                    assetRouter.distribute(pool, [{ swaps: [], assets: [], limits: [] }], [{ swaps: [], assets: [], limits: [] }], feeCollector, { from: account1 }),
+                    assetRouter.distribute(pool, [{ swaps: [], assets: [], limits: [] }], feeCollector, { from: account1 }),
                     'Pausable: paused'
                 )
             })
@@ -241,7 +241,7 @@ contract('UnoAssetRouterBalancer', (accounts) => {
                     'BAD_TOKENS_LENGTH'
                 )
                 await expectRevertCustomError(
-                    assetRouter.distribute(pool, [{ swaps: [], assets: [], limits: [] }], [{ swaps: [], assets: [], limits: [] }], feeCollector, { from: account1 }),
+                    assetRouter.distribute(pool, [{ swaps: [], assets: [], limits: [] }], feeCollector, { from: account1 }),
                     'CALLER_NOT_AUTHORIZED'
                 )
             })
@@ -798,19 +798,19 @@ contract('UnoAssetRouterBalancer', (accounts) => {
         describe('reverts', () => {
             it('reverts if called not by distributor', async () => {
                 await expectRevertCustomError(
-                    assetRouter.distribute(pool, [{ swaps: [], assets: [], limits: [] }], [{ swaps: [], assets: [], limits: [] }], feeCollector, { from: pauser }),
+                    assetRouter.distribute(pool, [{ swaps: [], assets: [], limits: [] }], feeCollector, { from: pauser }),
                     'CALLER_NOT_AUTHORIZED'
                 )
             })
             it('reverts if pool doesnt exist', async () => {
                 await expectRevertCustomError(
-                    assetRouter.distribute(pool2, [{ swaps: [], assets: [], limits: [] }], [{ swaps: [], assets: [], limits: [] }], feeCollector, { from: distributor }),
+                    assetRouter.distribute(pool2, [{ swaps: [], assets: [], limits: [] }], feeCollector, { from: distributor }),
                     'FARM_NOT_EXISTS'
                 )
             })
             it('reverts if there is no liquidity in the pool', async () => {
                 await expectRevertCustomError(
-                    assetRouter.distribute(pool, [{ swaps: [], assets: [], limits: [] }], [{ swaps: [], assets: [], limits: [] }], feeCollector, { from: distributor }),
+                    assetRouter.distribute(pool, [{ swaps: [], assets: [], limits: [] }], feeCollector, { from: distributor }),
                     'NO_LIQUIDITY'
                 )
             })
@@ -820,6 +820,7 @@ contract('UnoAssetRouterBalancer', (accounts) => {
             let balance1; let
                 balance2
             let feeCollectorBalanceBefore
+            let _fee
             before(async () => {
                 balance1 = await stakingToken.balanceOf(account1)
                 await stakingToken.approve(assetRouter.address, balance1, { from: account1 })
@@ -829,29 +830,22 @@ contract('UnoAssetRouterBalancer', (accounts) => {
                 await stakingToken.approve(assetRouter.address, balance2, { from: account2 })
                 await assetRouter.depositLP(pool, balance2, account2, { from: account2 })
 
-                await time.increase(5000)
+                await time.increase(50000)
 
                 const farmAddress = await factory.Farms(pool)
                 const gaugeContract = await IGauge.at(gauge.address) // this is not a IUniswapV2Pair, however the abi is sufficient for our purposes
                 const rewardAmount = await gaugeContract.claimable_reward_write.call(farmAddress, '0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3')
-                const WMATIC = await IUniswapV2Pair.at('0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270')
-                feeCollectorBalanceBefore = await WMATIC.balanceOf(feeCollector)
+                const REWARD = await IUniswapV2Pair.at('0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3')
+                feeCollectorBalanceBefore = await REWARD.balanceOf(feeCollector)
 
                 const reward = rewardAmount.mul(new BN(96)).div(new BN(100))
-                const _fee = rewardAmount.mul(new BN(4)).div(new BN(100))
+                _fee = rewardAmount.mul(new BN(4)).div(new BN(100))
 
                 receipt = await assetRouter.distribute(
                     pool,
                     [{
                         swaps: [{
                             poolId: '0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006', assetInIndex: 0, assetOutIndex: 1, amount: reward.toString(), userData: '0x'
-                        }],
-                        assets: ['0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3', '0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270'], // reward token to wmatic
-                        limits: ['0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', '0']
-                    }],
-                    [{
-                        swaps: [{
-                            poolId: '0xf461f2240b66d55dcf9059e26c022160c06863bf000100000000000000000006', assetInIndex: 0, assetOutIndex: 1, amount: _fee.toString(), userData: '0x'
                         }],
                         assets: ['0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3', '0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270'], // reward token to wmatic
                         limits: ['0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', '0']
@@ -871,9 +865,9 @@ contract('UnoAssetRouterBalancer', (accounts) => {
                 assert.ok(stake2.gt(balance2), 'Stake1 not increased')
             })
             it('collects fees', async () => {
-                const WMATIC = await IUniswapV2Pair.at('0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270')
-                const feeCollectorBalanceAfter = await WMATIC.balanceOf(feeCollector)
-                assert.ok(feeCollectorBalanceAfter.gt(feeCollectorBalanceBefore), 'Fee collector balance not increased')
+                const REWARD = await IUniswapV2Pair.at('0x9a71012b13ca4d3d0cdc72a177df3ef03b0e76a3')
+                const feeCollectorBalanceAfter = await REWARD.balanceOf(feeCollector)
+                assert.equal(feeCollectorBalanceAfter.sub(feeCollectorBalanceBefore).toString(), _fee.toString(), 'Fee collector balance not increased')
             })
         })
 

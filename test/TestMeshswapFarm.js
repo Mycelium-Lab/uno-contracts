@@ -107,7 +107,6 @@ contract('UnoFarmMeshswap', (accounts) => {
             await expectRevertCustomError(
                 implementation.distribute(
                     [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
-                    { route: [], amountOutMin: 0 },
                     { feeTo: accounts[1], fee: 0 },
                     { from: accounts[1] }
                 ),
@@ -128,7 +127,6 @@ contract('UnoFarmMeshswap', (accounts) => {
             await expectRevertCustomError(
                 implementation.distribute(
                     [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
-                    { route: [], amountOutMin: 0 },
                     { feeTo: accounts[1], fee: 0 },
                     { from: assetRouter }
                 ),
