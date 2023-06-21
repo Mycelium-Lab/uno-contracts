@@ -8,7 +8,6 @@ interface IUnoAssetRouterTraderjoe is IUnoAssetRouter {
 	function distribute(
 		address lpPair,
 		Farm.SwapInfo[4] calldata swapInfos,
-		Farm.SwapInfo[2] calldata feeSwapInfo,
 		address feeTo
 	) external returns(uint256 reward);
 }

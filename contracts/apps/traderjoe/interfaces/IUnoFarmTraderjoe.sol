@@ -10,7 +10,6 @@ interface IUnoFarmTraderjoe is IUnoFarm {
 	function MasterChef() external returns (IMasterChefJoe);
 	function distribute(
 		SwapInfo[4] calldata swapInfos,
-		SwapInfo[2] calldata feeSwapInfo,
 		FeeInfo calldata feeInfo
 	) external returns (uint256 reward);
 }
