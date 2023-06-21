@@ -963,8 +963,6 @@ contract('UnoAssetRouterApeswap', (accounts) => {
                 data = await rewarder.pendingTokens(pid, farmAddress, rewardFee)
                 rewarderFee = data['1']['0'].toString()
 
-                console.log(rewardFee, rewarderFee)
-
                 receipt = await assetRouter.distribute(
                     pool,
                     [
