@@ -9,7 +9,6 @@ interface IUnoFarmApeswap is IUnoFarm {
     function pid() external view returns (uint256);
     function distribute(
         SwapInfo[2] calldata swapInfos,
-        SwapInfo calldata feeSwapInfo,
         FeeInfo calldata feeInfo
     ) external returns(uint256 reward);
 }

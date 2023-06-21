@@ -145,7 +145,6 @@ contract UnoFarmPancakeswap is Initializable, ReentrancyGuardUpgradeable, IUnoFa
      */
     function distribute(
         SwapInfo[2] calldata swapInfos,
-        SwapInfo calldata feeSwapInfo,
         FeeInfo calldata feeInfo
     ) external onlyAssetRouter nonReentrant returns(uint256 reward){
         if(totalDeposits == 0) revert NO_LIQUIDITY();
@@ -153,8 +152,9 @@ contract UnoFarmPancakeswap is Initializable, ReentrancyGuardUpgradeable, IUnoFa
 
         MasterChef.withdraw(pid, 0);
 
-        _collectFees(feeSwapInfo, feeInfo);
-        uint256 rewardTokenHalf = IERC20(rewardToken).balanceOf(address(this)) / 2;
+        uint256 balance = IERC20(rewardToken).balanceOf(address(this));
+		balance -= _collectFees(IERC20(rewardToken), balance, feeInfo);
+		uint256 rewardTokenHalf = balance / 2;
         if (tokenA != rewardToken) {
             address[] calldata route = swapInfos[0].route;
             if(route[0] != rewardToken || route[route.length - 1] != tokenA) revert INVALID_ROUTE(rewardToken, tokenA);
@@ -186,22 +186,16 @@ contract UnoFarmPancakeswap is Initializable, ReentrancyGuardUpgradeable, IUnoFa
     }
     
     /**
-     * @dev Swaps and sends fees to feeTo.
-     */
-    function _collectFees(SwapInfo calldata feeSwapInfo, FeeInfo calldata feeInfo) internal {
-        if(feeInfo.feeTo != address(0)){
-            uint256 feeAmount = IERC20(rewardToken).balanceOf(address(this)) * feeInfo.fee / fractionMultiplier;
-            if(feeAmount > 0){
-                address[] calldata route = feeSwapInfo.route;
-                if(route.length > 0 && route[0] != route[route.length - 1]){
-                   if(route[0] != rewardToken) revert INVALID_FEE_ROUTE(rewardToken);
-                    pancakeswapRouter.swapExactTokensForTokens(feeAmount, feeSwapInfo.amountOutMin, route, feeInfo.feeTo, block.timestamp);
-                    return;
-                }
-                IERC20(rewardToken).safeTransfer(feeInfo.feeTo, feeAmount);
-            }
-        }
-    }
+	 * @dev Sends fees to feeTo.
+	 */
+	function _collectFees(IERC20 token, uint256 balance, FeeInfo calldata feeInfo) internal returns(uint256 feeAmount) {
+		if (feeInfo.feeTo != address(0)) {
+			feeAmount = balance * feeInfo.fee / fractionMultiplier;
+			if (feeAmount > 0) {
+				token.safeTransfer(feeInfo.feeTo, feeAmount);
+			}
+		}
+	}
 
     /**
      * @dev Returns total funds staked by the {_address}.

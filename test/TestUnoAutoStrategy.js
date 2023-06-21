@@ -948,7 +948,6 @@ contract('UnoAutoStrategy', (accounts) => {
                             amountOutMin: 1
                         }
                     ],
-                    { route: [], amountOutMin: 0 },
                     constants.ZERO_ADDRESS,
                     { from: distributor }
                 )
