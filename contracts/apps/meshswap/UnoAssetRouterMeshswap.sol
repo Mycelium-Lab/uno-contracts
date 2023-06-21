@@ -280,7 +280,6 @@ contract UnoAssetRouterMeshswap is Initializable, PausableUpgradeable, UUPSUpgra
 	 * @dev Distributes tokens between users.
 	 * @param lpPair - LP pool to distribute tokens in.
 	 * @param swapInfos - Arrays of structs with token arrays describing swap routes (rewardTokenToTokenA, rewardTokenToTokenB, rewarderTokenToTokenA, rewarderTokenToTokenB) and minimum amounts of output tokens that must be received for the transaction not to revert.
-	 * @param feeSwapInfo - Struct with token arrays describing swap route (rewardTokenToFeeToken, rewarderTokenToFeeToken) and minimum amounts of output tokens that must be received for the transaction not to revert.
 	 * @param feeTo - Address to collect fees to.
 	 *
 	 * Note: This function can only be called by the distributor.
@@ -288,14 +287,13 @@ contract UnoAssetRouterMeshswap is Initializable, PausableUpgradeable, UUPSUpgra
 	function distribute(
 		address lpPair,
 		Farm.SwapInfo[2] calldata swapInfos,
-		Farm.SwapInfo calldata feeSwapInfo,
 		address feeTo
 	) external whenNotPaused onlyRole(DISTRIBUTOR_ROLE) returns(uint256 reward){
 		Farm farm = Farm(farmFactory.Farms(lpPair));
         if(farm == Farm(address(0))) revert FARM_NOT_EXISTS();
 
         //I don't understand why the definition for FeeInfo can not be imported from Farm
-        reward = farm.distribute(swapInfos, feeSwapInfo, IUnoFarm.FeeInfo(feeTo, fee));
+        reward = farm.distribute(swapInfos, IUnoFarm.FeeInfo(feeTo, fee));
 		emit Distribute(lpPair, reward);
 	}
 

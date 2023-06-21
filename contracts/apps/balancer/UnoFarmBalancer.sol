@@ -184,21 +184,20 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable, IUnoFarmB
      */
     function distribute(
         SwapInfo[] calldata swapInfos,
-        SwapInfo[] calldata feeSwapInfos,
         FeeInfo calldata feeInfo
     ) external onlyAssetRouter nonReentrant returns(uint256 reward){
         if(totalDeposits == 0) revert NO_LIQUIDITY();
         if(distributionInfo[distributionID - 1].block == block.number) revert CALL_ON_THE_SAME_BLOCK();
 
         uint256 rewardCount = streamer.reward_count();
-        if((swapInfos.length != rewardCount) || (feeSwapInfos.length != rewardCount)) revert PARAMS_LENGTHS_NOT_MATCH_REWARD_COUNT();
+        if(swapInfos.length != rewardCount) revert PARAMS_LENGTHS_NOT_MATCH_REWARD_COUNT();
 
         gauge.claim_rewards();
         for (uint256 i = 0; i < rewardCount; i++) {
             IERC20 rewardToken = streamer.reward_tokens(i);
             if (address(rewardToken) != address(gauge) && address(rewardToken) != lpPool) {  //can't use LP tokens in swap
-                _collectFees(feeSwapInfos[i], feeInfo, rewardToken);
                 uint256 balance = rewardToken.balanceOf(address(this));
+                balance -= _collectFees(rewardToken, balance, feeInfo);
                 if(balance > 0){
                     rewardToken.approve(address(Vault), balance);
                     _batchSwap(swapInfos[i], payable(address(this)));
@@ -255,21 +254,16 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable, IUnoFarmB
     }
 
     /**
-     * @dev Swaps and sends fees to feeTo.//TODO: use quickswap router or 1inch?
-     */
-    function _collectFees(SwapInfo calldata feeSwapInfo, FeeInfo calldata feeInfo, IERC20 token) internal {
-        if(feeInfo.feeTo != address(0)){
-            uint256 feeAmount = token.balanceOf(address(this)) * feeInfo.fee / fractionMultiplier;
-            if(feeAmount > 0){
-                if(feeSwapInfo.swaps.length > 0){
-                    token.approve(address(Vault), feeAmount);
-                    _batchSwap(feeSwapInfo, payable(feeInfo.feeTo));
-                    return;
-                }
-                token.safeTransfer(feeInfo.feeTo, feeAmount);
-            }
-        }
-    }
+	 * @dev Sends fees to feeTo.
+	 */
+	function _collectFees(IERC20 token, uint256 balance, FeeInfo calldata feeInfo) internal returns(uint256 feeAmount) {
+		if (feeInfo.feeTo != address(0)) {
+			feeAmount = balance * feeInfo.fee / fractionMultiplier;
+			if (feeAmount > 0) {
+				token.safeTransfer(feeInfo.feeTo, feeAmount);
+			}
+		}
+	}
 
     /**
      * @dev Performs balancer batch swap. Separate function to avoid Stack too deep errors.

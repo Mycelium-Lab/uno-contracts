@@ -73,7 +73,7 @@ contract('UnoAssetRouterSushiswap', (accounts) => {
 
     const initReceipt = {}
     before(async () => {
-        const implementation = await Farm.new({ from: account1 })
+        const implementation = await Farm.new({ from: admin })
         accessManager = await AccessManager.new({ from: admin })// accounts[0] is admin
 
         await accessManager.grantRole('0xfbd454f36a7e1a388bd6fc3ab10d434aa4578f811acbbcf33afb1c697486313c', distributor, { from: admin }) // DISTRIBUTOR_ROLE
@@ -81,7 +81,7 @@ contract('UnoAssetRouterSushiswap', (accounts) => {
 
         assetRouter = await deployProxy(AssetRouter, { kind: 'uups', initializer: false })
 
-        factory = await FarmFactory.new(implementation.address, accessManager.address, assetRouter.address, { from: account1 })
+        factory = await FarmFactory.new(implementation.address, accessManager.address, assetRouter.address, { from: admin })
 
         const _receipt = await web3.eth.getTransactionReceipt(factory.transactionHash)
         const events = await assetRouter.getPastEvents('AllEvents', {
@@ -145,7 +145,7 @@ contract('UnoAssetRouterSushiswap', (accounts) => {
     describe("Can't call multiple initializations", () => {
         it('Reverts', async () => {
             await expectRevert(
-                assetRouter.initialize(accessManager.address, factory.address, { from: account1 }),
+                assetRouter.initialize(accessManager.address, factory.address, { from: admin }),
                 'Initializable: contract is already initialized'
             )
         })
@@ -232,7 +232,6 @@ contract('UnoAssetRouterSushiswap', (accounts) => {
                     assetRouter.distribute(
                         pool,
                         [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
-                        [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
                         feeCollector,
                         { from: account1 }
                     ),
@@ -272,7 +271,6 @@ contract('UnoAssetRouterSushiswap', (accounts) => {
                     assetRouter.distribute(
                         pool,
                         [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
-                        [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
                         feeCollector,
                         { from: account1 }
                     ),
@@ -902,7 +900,6 @@ contract('UnoAssetRouterSushiswap', (accounts) => {
                     assetRouter.distribute(
                         pool,
                         [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
-                        [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
                         feeCollector,
                         { from: pauser }
                     ),
@@ -914,7 +911,6 @@ contract('UnoAssetRouterSushiswap', (accounts) => {
                     assetRouter.distribute(
                         pool2,
                         [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
-                        [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
                         feeCollector,
                         { from: distributor }
                     ),
@@ -926,7 +922,6 @@ contract('UnoAssetRouterSushiswap', (accounts) => {
                     assetRouter.distribute(
                         pool,
                         [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
-                        [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
                         feeCollector,
                         { from: distributor }
                     ),
@@ -938,7 +933,8 @@ contract('UnoAssetRouterSushiswap', (accounts) => {
             let receipt
             let balance1; let
                 balance2
-            let feeCollectorBalanceBefore
+            let feeCollectorRewardBalanceBefore
+            let feeCollectorRewarderBalanceBefore
             before(async () => {
                 balance1 = await stakingToken.balanceOf(account1)
                 await stakingToken.approve(assetRouter.address, balance1, { from: account1 })
@@ -948,10 +944,18 @@ contract('UnoAssetRouterSushiswap', (accounts) => {
                 await stakingToken.approve(assetRouter.address, balance2, { from: account2 })
                 await assetRouter.depositLP(pool, balance2, account2, { from: account2 })
 
-                const USDC = await IUniswapV2Pair.at('0x2791bca1f2de4661ed88a30c99a7a9449aa84174')
-                feeCollectorBalanceBefore = await USDC.balanceOf(feeCollector)
+                const reward = await IERC20.at(rewardToken)
+                feeCollectorRewardBalanceBefore = await reward.balanceOf(feeCollector)
+                const _rewarder = await IERC20.at(rewarderToken)
+                feeCollectorRewarderBalanceBefore = await _rewarder.balanceOf(feeCollector)
+                const farmAddress = await factory.Farms(pool)
+                await time.increase(5000)
 
-                await time.increase(5000000)
+                let data = await miniChef.pendingSushi(pid, farmAddress)
+                rewardFee = data.toString()
+                data = await rewarder.pendingTokens(pid, farmAddress, rewardFee)
+                rewarderFee = data['1']['0'].toString()
+
                 receipt = await assetRouter.distribute(
                     pool,
                     [
@@ -990,23 +994,6 @@ contract('UnoAssetRouterSushiswap', (accounts) => {
                             amountOutMin: 0
                         }
                     ],
-                    [
-                        {
-                            route: [
-                                rewardToken,
-                                '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
-                                '0x2791bca1f2de4661ed88a30c99a7a9449aa84174'
-                            ],
-                            amountOutMin: 0
-                        },
-                        {
-                            route: [
-                                rewarderToken,
-                                '0x2791bca1f2de4661ed88a30c99a7a9449aa84174'
-                            ],
-                            amountOutMin: 0
-                        }
-                    ],
                     feeCollector,
                     { from: distributor }
                 )
@@ -1022,9 +1009,13 @@ contract('UnoAssetRouterSushiswap', (accounts) => {
                 assert.ok(stake2.gt(balance2), 'Stake2 not increased')
             })
             it('collects fees', async () => {
-                const USDC = await IUniswapV2Pair.at('0x2791bca1f2de4661ed88a30c99a7a9449aa84174')
-                const feeCollectorBalanceAfter = await USDC.balanceOf(feeCollector)
-                assert.ok(feeCollectorBalanceAfter.gt(feeCollectorBalanceBefore), 'Fee collector balance not increased')
+                const reward = await IERC20.at(rewardToken)
+                const feeCollectorRewardBalanceAfter = await reward.balanceOf(feeCollector)
+                assert.equal(feeCollectorRewardBalanceAfter.sub(feeCollectorRewardBalanceBefore).toString(), (new BN(rewardFee).mul(new BN(4)).div(new BN(100))).toString(), 'Fee collector balance not increased')
+
+                const _rewarder = await IERC20.at(rewarderToken)
+                const feeCollectorRewarderBalanceAfter = await _rewarder.balanceOf(feeCollector)
+                assert.ok(feeCollectorRewarderBalanceAfter.gt(feeCollectorRewarderBalanceBefore).toString(), 'Fee collector balance not increased')
             })
         })
         describe('bad path reverts', () => {
@@ -1065,16 +1056,6 @@ contract('UnoAssetRouterSushiswap', (accounts) => {
                                 amountOutMin: 0
                             }
                         ],
-                        [
-                            {
-                                route: [],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [],
-                                amountOutMin: 0
-                            }
-                        ],
                         feeCollector,
                         { from: distributor }
                     ),
@@ -1113,74 +1094,10 @@ contract('UnoAssetRouterSushiswap', (accounts) => {
                                 amountOutMin: 0
                             }
                         ],
-                        [
-                            {
-                                route: [],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [],
-                                amountOutMin: 0
-                            }
-                        ],
                         feeCollector,
                         { from: distributor }
                     ),
                     'BAD_REWARD_TOKEN_B_ROUTE'
-                )
-                await expectRevertCustomError(
-                    assetRouter.distribute(
-                        pool,
-                        [
-                            {
-                                route: [
-                                    rewardToken,
-                                    tokenA.address
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [
-                                    rewardToken,
-                                    tokenB.address
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [
-                                    rewarderToken,
-                                    tokenA.address
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [
-                                    rewarderToken,
-                                    tokenB.address
-                                ],
-                                amountOutMin: 0
-                            }
-                        ],
-                        [
-                            {
-                                route: [
-                                    constants.ZERO_ADDRESS,
-                                    '0x2791bca1f2de4661ed88a30c99a7a9449aa84174'
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [
-                                    rewarderToken,
-                                    '0x2791bca1f2de4661ed88a30c99a7a9449aa84174'
-                                ],
-                                amountOutMin: 0
-                            }
-                        ],
-                        feeCollector,
-                        { from: distributor }
-                    ),
-                    'BAD_FEE_TOKEN_ROUTE'
                 )
             })
             it('reverts if passed wrong tokenA in reward route', async () => {
@@ -1214,16 +1131,6 @@ contract('UnoAssetRouterSushiswap', (accounts) => {
                                     rewarderToken,
                                     tokenB.address
                                 ],
-                                amountOutMin: 0
-                            }
-                        ],
-                        [
-                            {
-                                route: [],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [],
                                 amountOutMin: 0
                             }
                         ],
@@ -1264,16 +1171,6 @@ contract('UnoAssetRouterSushiswap', (accounts) => {
                                     rewarderToken,
                                     tokenB.address
                                 ],
-                                amountOutMin: 0
-                            }
-                        ],
-                        [
-                            {
-                                route: [],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [],
                                 amountOutMin: 0
                             }
                         ],
@@ -1318,16 +1215,6 @@ contract('UnoAssetRouterSushiswap', (accounts) => {
                                     amountOutMin: 0
                                 }
                             ],
-                            [
-                                {
-                                    route: [],
-                                    amountOutMin: 0
-                                },
-                                {
-                                    route: [],
-                                    amountOutMin: 0
-                                }
-                            ],
                             feeCollector,
                             { from: distributor }
                         ),
@@ -1366,74 +1253,10 @@ contract('UnoAssetRouterSushiswap', (accounts) => {
                                     amountOutMin: 0
                                 }
                             ],
-                            [
-                                {
-                                    route: [],
-                                    amountOutMin: 0
-                                },
-                                {
-                                    route: [],
-                                    amountOutMin: 0
-                                }
-                            ],
                             feeCollector,
                             { from: distributor }
                         ),
                         'BAD_REWARDER_TOKEN_B_ROUTE'
-                    )
-                    await expectRevertCustomError(
-                        assetRouter.distribute(
-                            pool,
-                            [
-                                {
-                                    route: [
-                                        rewardToken,
-                                        tokenA.address
-                                    ],
-                                    amountOutMin: 0
-                                },
-                                {
-                                    route: [
-                                        rewardToken,
-                                        tokenB.address
-                                    ],
-                                    amountOutMin: 0
-                                },
-                                {
-                                    route: [
-                                        rewarderToken,
-                                        tokenA.address
-                                    ],
-                                    amountOutMin: 0
-                                },
-                                {
-                                    route: [
-                                        rewarderToken,
-                                        tokenB.address
-                                    ],
-                                    amountOutMin: 0
-                                }
-                            ],
-                            [
-                                {
-                                    route: [
-                                        rewardToken,
-                                        '0x2791bca1f2de4661ed88a30c99a7a9449aa84174'
-                                    ],
-                                    amountOutMin: 0
-                                },
-                                {
-                                    route: [
-                                        constants.ZERO_ADDRESS,
-                                        '0x2791bca1f2de4661ed88a30c99a7a9449aa84174'
-                                    ],
-                                    amountOutMin: 0
-                                }
-                            ],
-                            feeCollector,
-                            { from: distributor }
-                        ),
-                        'BAD_FEE_TOKEN_ROUTE'
                     )
                 })
                 it('reverts if passed wrong tokenA in rewardER route', async () => {
@@ -1467,16 +1290,6 @@ contract('UnoAssetRouterSushiswap', (accounts) => {
                                         rewarderToken,
                                         tokenB.address
                                     ],
-                                    amountOutMin: 0
-                                }
-                            ],
-                            [
-                                {
-                                    route: [],
-                                    amountOutMin: 0
-                                },
-                                {
-                                    route: [],
                                     amountOutMin: 0
                                 }
                             ],
@@ -1517,16 +1330,6 @@ contract('UnoAssetRouterSushiswap', (accounts) => {
                                         rewarderToken,
                                         constants.ZERO_ADDRESS
                                     ],
-                                    amountOutMin: 0
-                                }
-                            ],
-                            [
-                                {
-                                    route: [],
-                                    amountOutMin: 0
-                                },
-                                {
-                                    route: [],
                                     amountOutMin: 0
                                 }
                             ],
