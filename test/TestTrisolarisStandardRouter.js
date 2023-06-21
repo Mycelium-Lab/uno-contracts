@@ -242,7 +242,6 @@ contract('UnoAssetRouterTrisolarisStandard', (accounts) => {
                     assetRouter.distribute(
                         pool,
                         [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
-                        [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
                         feeCollector,
                         { from: account1 }
                     ),
@@ -275,7 +274,6 @@ contract('UnoAssetRouterTrisolarisStandard', (accounts) => {
                     assetRouter.distribute(
                         pool,
                         [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
-                        [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
                         feeCollector,
                         { from: account1 }
                     ),
@@ -939,7 +937,6 @@ contract('UnoAssetRouterTrisolarisStandard', (accounts) => {
                     assetRouter.distribute(
                         pool,
                         [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
-                        [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
                         feeCollector,
                         { from: pauser }
                     ),
@@ -951,7 +948,6 @@ contract('UnoAssetRouterTrisolarisStandard', (accounts) => {
                     assetRouter.distribute(
                         pool2,
                         [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
-                        [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
                         feeCollector,
                         { from: distributor }
                     ),
@@ -963,7 +959,6 @@ contract('UnoAssetRouterTrisolarisStandard', (accounts) => {
                     assetRouter.distribute(
                         pool,
                         [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
-                        [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
                         feeCollector,
                         { from: distributor }
                     ),
@@ -985,7 +980,7 @@ contract('UnoAssetRouterTrisolarisStandard', (accounts) => {
                 await stakingToken.approve(assetRouter.address, balance2, { from: account2 })
                 await assetRouter.depositLP(pool, balance2, account2, { from: account2 })
 
-                const TOKEN = await IERC20.at('0xB12BFcA5A55806AaF64E99521918A4bf0fC40802')
+                const TOKEN = await IERC20.at('0xFa94348467f64D5A457F75F8bc40495D33c65aBB')
                 feeCollectorBalanceBefore = await TOKEN.balanceOf(feeCollector)
 
                 await time.increase(5000000)
@@ -1017,19 +1012,6 @@ contract('UnoAssetRouterTrisolarisStandard', (accounts) => {
                             amountOutMin: 0
                         }
                     ],
-                    [
-                        {
-                            route: [
-                                '0xFa94348467f64D5A457F75F8bc40495D33c65aBB',
-                                '0xB12BFcA5A55806AaF64E99521918A4bf0fC40802'
-                            ],
-                            amountOutMin: 0
-                        },
-                        {
-                            route: [],
-                            amountOutMin: 0
-                        }
-                    ],
                     feeCollector,
                     { from: distributor }
                 )
@@ -1045,7 +1027,7 @@ contract('UnoAssetRouterTrisolarisStandard', (accounts) => {
                 assert.isAbove(stake2.toNumber(), balance2.toNumber(), 'Stake2 not increased')
             })
             it('collects fees', async () => {
-                const TOKEN = await IERC20.at('0xB12BFcA5A55806AaF64E99521918A4bf0fC40802')
+                const TOKEN = await IERC20.at('0xFa94348467f64D5A457F75F8bc40495D33c65aBB')
                 const feeCollectorBalanceAfter = await TOKEN.balanceOf(feeCollector)
                 assert.ok(feeCollectorBalanceAfter.gt(feeCollectorBalanceBefore), 'Fee collector balance not increased')
             })
@@ -1082,19 +1064,6 @@ contract('UnoAssetRouterTrisolarisStandard', (accounts) => {
                                 amountOutMin: 0
                             }
                         ],
-                        [
-                            {
-                                route: [
-                                    '0xFa94348467f64D5A457F75F8bc40495D33c65aBB',
-                                    '0xB12BFcA5A55806AaF64E99521918A4bf0fC40802'
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [],
-                                amountOutMin: 0
-                            }
-                        ],
                         feeCollector,
                         { from: distributor }
                     ),
@@ -1127,68 +1096,10 @@ contract('UnoAssetRouterTrisolarisStandard', (accounts) => {
                                 amountOutMin: 0
                             }
                         ],
-                        [
-                            {
-                                route: [
-                                    '0xFa94348467f64D5A457F75F8bc40495D33c65aBB',
-                                    '0xB12BFcA5A55806AaF64E99521918A4bf0fC40802'
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [],
-                                amountOutMin: 0
-                            }
-                        ],
                         feeCollector,
                         { from: distributor }
                     ),
                     'BAD_REWARD_TOKEN_B_ROUTE'
-                )
-                await expectRevertCustomError(
-                    assetRouter.distribute(
-                        pool,
-                        [
-                            {
-                                route: [
-                                    '0xFa94348467f64D5A457F75F8bc40495D33c65aBB',
-                                    '0x4988a896b1227218e4A686fdE5EabdcAbd91571f'
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [
-                                    '0xFa94348467f64D5A457F75F8bc40495D33c65aBB',
-                                    '0xB12BFcA5A55806AaF64E99521918A4bf0fC40802'
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [],
-                                amountOutMin: 0
-                            }
-                        ],
-                        [
-                            {
-                                route: [
-                                    constants.ZERO_ADDRESS,
-                                    '0xB12BFcA5A55806AaF64E99521918A4bf0fC40802'
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [],
-                                amountOutMin: 0
-                            }
-                        ],
-                        feeCollector,
-                        { from: distributor }
-                    ),
-                    'BAD_FEE_TOKEN_ROUTE'
                 )
             })
             it('reverts if passed wrong tokenA', async () => {
@@ -1212,19 +1123,6 @@ contract('UnoAssetRouterTrisolarisStandard', (accounts) => {
                             },
                             {
                                 route: [],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [],
-                                amountOutMin: 0
-                            }
-                        ],
-                        [
-                            {
-                                route: [
-                                    '0xFa94348467f64D5A457F75F8bc40495D33c65aBB',
-                                    '0xB12BFcA5A55806AaF64E99521918A4bf0fC40802'
-                                ],
                                 amountOutMin: 0
                             },
                             {
@@ -1259,19 +1157,6 @@ contract('UnoAssetRouterTrisolarisStandard', (accounts) => {
                             },
                             {
                                 route: [],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [],
-                                amountOutMin: 0
-                            }
-                        ],
-                        [
-                            {
-                                route: [
-                                    '0xFa94348467f64D5A457F75F8bc40495D33c65aBB',
-                                    '0xB12BFcA5A55806AaF64E99521918A4bf0fC40802'
-                                ],
                                 amountOutMin: 0
                             },
                             {

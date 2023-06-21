@@ -56,7 +56,6 @@ interface IUnoFarm {
     error NO_LIQUIDITY();
     error CALL_ON_THE_SAME_BLOCK();
     error INVALID_ROUTE(address fromToken, address toToken);
-    error INVALID_FEE_ROUTE(address feeToken);
 
     function rewardToken() external view returns (address);
     function lpPool() external view returns (address);

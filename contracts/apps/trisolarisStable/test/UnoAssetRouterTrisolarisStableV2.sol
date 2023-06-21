@@ -418,7 +418,6 @@ contract UnoAssetRouterTrisolarisStableV2 is Initializable, PausableUpgradeable,
 
      * @param rewardSwapInfos - Arrays of structs with token arrays describing swap routes from reward to tokens in {swap} and minimum amounts of output tokens that must be received for the transaction not to revert.
      * @param rewarderSwapInfos - Arrays of structs with token arrays describing swap routes from rewarder to tokens in {swap} and minimum amounts of output tokens that must be received for the transaction not to revert.
-     * @param feeSwapInfos - Arrays of structs with token arrays describing swap routes (rewardTokenToFeeToken, rewarderTokenToFeeToken) and minimum amounts of output tokens that must be received for the transaction not to revert.
      * @param feeTo - Address to collect fees to.
      *
      * Note: This function can only be called by the distributor.
@@ -427,7 +426,6 @@ contract UnoAssetRouterTrisolarisStableV2 is Initializable, PausableUpgradeable,
         address swap,
         Farm.SwapInfo[] calldata rewardSwapInfos,
         Farm.SwapInfo[] calldata rewarderSwapInfos,
-        Farm.SwapInfo[2] calldata feeSwapInfos,
         address feeTo
     ) external whenNotPaused onlyRole(DISTRIBUTOR_ROLE) {
         Farm farm = Farm(farmFactory.Farms(swap));
@@ -436,7 +434,6 @@ contract UnoAssetRouterTrisolarisStableV2 is Initializable, PausableUpgradeable,
         uint256 reward = farm.distribute(
             rewardSwapInfos,
             rewarderSwapInfos,
-            feeSwapInfos,
             IUnoFarm.FeeInfo(feeTo, fee)
         );
         emit Distribute(swap, reward);

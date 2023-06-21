@@ -54,7 +54,6 @@ interface IUnoAssetRouterTrisolarisStable {
         address swap,
         Farm.SwapInfo[] calldata rewardSwapInfos,
         Farm.SwapInfo[] calldata rewarderSwapInfos,
-        Farm.SwapInfo[2] calldata feeSwapInfos,
         address feeTo
     ) external returns(uint256 reward);
 
