@@ -13,7 +13,6 @@ interface IUnoFarmTrisolarisStandard is IUnoFarm {
 
     function distribute(
         SwapInfo[4] calldata swapInfos,
-        SwapInfo[2] calldata feeSwapInfos,
         FeeInfo calldata feeInfo
     ) external returns (uint256 reward);
 }

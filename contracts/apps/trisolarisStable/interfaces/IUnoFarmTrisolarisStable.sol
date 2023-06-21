@@ -22,7 +22,6 @@ interface IUnoFarmTrisolarisStable is IUnoFarm {
     function distribute(
         SwapInfo[] calldata rewardSwapInfos,
         SwapInfo[] calldata rewarderSwapInfos,
-        SwapInfo[2] calldata feeSwapInfos,
         FeeInfo calldata feeInfo
     ) external returns (uint256 reward);
 }

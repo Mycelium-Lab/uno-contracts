@@ -163,7 +163,6 @@ contract UnoFarmTrisolarisStable is Initializable, ReentrancyGuardUpgradeable, I
     function distribute(
         SwapInfo[] calldata rewardSwapInfos,
         SwapInfo[] calldata rewarderSwapInfos,
-        SwapInfo[2] calldata feeSwapInfos,
         FeeInfo calldata feeInfo
     ) external onlyAssetRouter nonReentrant returns (uint256 reward) {
         if(totalDeposits == 0) revert NO_LIQUIDITY();
@@ -174,14 +173,20 @@ contract UnoFarmTrisolarisStable is Initializable, ReentrancyGuardUpgradeable, I
 
         MasterChef.harvest(pid, address(this));
 
-        _collectFees(feeSwapInfos[0], feeInfo, rewardToken);
-        _collectFees(feeSwapInfos[1], feeInfo, rewarderToken);
         { // scope to avoid stack too deep errors
-        uint256 rewardTokenFraction = IERC20(rewardToken).balanceOf(address(this)) / tokens.length;
+        uint256 rewardTokenFraction;
+        {
+            uint256 balance = IERC20(rewardToken).balanceOf(address(this));
+            balance -= _collectFees(IERC20(rewardToken), balance, feeInfo);
+            rewardTokenFraction = balance / tokens.length;
+        }
         uint256 rewarderTokenFraction;
         if (rewarderToken != address(0)) {
-            rewarderTokenFraction = IERC20(rewarderToken).balanceOf(address(this)) / tokens.length;
+            uint256 balance = IERC20(rewarderToken).balanceOf(address(this));
+            balance -= _collectFees(IERC20(rewarderToken), balance, feeInfo);
+            rewarderTokenFraction = balance / tokens.length;
         }
+
         if (rewardTokenFraction > 0) {
             for (uint256 i = 0; i < tokens.length; i++) {
                 if (tokens[i] != rewardToken) {
@@ -225,22 +230,16 @@ contract UnoFarmTrisolarisStable is Initializable, ReentrancyGuardUpgradeable, I
     }
 
     /**
-     * @dev Swaps and sends fees to feeTo.
-     */
-    function _collectFees(SwapInfo calldata feeSwapInfo, FeeInfo calldata feeInfo, address token) internal {
-        if(token != address(0) && feeInfo.feeTo != address(0)){
-            uint256 feeAmount = IERC20(token).balanceOf(address(this)) * feeInfo.fee / fractionMultiplier;
-            if(feeAmount > 0){
-                address[] calldata route = feeSwapInfo.route;
-                if(route.length > 0 && route[0] != route[route.length - 1]){
-                    if(route[0] != token) revert INVALID_FEE_ROUTE(token);
-                    trisolarisRouter.swapExactTokensForTokens(feeAmount, feeSwapInfo.amountOutMin, route, feeInfo.feeTo, block.timestamp);
-                    return;
-                }
-                IERC20(token).safeTransfer(feeInfo.feeTo, feeAmount);
-            }
-        }
-    }
+	 * @dev Sends fees to feeTo.
+	 */
+	function _collectFees(IERC20 token, uint256 balance, FeeInfo calldata feeInfo) internal returns(uint256 feeAmount) {
+		if (feeInfo.feeTo != address(0)) {
+			feeAmount = balance * feeInfo.fee / fractionMultiplier;
+			if (feeAmount > 0) {
+				token.safeTransfer(feeInfo.feeTo, feeAmount);
+			}
+		}
+	}
 
     /**
      * @dev Returns total funds staked by the {_address}.
