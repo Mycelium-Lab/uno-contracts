@@ -261,10 +261,6 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 }
                         ],
-                        [
-                            { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 }
-                        ],
                         feeCollector,
                         { from: account1 }
                     ),
@@ -304,10 +300,6 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
                         [
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 }
-                        ],
-                        [
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 }
                         ],
@@ -1105,10 +1097,6 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 }
                         ],
-                        [
-                            { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 }
-                        ],
                         feeCollector,
                         { from: pauser }
                     ),
@@ -1125,10 +1113,6 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 }
                         ],
-                        [
-                            { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 }
-                        ],
                         feeCollector,
                         { from: distributor }
                     ),
@@ -1140,7 +1124,8 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
             let receipt
             let balance1
             let balance2
-            let feeCollectorBalanceBefore
+            let feeCollectorRewardBalanceBefore
+            let feeCollectorRewarderBalanceBefore
             before(async () => {
                 balance1 = await stakingToken.balanceOf(account1)
                 await stakingToken.approve(assetRouter.address, balance1, {
@@ -1164,11 +1149,10 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
                     { from: account2 }
                 )
 
-                WETH = await IUniswapV2Pair.at(
-                    '0x49D5c2BdFfac6CE2BFdB6640F4F80f226bc10bAB'
-                )
-
-                feeCollectorBalanceBefore = await WETH.balanceOf(feeCollector)
+                const reward = await IERC20.at(rewardToken)
+                feeCollectorRewardBalanceBefore = await reward.balanceOf(feeCollector)
+                const _rewarder = await IERC20.at(tokenB.address)
+                feeCollectorRewarderBalanceBefore = await _rewarder.balanceOf(feeCollector)
                 await time.increase(5000000)
                 receipt = await assetRouter.distribute(
                     pool,
@@ -1203,23 +1187,6 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
                             amountOutMin: 0
                         }
                     ],
-                    [
-                        {
-                            route: [
-                                rewardToken,
-                                '0xA7D7079b0FEaD91F3e65f86E8915Cb59c1a4C664',
-                                WETH.address
-                            ],
-                            amountOutMin: 0
-                        },
-                        {
-                            route: [tokenB.address,
-                                '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E',
-                                '0xA7D7079b0FEaD91F3e65f86E8915Cb59c1a4C664',
-                                WETH.address],
-                            amountOutMin: 0
-                        }
-                    ],
                     feeCollector,
                     { from: distributor }
                 )
@@ -1241,13 +1208,13 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
                 assert.ok(stake2.gt(balance2), 'Stake2 not increased')
             })
             it('collects fees', async () => {
-                const feeCollectorBalanceAfter = await WETH.balanceOf(
-                    feeCollector
-                )
-                assert.ok(
-                    feeCollectorBalanceAfter.gt(feeCollectorBalanceBefore),
-                    'Fee collector balance not increased'
-                )
+                const reward = await IERC20.at(rewardToken)
+                const feeCollectorRewardBalanceAfter = await reward.balanceOf(feeCollector)
+                assert.ok(feeCollectorRewardBalanceAfter.gt(feeCollectorRewardBalanceBefore), 'Fee collector balance not increased')
+
+                const _rewarder = await IERC20.at(tokenB.address)
+                const feeCollectorRewarderBalanceAfter = await _rewarder.balanceOf(feeCollector)
+                assert.ok(feeCollectorRewarderBalanceAfter.gt(feeCollectorRewarderBalanceBefore), 'Fee collector balance not increased')
             })
         })
         describe('bad path reverts', () => {
@@ -1278,17 +1245,6 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 }
                         ],
-                        [
-                            {
-                                route: [
-                                    rewardToken,
-                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    WETH.address
-                                ],
-                                amountOutMin: 0
-                            },
-                            { route: [], amountOutMin: 0 }
-                        ],
                         feeCollector,
                         { from: distributor }
                     ),
@@ -1317,60 +1273,10 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 }
                         ],
-                        [
-                            {
-                                route: [
-                                    rewardToken,
-                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    WETH.address
-                                ],
-                                amountOutMin: 0
-                            },
-                            { route: [], amountOutMin: 0 }
-                        ],
                         feeCollector,
                         { from: distributor }
                     ),
                     'BAD_REWARD_TOKEN_B_ROUTE'
-                )
-                await expectRevertCustomError(
-                    assetRouter.distribute(
-                        pool,
-                        [
-                            {
-                                route: [
-                                    rewardToken,
-                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    tokenA.address
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [
-                                    rewardToken,
-                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    tokenB.address
-                                ],
-                                amountOutMin: 0
-                            },
-                            { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 }
-                        ],
-                        [
-                            {
-                                route: [
-                                    constants.ZERO_ADDRESS,
-                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    WETH.address
-                                ],
-                                amountOutMin: 0
-                            },
-                            { route: [], amountOutMin: 0 }
-                        ],
-                        feeCollector,
-                        { from: distributor }
-                    ),
-                    'BAD_FEE_TOKEN_ROUTE'
                 )
             })
             it('reverts if passed wrong tokenA in reward route', async () => {
@@ -1395,17 +1301,6 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
                                 amountOutMin: 0
                             },
                             { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 }
-                        ],
-                        [
-                            {
-                                route: [
-                                    rewardToken,
-                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    WETH.address
-                                ],
-                                amountOutMin: 0
-                            },
                             { route: [], amountOutMin: 0 }
                         ],
                         feeCollector,
@@ -1436,17 +1331,6 @@ contract('UnoAssetRouterTraderjoe for MasterChefv3', (accounts) => {
                                 amountOutMin: 0
                             },
                             { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 }
-                        ],
-                        [
-                            {
-                                route: [
-                                    rewardToken,
-                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    WETH.address
-                                ],
-                                amountOutMin: 0
-                            },
                             { route: [], amountOutMin: 0 }
                         ],
                         feeCollector,
