@@ -228,7 +228,6 @@ contract('UnoAssetRouterPancakeswap', (accounts) => {
                     assetRouter.distribute(
                         pool,
                         [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
-                        { route: [], amountOutMin: 0 },
                         feeCollector,
                         { from: account1 }
                     ),
@@ -268,7 +267,6 @@ contract('UnoAssetRouterPancakeswap', (accounts) => {
                     assetRouter.distribute(
                         pool,
                         [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
-                        { route: [], amountOutMin: 0 },
                         feeCollector,
                         { from: account1 }
                     ),
@@ -889,14 +887,12 @@ contract('UnoAssetRouterPancakeswap', (accounts) => {
     })
 
     describe('Distributions', () => {
-        let BUSD
         describe('reverts', () => {
             it('reverts if called not by distributor', async () => {
                 await expectRevertCustomError(
                     assetRouter.distribute(
                         pool,
                         [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
-                        { route: [], amountOutMin: 0 },
                         feeCollector,
                         { from: pauser }
                     ),
@@ -908,7 +904,6 @@ contract('UnoAssetRouterPancakeswap', (accounts) => {
                     assetRouter.distribute(
                         pool2,
                         [{ route: [], amountOutMin: 0 }, { route: [], amountOutMin: 0 }],
-                        { route: [], amountOutMin: 0 },
                         feeCollector,
                         { from: distributor }
                     ),
@@ -933,6 +928,7 @@ contract('UnoAssetRouterPancakeswap', (accounts) => {
             let balance1
             let balance2
             let feeCollectorBalanceBefore
+            let rewardFee
             before(async () => {
                 balance1 = await stakingToken.balanceOf(account1)
                 await stakingToken.approve(assetRouter.address, balance1, { from: account1 })
@@ -942,11 +938,15 @@ contract('UnoAssetRouterPancakeswap', (accounts) => {
                 await stakingToken.approve(assetRouter.address, balance2, { from: account2 })
                 await assetRouter.depositLP(pool, balance2, account2, { from: account2 })
 
-                BUSD = await IUniswapV2Pair.at('0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56')
-
-                feeCollectorBalanceBefore = await BUSD.balanceOf(feeCollector)
+                const reward = await IBEP20.at(rewardToken)
+                feeCollectorBalanceBefore = await reward.balanceOf(feeCollector)
+                const farmAddress = await factory.Farms(pool)
+                const balance = await reward.balanceOf(farmAddress)
 
                 await time.increase(5000000)
+
+                const data = await masterChef.pendingCake(pid, farmAddress)
+                rewardFee = data.add(balance).toString()
 
                 receipt = await assetRouter.distribute(
                     pool,
@@ -966,13 +966,6 @@ contract('UnoAssetRouterPancakeswap', (accounts) => {
                             amountOutMin: 0
                         }
                     ],
-                    {
-                        route: [
-                            rewardToken,
-                            BUSD.address
-                        ],
-                        amountOutMin: 0
-                    },
                     feeCollector,
                     { from: distributor }
                 )
@@ -988,7 +981,9 @@ contract('UnoAssetRouterPancakeswap', (accounts) => {
                 assert.ok(stake2.gt(balance2), 'Stake2 not increased')
             })
             it('collects fees', async () => {
-                const feeCollectorBalanceAfter = await BUSD.balanceOf(feeCollector)
+                const reward = await IBEP20.at(rewardToken)
+                const feeCollectorBalanceAfter = await reward.balanceOf(feeCollector)
+                // console.log(feeCollectorBalanceAfter.sub(feeCollectorBalanceBefore).toString(), (new BN(rewardFee).mul(new BN(4)).div(new BN(100))).toString())
                 assert.ok(feeCollectorBalanceAfter.gt(feeCollectorBalanceBefore), 'Fee collector balance not increased')
             })
         })
@@ -1016,13 +1011,6 @@ contract('UnoAssetRouterPancakeswap', (accounts) => {
                                 amountOutMin: 0
                             }
                         ],
-                        {
-                            route: [
-                                rewardToken,
-                                BUSD.address
-                            ],
-                            amountOutMin: 0
-                        },
                         feeCollector,
                         { from: distributor }
                     ),
@@ -1047,48 +1035,10 @@ contract('UnoAssetRouterPancakeswap', (accounts) => {
                                 amountOutMin: 0
                             }
                         ],
-                        {
-                            route: [
-                                rewardToken,
-                                BUSD.address
-                            ],
-                            amountOutMin: 0
-                        },
                         feeCollector,
                         { from: distributor }
                     ),
                     'BAD_REWARD_TOKEN_B_ROUTE'
-                )
-                await expectRevertCustomError(
-                    assetRouter.distribute(
-                        pool,
-                        [
-                            {
-                                route: [
-                                    rewardToken,
-                                    tokenA.address
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [
-                                    rewardToken,
-                                    tokenB.address
-                                ],
-                                amountOutMin: 0
-                            }
-                        ],
-                        {
-                            route: [
-                                constants.ZERO_ADDRESS,
-                                BUSD.address
-                            ],
-                            amountOutMin: 0
-                        },
-                        feeCollector,
-                        { from: distributor }
-                    ),
-                    'BAD_FEE_TOKEN_ROUTE'
                 )
             })
             it('reverts if passed wrong tokenA in reward route', async () => {
@@ -1111,13 +1061,6 @@ contract('UnoAssetRouterPancakeswap', (accounts) => {
                                 amountOutMin: 0
                             }
                         ],
-                        {
-                            route: [
-                                rewardToken,
-                                BUSD.address
-                            ],
-                            amountOutMin: 0
-                        },
                         feeCollector,
                         { from: distributor }
                     ),
@@ -1144,13 +1087,6 @@ contract('UnoAssetRouterPancakeswap', (accounts) => {
                                 amountOutMin: 0
                             }
                         ],
-                        {
-                            route: [
-                                rewardToken,
-                                BUSD.address
-                            ],
-                            amountOutMin: 0
-                        },
                         feeCollector,
                         { from: distributor }
                     ),
