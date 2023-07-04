@@ -64,7 +64,7 @@ interface IUnoFarm {
     function lpPool() external view returns (address);
     function assetRouter() external view returns (address);
 
-    function initialize( address _lpStakingPool, address _assetRouter) external;
+    function initialize(address _gauge, address _assetRouter) external;
 
     function deposit(uint256 amountLP, address recipient) external;
     function withdraw(uint256 amount, address origin, address recipient) external;
