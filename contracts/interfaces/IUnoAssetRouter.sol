@@ -31,7 +31,7 @@ interface IUnoAssetRouter {
     function farmFactory() external view returns(IUnoFarmFactory);
     function accessManager() external view returns(IUnoAccessManager);
     function fee() external view returns(uint256);
-    function WAVAX() external view returns(address);
+    function WETH() external view returns(address);
 
     function deposit(address lpPair, uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin, address recipient) external returns(uint256 sentA, uint256 sentB, uint256 liquidity);
     function depositETH(address lpPair, uint256 amountToken, uint256 amountTokenMin, uint256 amountETHMin, address recipient) external payable returns(uint256 sentToken, uint256 sentETH, uint256 liquidity);

@@ -3,6 +3,7 @@ pragma solidity 0.8.10;
 
 import '../../../interfaces/IUnoFarm.sol';
 import "../../../interfaces/IGauge.sol"; 
+import "../../../interfaces/IRouter.sol";
 
 interface IUnoFarmVelodrome is IUnoFarm { 
 	/**
@@ -11,12 +12,13 @@ interface IUnoFarmVelodrome is IUnoFarm {
      * {amountOutMin} - The minimum amount of output token that must be received for the transaction not to revert.
      */
     struct SwapInfo{
-        address[] route;
+        IRouter.Route[] route;
         uint256 amountOutMin;
     }
 
     error INVALID_GAUGE();
 
+    function isStable() external view returns (bool);
     function gauge() external view returns (IGauge);
     
     function distribute(

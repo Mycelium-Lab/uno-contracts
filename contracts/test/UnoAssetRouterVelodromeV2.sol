@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.10;
 
-import './interfaces/IUnoAssetRouterTraderjoe.sol'; 
-import '../../interfaces/IUnoFarm.sol';
-import "../../interfaces/IAggregationRouterV5.sol";
-import "../../interfaces/IUniswapV2Router.sol";
-import "../../interfaces/IUniswapV2Pair.sol";
+import '../apps/velodrome/interfaces/IUnoAssetRouterVelodrome.sol'; 
+import '../interfaces/IUnoFarm.sol';
+import "../interfaces/IAggregationRouterV5.sol";
+import "../interfaces/IRouter.sol";
+import "../interfaces/IPool.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract UnoAssetRouterTraderjoe is Initializable, PausableUpgradeable, UUPSUpgradeable, IUnoAssetRouterTraderjoe {
+contract UnoAssetRouterVelodrome is Initializable, PausableUpgradeable, UUPSUpgradeable, IUnoAssetRouterVelodrome {
 	using SafeERC20 for IERC20;
 
 	/**
@@ -28,9 +28,11 @@ contract UnoAssetRouterTraderjoe is Initializable, PausableUpgradeable, UUPSUpgr
 
 	uint256 public fee;
 
-	address public constant WAVAX = 0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7;
-	IUniswapV2Router01 private constant TraderjoeRouter = IUniswapV2Router01(0x60aE616a2155Ee3d9A68541Ba4544862310933d4);
+	address public constant WETH = 0x4200000000000000000000000000000000000006;
+	IRouter private constant VelodromeRouter = IRouter(0xa062aE8A9c5e11aaA026fc2670B0D65cCc8B2858);
     address private constant OneInchRouter = 0x1111111254EEB25477B68fb85Ed929f73A960582;
+
+    uint256 public constant version = 2;
 
 	modifier onlyRole(bytes32 role) {
 		if(!accessManager.hasRole(role, msg.sender)) revert CALLER_NOT_AUTHORIZED();
@@ -85,7 +87,7 @@ contract UnoAssetRouterTraderjoe is Initializable, PausableUpgradeable, UUPSUpgr
         IERC20(tokenA).safeTransferFrom(msg.sender, address(this), amountA);
         IERC20(tokenB).safeTransferFrom(msg.sender, address(this), amountB);
 
-        (sentA, sentB, liquidity) = _addLiquidity(tokenA, tokenB, amountA, amountB, amountAMin, amountBMin, address(farm));
+        (sentA, sentB, liquidity) = _addLiquidity(tokenA, tokenB, farm.isStable(), amountA, amountB, amountAMin, amountBMin, address(farm));
         farm.deposit(liquidity, recipient);
 
         emit Deposit(lpPair, msg.sender, recipient, liquidity); 
@@ -112,12 +114,12 @@ contract UnoAssetRouterTraderjoe is Initializable, PausableUpgradeable, UUPSUpgr
 
         address tokenA = farm.tokenA();
         address tokenB = farm.tokenB();
-        if (tokenA == WAVAX) {
+        if (tokenA == WETH) {
             IERC20(tokenB).safeTransferFrom(msg.sender, address(this), amountToken);
-            (sentToken, sentETH, liquidity) = _addLiquidityETH(tokenB, amountToken, amountTokenMin, amountETHMin, address(farm));
-        } else if (tokenB == WAVAX) {
+            (sentToken, sentETH, liquidity) = _addLiquidityETH(tokenB, farm.isStable(), amountToken, amountTokenMin, amountETHMin, address(farm));
+        } else if (tokenB == WETH) {
             IERC20(tokenA).safeTransferFrom(msg.sender, address(this), amountToken);
-            (sentToken, sentETH, liquidity) = _addLiquidityETH(tokenA, amountToken, amountTokenMin, amountETHMin, address(farm));
+            (sentToken, sentETH, liquidity) = _addLiquidityETH(tokenA, farm.isStable(), amountToken, amountTokenMin, amountETHMin, address(farm));
         } else revert NOT_ETH_FARM();
 
         farm.deposit(liquidity, recipient);
@@ -155,7 +157,7 @@ contract UnoAssetRouterTraderjoe is Initializable, PausableUpgradeable, UUPSUpgr
         (amountB, sent1, amountBMin) = _swapDeposit(swapData[1], IERC20(tokenB));
 
         // Variable naming is not correct, however I have to do it this way to avoid Stack too deep error.
-        (amountAMin, amountBMin, liquidity) = _addLiquidity(tokenA, tokenB, amountA, amountB, amountAMin, amountBMin, address(farm));
+        (amountAMin, amountBMin, liquidity) = _addLiquidity(tokenA, tokenB, farm.isStable(), amountA, amountB, amountAMin, amountBMin, address(farm));
         farm.deposit(liquidity, recipient);
         
         if(amountA > amountAMin){
@@ -204,7 +206,7 @@ contract UnoAssetRouterTraderjoe is Initializable, PausableUpgradeable, UUPSUpgr
         if(farm == Farm(address(0))) revert FARM_NOT_EXISTS();
 
         farm.withdraw(amount, msg.sender, address(this));
-        (amountA, amountB) = _removeLiquidity(lpPair, farm.tokenA(), farm.tokenB(), amount, amountAMin, amountBMin, recipient);
+        (amountA, amountB) = _removeLiquidity(lpPair, farm.tokenA(), farm.tokenB(), farm.isStable(), amount, amountAMin, amountBMin, recipient);
         
         emit Withdraw(lpPair, msg.sender, recipient, amount);  
     }
@@ -228,10 +230,10 @@ contract UnoAssetRouterTraderjoe is Initializable, PausableUpgradeable, UUPSUpgr
         address tokenB = farm.tokenB();
 
         farm.withdraw(amount, msg.sender, address(this));
-        if (tokenA == WAVAX) {
-            (amountToken, amountETH) = _removeLiquidityETH(lpPair, tokenB, amount, amountTokenMin, amountETHMin, recipient);
-        } else if (tokenB == WAVAX) {
-            (amountToken, amountETH) = _removeLiquidityETH(lpPair, tokenA, amount, amountTokenMin, amountETHMin, recipient);
+        if (tokenA == WETH) {
+            (amountToken, amountETH) = _removeLiquidityETH(lpPair, tokenB, farm.isStable(), amount, amountTokenMin, amountETHMin, recipient);
+        } else if (tokenB == WETH) {
+            (amountToken, amountETH) = _removeLiquidityETH(lpPair, tokenA, farm.isStable(), amount, amountTokenMin, amountETHMin, recipient);
         } else revert NOT_ETH_FARM();
 
         emit Withdraw(lpPair, msg.sender, recipient, amount);
@@ -257,7 +259,7 @@ contract UnoAssetRouterTraderjoe is Initializable, PausableUpgradeable, UUPSUpgr
 
         address tokenA = farm.tokenA();
         address tokenB = farm.tokenB();
-        (uint256 _amountA, uint256 _amountB) = _removeLiquidity(lpPair, tokenA, tokenB, amount, 0, 0, address(this));
+        (uint256 _amountA, uint256 _amountB) = _removeLiquidity(lpPair, tokenA, tokenB, farm.isStable(), amount, 0, 0, address(this));
         
         (amount0, amountA) = _swapWithdraw(swapData[0], IERC20(tokenA), _amountA, recipient);
         (amount1, amountB) = _swapWithdraw(swapData[1], IERC20(tokenB), _amountB, recipient);
@@ -289,7 +291,7 @@ contract UnoAssetRouterTraderjoe is Initializable, PausableUpgradeable, UUPSUpgr
      */ 
     function distribute(
         address lpPair,
-        Farm.SwapInfo[4] calldata swapInfos,
+        Farm.SwapInfo[2] calldata swapInfos,
         address feeTo
     ) external whenNotPaused onlyRole(DISTRIBUTOR_ROLE) returns(uint256 reward){
         Farm farm = Farm(farmFactory.Farms(lpPair));
@@ -341,8 +343,8 @@ contract UnoAssetRouterTraderjoe is Initializable, PausableUpgradeable, UUPSUpgr
      */  
     function getTokens(address lpPair) external view returns(IERC20[] memory tokens){
         tokens = new IERC20[](2);
-        tokens[0] = IERC20(IUniswapV2Pair(lpPair).token0());
-        tokens[1] = IERC20(IUniswapV2Pair(lpPair).token1());
+        tokens[0] = IERC20(IPool(lpPair).token0());
+        tokens[1] = IERC20(IPool(lpPair).token1());
     }
 
     /**
@@ -351,16 +353,17 @@ contract UnoAssetRouterTraderjoe is Initializable, PausableUpgradeable, UUPSUpgr
     function _addLiquidity(
         address tokenA,
         address tokenB, 
+        bool isStable,
         uint256 amountA, 
         uint256 amountB, 
         uint256 amountAMin, 
         uint256 amountBMin, 
         address farm
     ) internal returns(uint256 sentA, uint256 sentB, uint256 liquidity){
-        IERC20(tokenA).approve(address(TraderjoeRouter), amountA);
-        IERC20(tokenB).approve(address(TraderjoeRouter), amountB);
+        IERC20(tokenA).approve(address(VelodromeRouter), amountA);
+        IERC20(tokenB).approve(address(VelodromeRouter), amountB);
 
-        (sentA, sentB, liquidity) = TraderjoeRouter.addLiquidity(tokenA, tokenB, amountA, amountB, amountAMin, amountBMin, farm, block.timestamp);
+        (sentA, sentB, liquidity) = VelodromeRouter.addLiquidity(tokenA, tokenB, isStable, amountA, amountB, amountAMin, amountBMin, farm, block.timestamp);
         // Refund dust
         if(amountA > sentA){
             IERC20(tokenA).safeTransfer(msg.sender, amountA - sentA);
@@ -375,14 +378,15 @@ contract UnoAssetRouterTraderjoe is Initializable, PausableUpgradeable, UUPSUpgr
      */ 
     function _addLiquidityETH(
         address token,
+        bool isStable,
         uint256 amount, 
         uint256 amountTokenMin, 
         uint256 amountETHMin, 
         address farm
     ) internal returns(uint256 sentToken, uint256 sentETH, uint256 liquidity){
-        IERC20(token).approve(address(TraderjoeRouter), amount);
+        IERC20(token).approve(address(VelodromeRouter), amount);
 
-        (sentToken, sentETH, liquidity) = TraderjoeRouter.addLiquidityAVAX{value: msg.value}(token, amount, amountTokenMin, amountETHMin, farm, block.timestamp);
+        (sentToken, sentETH, liquidity) = VelodromeRouter.addLiquidityETH{value: msg.value}(token, isStable, amount, amountTokenMin, amountETHMin, farm, block.timestamp);
         // Refund dust
         if(amount > sentToken){
             IERC20(token).safeTransfer(msg.sender, amount - sentToken);
@@ -399,13 +403,14 @@ contract UnoAssetRouterTraderjoe is Initializable, PausableUpgradeable, UUPSUpgr
         address lpPair,
         address tokenA,
         address tokenB, 
+        bool isStable,
         uint256 amount, 
         uint256 amountAMin, 
         uint256 amountBMin, 
         address recipient
     ) internal returns(uint256 amountA, uint256 amountB){
-        IERC20(lpPair).approve(address(TraderjoeRouter), amount);
-        (amountA, amountB) = TraderjoeRouter.removeLiquidity(tokenA, tokenB, amount, amountAMin, amountBMin, recipient, block.timestamp);
+        IERC20(lpPair).approve(address(VelodromeRouter), amount);
+        (amountA, amountB) = VelodromeRouter.removeLiquidity(tokenA, tokenB, isStable, amount, amountAMin, amountBMin, recipient, block.timestamp);
     }
 
     /**
@@ -414,13 +419,14 @@ contract UnoAssetRouterTraderjoe is Initializable, PausableUpgradeable, UUPSUpgr
     function _removeLiquidityETH(
         address lpPair,
         address token,
+        bool isStable,
         uint256 amount, 
         uint256 amountTokenMin, 
         uint256 amountETHMin, 
         address recipient
     ) internal returns(uint256 amountToken, uint256 amountETH){
-        IERC20(lpPair).approve(address(TraderjoeRouter), amount);
-        (amountToken, amountETH) = TraderjoeRouter.removeLiquidityAVAX(token, amount, amountTokenMin, amountETHMin, recipient, block.timestamp);
+        IERC20(lpPair).approve(address(VelodromeRouter), amount);
+        (amountToken, amountETH) = VelodromeRouter.removeLiquidityETH(token, isStable, amount, amountTokenMin, amountETHMin, recipient, block.timestamp);
     }
 
     function _swapDeposit(bytes calldata swapData, IERC20 toToken) internal returns(uint256 returnAmount, uint256 spentAmount, uint256 amountMin){
@@ -516,8 +522,8 @@ contract UnoAssetRouterTraderjoe is Initializable, PausableUpgradeable, UUPSUpgr
      */ 
     function _getTokenStake(address lpPair, uint256 amountLP) internal view returns (uint256 amountA, uint256 amountB) {
         uint256 totalSupply = IERC20(lpPair).totalSupply();
-        amountA = amountLP * IERC20(IUniswapV2Pair(lpPair).token0()).balanceOf(lpPair) / totalSupply;
-        amountB = amountLP * IERC20(IUniswapV2Pair(lpPair).token1()).balanceOf(lpPair) / totalSupply;
+        amountA = amountLP * IERC20(IPool(lpPair).token0()).balanceOf(lpPair) / totalSupply;
+        amountB = amountLP * IERC20(IPool(lpPair).token1()).balanceOf(lpPair) / totalSupply;
     }
 
     /**

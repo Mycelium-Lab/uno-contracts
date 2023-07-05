@@ -3,7 +3,6 @@ pragma solidity 0.8.10;
 
 import './interfaces/IUnoFarmVelodrome.sol';
 import "../../interfaces/IPool.sol";
-import "../../interfaces/IRouter.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -26,6 +25,7 @@ contract UnoFarmVelodrome is Initializable, ReentrancyGuardUpgradeable, IUnoFarm
 	 * {velodromeRouter} - The contract that executes swaps.
 	 * {gauge} - Contract that distributes reward tokens.
 	 */
+	//TODO: v1 also
 	IRouter private constant velodromeRouter = IRouter(0xa062aE8A9c5e11aaA026fc2670B0D65cCc8B2858);
     IGauge public gauge;
 
@@ -41,6 +41,8 @@ contract UnoFarmVelodrome is Initializable, ReentrancyGuardUpgradeable, IUnoFarm
 
      * {fractionMultiplier} - Used to store decimal values.
      */
+	bool public isStable;
+
 	uint256 private totalDeposits;
 	uint256 private totalDepositAge;
 	uint256 private totalDepositLastUpdate;
@@ -72,6 +74,7 @@ contract UnoFarmVelodrome is Initializable, ReentrancyGuardUpgradeable, IUnoFarm
 
 		gauge = IGauge(_gauge);
 		lpPool = gauge.stakingToken();
+		isStable = IPool(lpPool).stable();
 
 		rewardToken = gauge.rewardToken();
 		tokenA = IPool(lpPool).token0();
@@ -155,19 +158,19 @@ contract UnoFarmVelodrome is Initializable, ReentrancyGuardUpgradeable, IUnoFarm
 
 		if (rewardTokenHalf > 0) {
 			if (tokenA != rewardToken) {
-				address[] calldata route = swapInfos[0].route;
-				if(route[0] != rewardToken || route[route.length - 1] != tokenA) revert INVALID_ROUTE(rewardToken, tokenA);
+				IRouter.Route[] calldata route = swapInfos[0].route;
+				if(route[0].from != rewardToken || route[route.length - 1].to != tokenA) revert INVALID_ROUTE(rewardToken, tokenA);
 				velodromeRouter.swapExactTokensForTokens(rewardTokenHalf, swapInfos[0].amountOutMin, route, address(this), block.timestamp);
 			}
 
 			if (tokenB != rewardToken) {
-				address[] calldata route = swapInfos[1].route;
-                if(route[0] != rewardToken || route[route.length - 1] != tokenB) revert INVALID_ROUTE(rewardToken, tokenB);
+				IRouter.Route[] calldata route = swapInfos[1].route;
+                if(route[0].from != rewardToken || route[route.length - 1].to != tokenB) revert INVALID_ROUTE(rewardToken, tokenB);
 				velodromeRouter.swapExactTokensForTokens(rewardTokenHalf, swapInfos[1].amountOutMin, route, address(this), block.timestamp);
 			}
 		}
 
-		(,,reward) = velodromeRouter.addLiquidity(tokenA, tokenB, IERC20(tokenA).balanceOf(address(this)), IERC20(tokenB).balanceOf(address(this)), swapInfos[0].amountOutMin, swapInfos[1].amountOutMin, address(this), block.timestamp);
+		(,,reward) = velodromeRouter.addLiquidity(tokenA, tokenB, isStable, IERC20(tokenA).balanceOf(address(this)), IERC20(tokenB).balanceOf(address(this)), swapInfos[0].amountOutMin, swapInfos[1].amountOutMin, address(this), block.timestamp);
 
 		uint256 rewardPerDepositAge = (reward * fractionMultiplier) / (totalDepositAge + totalDeposits * (block.number - totalDepositLastUpdate));
 		uint256 cumulativeRewardAgePerDepositAge = distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge + rewardPerDepositAge * (block.number - distributionInfo[distributionID - 1].block);
