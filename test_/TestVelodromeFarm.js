@@ -1,12 +1,10 @@
 const { expectEvent, expectRevert, BN } = require('@openzeppelin/test-helpers')
 
-const IUniswapV2Pair = artifacts.require('IUniswapV2Pair')
+const IPool = artifacts.require('IPool')
+const IGauge = artifacts.require('IGauge')
 
-const Farm = artifacts.require('UnoFarmTraderjoe')
-const IMasterTraderjoe = artifacts.require('IMasterChefJoe')
-
-const pool = '0xf4003F4efBE8691B60249E6afbD307aBE7758adb' // wavax usdc
-const masterTraderjoeAddress = '0x4483f0b6e2F5486D06958C20f8C39A7aBe87bf8F'
+const Farm = artifacts.require('UnoFarmVelodrome')
+const gaugeAddress = '0x0f30716960f0618983ac42be2982ffec181af265' // velo-optimism
 
 async function expectRevertCustomError(promise, reason) {
     try {
@@ -23,13 +21,12 @@ async function expectRevertCustomError(promise, reason) {
     }
 }
 
-contract('UnoFarmTraderjoe', (accounts) => {
+contract('UnoFarmVelodrome', (accounts) => {
     const assetRouter = accounts[0]
 
     let implementation
+    let gauge
     let stakingToken
-    let masterTraderjoe
-    let pid
     let rewardToken
 
     let receipt
@@ -37,23 +34,13 @@ contract('UnoFarmTraderjoe', (accounts) => {
     before(async () => {
         implementation = await Farm.new({ from: accounts[0] })
 
-        receipt = await implementation.initialize(pool, assetRouter, {
+        receipt = await implementation.initialize(gaugeAddress, assetRouter, {
             from: accounts[0]
         })
 
-        masterTraderjoe = await IMasterTraderjoe.at(masterTraderjoeAddress)
-        const poolLength = await masterTraderjoe.poolLength()
-
-        for (let i = 0; i < poolLength.toNumber(); i++) {
-            const lpToken = (await masterTraderjoe.poolInfo(i)).lpToken
-            if (lpToken.toString() === pool) {
-                pid = i
-                break
-            }
-        }
-
-        stakingToken = await IUniswapV2Pair.at(pool)
-        rewardToken = await masterTraderjoe.JOE()
+        gauge = await IGauge.at(gaugeAddress)
+        stakingToken = await IPool.at(await gauge.stakingToken())
+        rewardToken = await gauge.rewardToken()
     })
 
     describe('Emits initialize event', () => {
@@ -65,7 +52,7 @@ contract('UnoFarmTraderjoe', (accounts) => {
     describe("Can't call multiple initializations", () => {
         it('Reverts', async () => {
             await expectRevert(
-                implementation.initialize(pool, assetRouter, {
+                implementation.initialize(gaugeAddress, assetRouter, {
                     from: accounts[0]
                 }),
                 'Initializable: contract is already initialized'
@@ -74,8 +61,8 @@ contract('UnoFarmTraderjoe', (accounts) => {
     })
 
     describe('Initializes variables', () => {
-        it('Sets pool ID', async () => {
-            assert.equal(await implementation.pid(), pid, 'PID is not correct')
+        it('Sets gauge', async () => {
+            assert.equal((await implementation.gauge()).toLowerCase(), gaugeAddress, 'gauge is not correct')
         })
         it('Sets lpPool', async () => {
             assert.equal(
@@ -136,8 +123,6 @@ contract('UnoFarmTraderjoe', (accounts) => {
                 implementation.distribute(
                     [
                         { route: [], amountOutMin: 0 },
-                        { route: [], amountOutMin: 0 },
-                        { route: [], amountOutMin: 0 },
                         { route: [], amountOutMin: 0 }
                     ],
                     { feeTo: accounts[1], fee: 0 },
@@ -169,8 +154,6 @@ contract('UnoFarmTraderjoe', (accounts) => {
             await expectRevertCustomError(
                 implementation.distribute(
                     [
-                        { route: [], amountOutMin: 0 },
-                        { route: [], amountOutMin: 0 },
                         { route: [], amountOutMin: 0 },
                         { route: [], amountOutMin: 0 }
                     ],

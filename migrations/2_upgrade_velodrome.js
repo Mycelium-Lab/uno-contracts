@@ -1,7 +1,7 @@
 global.crypto = require('crypto')
 
-const Farm = artifacts.require('UnoFarmTraderjoe')
-const AssetRouter = artifacts.require('UnoAssetRouterTraderjoe')
+const Farm = artifacts.require('UnoFarmVelodrome')
+const AssetRouter = artifacts.require('UnoAssetRouterVelodrome')
 
 require('dotenv').config()
 const ethers = require('ethers')
@@ -20,13 +20,13 @@ async function readAddress(app) {
 }
 
 module.exports = async (deployer, network) => {
-    if (network !== 'avalanche') return
+    if (network !== 'optimism') return
 
     const multisig = await readAddress('multisig')
     const timelockAddress = await readAddress('timelock')
     {
         // AssetRouter upgrade
-        const UnoAssetRouter = await readAddress('traderjoe-router')
+        const UnoAssetRouter = await readAddress('velodrome-router')
         const impl = await prepareUpgrade(UnoAssetRouter, AssetRouter, { deployer })
         console.log('New Router implementation:', impl) // upgradeTo(newImplementation)
 
@@ -63,7 +63,7 @@ module.exports = async (deployer, network) => {
 
     {
         // Farm upgrade
-        const UnoFarmFactory = await readAddress('traderjoe-factory')
+        const UnoFarmFactory = await readAddress('velodrome-factory')
 
         await deployer.deploy(Farm)
         const impl = Farm.address

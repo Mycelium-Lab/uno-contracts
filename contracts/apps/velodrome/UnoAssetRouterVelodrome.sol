@@ -205,7 +205,7 @@ contract UnoAssetRouterVelodrome is Initializable, PausableUpgradeable, UUPSUpgr
         if(farm == Farm(address(0))) revert FARM_NOT_EXISTS();
 
         farm.withdraw(amount, msg.sender, address(this));
-        (amountA, amountB) = _removeLiquidity(farm.lpPool(), farm.tokenA(), farm.tokenB(), farm.isStable(), amount, amountAMin, amountBMin, recipient);
+        (amountA, amountB) = _removeLiquidity(farm.lpPool(), farm.tokenA(), farm.tokenB(), amount, amountAMin, amountBMin, recipient);
         
         emit Withdraw(gauge, msg.sender, recipient, amount);  
     }
@@ -230,9 +230,9 @@ contract UnoAssetRouterVelodrome is Initializable, PausableUpgradeable, UUPSUpgr
 
         farm.withdraw(amount, msg.sender, address(this));
         if (tokenA == WETH) {
-            (amountToken, amountETH) = _removeLiquidityETH(farm.lpPool(), tokenB, farm.isStable(), amount, amountTokenMin, amountETHMin, recipient);
+            (amountToken, amountETH) = _removeLiquidityETH(farm.lpPool(), tokenB, amount, amountTokenMin, amountETHMin, recipient);
         } else if (tokenB == WETH) {
-            (amountToken, amountETH) = _removeLiquidityETH(farm.lpPool(), tokenA, farm.isStable(), amount, amountTokenMin, amountETHMin, recipient);
+            (amountToken, amountETH) = _removeLiquidityETH(farm.lpPool(), tokenA, amount, amountTokenMin, amountETHMin, recipient);
         } else revert NOT_ETH_FARM();
 
         emit Withdraw(gauge, msg.sender, recipient, amount);
@@ -258,7 +258,7 @@ contract UnoAssetRouterVelodrome is Initializable, PausableUpgradeable, UUPSUpgr
 
         address tokenA = farm.tokenA();
         address tokenB = farm.tokenB();
-        (uint256 _amountA, uint256 _amountB) = _removeLiquidity(farm.lpPool(), tokenA, tokenB, farm.isStable(), amount, 0, 0, address(this));
+        (uint256 _amountA, uint256 _amountB) = _removeLiquidity(farm.lpPool(), tokenA, tokenB, amount, 0, 0, address(this));
         
         (amount0, amountA) = _swapWithdraw(swapData[0], IERC20(tokenA), _amountA, recipient);
         (amount1, amountB) = _swapWithdraw(swapData[1], IERC20(tokenB), _amountB, recipient);
@@ -403,14 +403,13 @@ contract UnoAssetRouterVelodrome is Initializable, PausableUpgradeable, UUPSUpgr
         address lpPair,
         address tokenA,
         address tokenB, 
-        bool isStable,
         uint256 amount, 
         uint256 amountAMin, 
         uint256 amountBMin, 
         address recipient
     ) internal returns(uint256 amountA, uint256 amountB){
         IERC20(lpPair).approve(address(VelodromeRouter), amount);
-        (amountA, amountB) = VelodromeRouter.removeLiquidity(tokenA, tokenB, isStable, amount, amountAMin, amountBMin, recipient, block.timestamp);
+        (amountA, amountB) = VelodromeRouter.removeLiquidity(tokenA, tokenB, IPool(lpPair).stable(), amount, amountAMin, amountBMin, recipient, block.timestamp);
     }
 
     /**
@@ -419,14 +418,13 @@ contract UnoAssetRouterVelodrome is Initializable, PausableUpgradeable, UUPSUpgr
     function _removeLiquidityETH(
         address lpPair,
         address token,
-        bool isStable,
         uint256 amount, 
         uint256 amountTokenMin, 
         uint256 amountETHMin, 
         address recipient
     ) internal returns(uint256 amountToken, uint256 amountETH){
         IERC20(lpPair).approve(address(VelodromeRouter), amount);
-        (amountToken, amountETH) = VelodromeRouter.removeLiquidityETH(token, isStable, amount, amountTokenMin, amountETHMin, recipient, block.timestamp);
+        (amountToken, amountETH) = VelodromeRouter.removeLiquidityETH(token, IPool(lpPair).stable(), amount, amountTokenMin, amountETHMin, recipient, block.timestamp);
     }
 
     function _swapDeposit(bytes calldata swapData, IERC20 toToken) internal returns(uint256 returnAmount, uint256 spentAmount, uint256 amountMin){

@@ -5,8 +5,8 @@ const FarmFactory = artifacts.require('UnoFarmFactory')
 const { promises: fs } = require('fs')
 const path = require('path')
 
-const Farm = artifacts.require('UnoFarmTraderjoe')
-const AssetRouter = artifacts.require('UnoAssetRouterTraderjoe')
+const Farm = artifacts.require('UnoFarmVelodrome')
+const AssetRouter = artifacts.require('UnoAssetRouterVelodrome')
 
 async function addAddress(key, address) {
     const data = await fs.readFile(path.resolve(__dirname, './addresses/addresses.json'))
@@ -17,7 +17,7 @@ async function addAddress(key, address) {
 }
 
 module.exports = async (deployer, network, accounts) => {
-    if (network !== 'avalanche') return
+    if (network !== 'optimism') return
     // AccessManager deployment, dont deploy if already deployed on this network
     await deployer.deploy(AccessManager, { overwrite: false, from: accounts[0] })
     // Deploy new Farm implementation for factory to deploy
@@ -31,6 +31,6 @@ module.exports = async (deployer, network, accounts) => {
     await deployer.deploy(FarmFactory, Farm.address, AccessManager.address, assetRouter.address)
 
     await addAddress('access-manager', AccessManager.address)
-    await addAddress('traderjoe-router', assetRouter.address)
-    await addAddress('traderjoe-factory', FarmFactory.address)
+    await addAddress('velodrome-router', assetRouter.address)
+    await addAddress('velodrome-factory', FarmFactory.address)
 }

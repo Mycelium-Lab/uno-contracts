@@ -9,28 +9,25 @@ const { deployProxy, upgradeProxy } = require('@openzeppelin/truffle-upgrades')
 
 const timeMachine = require('ganache-time-traveler')
 
-const IUniswapV2Pair = artifacts.require('IUniswapV2Pair')
-const IUniswapV2Router01 = artifacts.require('IUniswapV2Router01')
-const IMasterJoe = artifacts.require('IMasterChefJoe')
+const IGauge = artifacts.require('IGauge')
+const IPool = artifacts.require('IPool')
+const IRouter = artifacts.require('IRouter')
 const IERC20 = artifacts.require('IERC20')
 
 const AccessManager = artifacts.require('UnoAccessManager')
 const FarmFactory = artifacts.require('UnoFarmFactory')
 
-const Farm = artifacts.require('UnoFarmTraderjoe')
-const AssetRouter = artifacts.require('UnoAssetRouterTraderjoe')
-const AssetRouterV2 = artifacts.require('UnoAssetRouterTraderjoeV2')
+const Farm = artifacts.require('UnoFarmVelodrome')
+const AssetRouter = artifacts.require('UnoAssetRouterVelodrome')
+const AssetRouterV2 = artifacts.require('UnoAssetRouterVelodromeV2')
 
-const traderjoeRouter = '0x60aE616a2155Ee3d9A68541Ba4544862310933d4'
-const pool = '0xf4003F4efBE8691B60249E6afbD307aBE7758adb' // wAVAX-USDC
-const pool2 = '0xFE15c2695F1F920da45C30AAE47d11dE51007AF9' // wAVAX-WETH.e
-const masterJoeAddress = '0x4483f0b6e2F5486D06958C20f8C39A7aBe87bf8F'
+const velodromeRouter = '0xa062aE8A9c5e11aaA026fc2670B0D65cCc8B2858'
+const gauge = '0x0F30716960F0618983Ac42bE2982FfEC181AF265' // velo-optimism
+const gauge2 = '0xE7630c9560C59CCBf5EEd8f33dd0ccA2E67a3981' // weth-usdc
 
-const JOEHolder = '0x799d4c5e577cf80221a076064a2054430d2af5cd' // has to be unlocked and hold 0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a
-
-const account1 = '0x05810778827F97e742AB4657660901F4d6FA9dCf' // has to be unlocked and hold 0xf4003F4efBE8691B60249E6afbD307aBE7758adb
-const account2 = '0x8a5658C67C5a28885E8DAc103B3400b186025E93' // has to be unlocked and hold 0xf4003F4efBE8691B60249E6afbD307aBE7758adb
-const account3 = '0xBF14DB80D9275FB721383a77C00Ae180fc40ae98' // has to be unlocked and hold wAVAX-USDC
+const account1 = '0xd43f3716CbB9386352880a9BD52f7F07aC01752B' // has to be unlocked and hold velo-optimism
+const account2 = '0xE4664Cb4DCCEB441D816cf80c0F9758036222aaD' // has to be unlocked and hold velo-optimism
+const account3 = '0xEbe80f029b1c02862B9E8a70a7e5317C06F62Cae' // has to be unlocked and hold eth + usdc
 
 const amounts = [
     new BN(100000),
@@ -66,7 +63,7 @@ async function expectRevertCustomError(promise, reason) {
         //  }
     }
 }
-contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
+contract('UnoAssetRouterVelodrome', (accounts) => {
     const admin = accounts[0]
     const pauser = accounts[1]
     const distributor = accounts[2]
@@ -75,13 +72,15 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
     let assetRouter
     let factory
 
+    let gaugeContract
+    let gauge2Contract
     let stakingToken
+    let stakingTokenIERC20
     let snapshotId
+    let isStable
 
     let tokenA
     let tokenB
-    let masterJoe
-    let pid
     let rewardToken
 
     const initReceipt = {}
@@ -127,34 +126,18 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
         initReceipt.receipt = _receipt
         initReceipt.logs = events
 
-        stakingToken = await IERC20.at(pool)
+        gaugeContract = await IGauge.at(gauge)
+        gauge2Contract = await IGauge.at(gauge2)
+        stakingToken = await IPool.at(await gaugeContract.stakingToken())
+        stakingTokenIERC20 = await IERC20.at(stakingToken.address)
+        isStable = await stakingToken.stable()
+        rewardToken = await gaugeContract.rewardToken()
 
-        const lpToken = await IUniswapV2Pair.at(pool)
-
-        const tokenAAddress = await lpToken.token0()
-        const tokenBAddress = await lpToken.token1()
+        const tokenAAddress = await stakingToken.token0()
+        const tokenBAddress = await stakingToken.token1()
 
         tokenA = await IERC20.at(tokenAAddress)
         tokenB = await IERC20.at(tokenBAddress)
-
-        masterJoe = await IMasterJoe.at(masterJoeAddress)
-        const poolLength = await masterJoe.poolLength()
-
-        for (let i = 0; i < poolLength.toNumber(); i++) {
-            const _lpToken = (await masterJoe.poolInfo(i)).lpToken
-            if (_lpToken.toString() === pool) {
-                pid = i
-                break
-            }
-        }
-
-        rewardToken = await masterJoe.JOE()
-
-        const JOEtoken = await IERC20.at(rewardToken)
-        const JOEbalance = await JOEtoken.balanceOf(JOEHolder)
-        await JOEtoken.transfer(masterJoeAddress, JOEbalance, {
-            from: JOEHolder
-        })
     })
 
     describe('Emits initialize event', () => {
@@ -198,10 +181,10 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             )
         })
 
-        it('Sets WAVAX', async () => {
+        it('Sets WETH', async () => {
             assert.equal(
-                (await assetRouter.WAVAX()).toLowerCase(),
-                '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7'.toLowerCase(),
+                (await assetRouter.WETH()).toLowerCase(),
+                '0x4200000000000000000000000000000000000006'.toLowerCase(),
                 'farmFactory not set'
             )
         })
@@ -210,7 +193,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
     describe('getTokens', () => {
         let tokens
         before(async () => {
-            tokens = await assetRouter.getTokens(pool)
+            tokens = await assetRouter.getTokens(gauge)
         })
         it('TokenA is correct', async () => {
             assert.equal(tokens[0], tokenA.address, 'TokenA is not correct')
@@ -247,17 +230,15 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             })
             it('prevents function calls', async () => {
                 await expectRevert(
-                    assetRouter.deposit(pool, 0, 0, 0, 0, account1, {
+                    assetRouter.deposit(gauge, 0, 0, 0, 0, account1, {
                         from: account1
                     }),
                     'Pausable: paused'
                 )
                 await expectRevert(
                     assetRouter.distribute(
-                        pool,
+                        gauge,
                         [
-                            { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 }
                         ],
@@ -289,17 +270,15 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             it('allows function calls', async () => {
                 // Pausable: paused check passes. revert for a different reason
                 await expectRevertCustomError(
-                    assetRouter.deposit(pool, 0, 0, 0, 0, account1, {
+                    assetRouter.deposit(gauge, 0, 0, 0, 0, account1, {
                         from: account1
                     }),
                     'NO_TOKENS_SENT'
                 )
                 await expectRevertCustomError(
                     assetRouter.distribute(
-                        pool,
+                        gauge,
                         [
-                            { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 }
                         ],
@@ -323,39 +302,39 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
         describe('reverts', () => {
             it('reverts if total amount provided is zero', async () => {
                 await expectRevertCustomError(
-                    assetRouter.deposit(pool, 0, 0, 0, 0, account1, {
+                    assetRouter.deposit(gauge, 0, 0, 0, 0, account1, {
                         from: account1
                     }),
                     'NO_TOKENS_SENT'
                 )
             })
         })
-        describe('deposit lp tokens in new pool', () => {
+        describe('deposit lp tokens in new gauge', () => {
             let receipt
             before(async () => {
-                await stakingToken.approve(assetRouter.address, amounts[0], {
+                await stakingTokenIERC20.approve(assetRouter.address, amounts[0], {
                     from: account1
                 })
                 receipt = await assetRouter.depositLP(
-                    pool,
+                    gauge,
                     amounts[0],
                     account1,
                     { from: account1 }
                 )
 
-                const farmAddress = await factory.Farms(pool)
+                const farmAddress = await factory.Farms(gauge)
                 farm = await Farm.at(farmAddress)
             })
             it('fires events', async () => {
                 expectEvent(receipt, 'Deposit', {
-                    lpPool: pool,
+                    lpPool: gauge,
                     sender: account1,
                     recipient: account1,
                     amount: amounts[0]
                 })
             })
             it('updates stakes', async () => {
-                const { stakeLP } = await assetRouter.userStake(account1, pool)
+                const { stakeLP } = await assetRouter.userStake(account1, gauge)
                 assert.equal(
                     stakeLP.toString(),
                     amounts[0].toString(),
@@ -364,7 +343,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             })
             it('updates totalDeposits', async () => {
                 const { totalDepositsLP } = await assetRouter.totalDeposits(
-                    pool
+                    gauge
                 )
                 assert.equal(
                     totalDepositsLP.toString(),
@@ -372,24 +351,22 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
                     "Total amount sent doesn't equal totalDeposits"
                 )
             })
-            it('stakes tokens in StakingRewards contract', async () => {
+            it('stakes tokens in gauge contract', async () => {
                 assert.equal(
-                    (
-                        await masterJoe.userInfo(pid, farm.address)
-                    ).amount.toString(),
+                    (await gaugeContract.balanceOf(farm.address)).toString(),
                     amounts[0].toString(),
-                    "Total amount sent doesn't equal StakingRewards farm balance"
+                    "Total amount sent doesn't equal gauge balance"
                 )
             })
         })
         describe('deposits from the same account add up', () => {
             let receipt
             before(async () => {
-                await stakingToken.approve(assetRouter.address, amounts[1], {
+                await stakingTokenIERC20.approve(assetRouter.address, amounts[1], {
                     from: account1
                 })
                 receipt = await assetRouter.depositLP(
-                    pool,
+                    gauge,
                     amounts[1],
                     account1,
                     { from: account1 }
@@ -397,14 +374,14 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             })
             it('fires events', async () => {
                 expectEvent(receipt, 'Deposit', {
-                    lpPool: pool,
+                    lpPool: gauge,
                     sender: account1,
                     recipient: account1,
                     amount: amounts[1]
                 })
             })
             it('updates stakes', async () => {
-                const { stakeLP } = await assetRouter.userStake(account1, pool)
+                const { stakeLP } = await assetRouter.userStake(account1, gauge)
                 assert.equal(
                     stakeLP.toString(),
                     amounts[0].add(amounts[1]).toString(),
@@ -413,7 +390,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             })
             it('updates totalDeposits', async () => {
                 const { totalDepositsLP } = await assetRouter.totalDeposits(
-                    pool
+                    gauge
                 )
                 assert.equal(
                     totalDepositsLP.toString(),
@@ -421,24 +398,22 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
                     "Total amount sent doesn't equal totalDeposits"
                 )
             })
-            it('stakes tokens in StakingRewards contract', async () => {
+            it('stakes tokens in gauge contract', async () => {
                 assert.equal(
-                    (
-                        await masterJoe.userInfo(pid, farm.address)
-                    ).amount.toString(),
+                    (await gaugeContract.balanceOf(farm.address)).toString(),
                     amounts[0].add(amounts[1]).toString(),
-                    "Total amount sent doesn't equal StakingRewards farm balance"
+                    "Total amount sent doesn't equal gauge balance"
                 )
             })
         })
         describe('deposit lp tokens from different account', () => {
             let receipt
             before(async () => {
-                await stakingToken.approve(assetRouter.address, amounts[2], {
+                await stakingTokenIERC20.approve(assetRouter.address, amounts[2], {
                     from: account2
                 })
                 receipt = await assetRouter.depositLP(
-                    pool,
+                    gauge,
                     amounts[2],
                     account2,
                     { from: account2 }
@@ -447,14 +422,14 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
 
             it('fires events', async () => {
                 expectEvent(receipt, 'Deposit', {
-                    lpPool: pool,
+                    lpPool: gauge,
                     sender: account2,
                     recipient: account2,
                     amount: amounts[2]
                 })
             })
             it("doesn't change stakes for account[0]", async () => {
-                const { stakeLP } = await assetRouter.userStake(account1, pool)
+                const { stakeLP } = await assetRouter.userStake(account1, gauge)
                 assert.equal(
                     stakeLP.toString(),
                     amounts[0].add(amounts[1]).toString(),
@@ -462,7 +437,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
                 )
             })
             it('updates stakes for account[1]', async () => {
-                const { stakeLP } = await assetRouter.userStake(account2, pool)
+                const { stakeLP } = await assetRouter.userStake(account2, gauge)
                 assert.equal(
                     stakeLP.toString(),
                     amounts[2].toString(),
@@ -471,7 +446,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             })
             it('updates totalDeposits', async () => {
                 const { totalDepositsLP } = await assetRouter.totalDeposits(
-                    pool
+                    gauge
                 )
                 assert.equal(
                     totalDepositsLP.toString(),
@@ -481,9 +456,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             })
             it('stakes tokens in StakingRewards contract', async () => {
                 assert.equal(
-                    (
-                        await masterJoe.userInfo(pid, farm.address)
-                    ).amount.toString(),
+                    (await gaugeContract.balanceOf(farm.address)).toString(),
                     amounts[0].add(amounts[1]).add(amounts[2]).toString(),
                     "Total amount sent doesn't equal StakingRewards farm balance"
                 )
@@ -492,11 +465,11 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
         describe('deposit lp tokens for different user', () => {
             let receipt
             before(async () => {
-                await stakingToken.approve(assetRouter.address, amounts[3], {
+                await stakingTokenIERC20.approve(assetRouter.address, amounts[3], {
                     from: account1
                 })
                 receipt = await assetRouter.depositLP(
-                    pool,
+                    gauge,
                     amounts[3],
                     account2,
                     { from: account1 }
@@ -504,14 +477,14 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             })
             it('fires event', async () => {
                 expectEvent(receipt, 'Deposit', {
-                    lpPool: pool,
+                    lpPool: gauge,
                     sender: account1,
                     recipient: account2,
                     amount: amounts[3]
                 })
             })
             it('doesnt change stakes for account1', async () => {
-                const { stakeLP } = await assetRouter.userStake(account1, pool)
+                const { stakeLP } = await assetRouter.userStake(account1, gauge)
                 assert.equal(
                     stakeLP.toString(),
                     amounts[0].add(amounts[1]).toString(),
@@ -519,7 +492,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
                 )
             })
             it('updates stakes for account2', async () => {
-                const { stakeLP } = await assetRouter.userStake(account2, pool)
+                const { stakeLP } = await assetRouter.userStake(account2, gauge)
                 assert.equal(
                     stakeLP.toString(),
                     amounts[2].add(amounts[3]).toString(),
@@ -528,7 +501,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             })
             it('updates totalDeposits', async () => {
                 const { totalDepositsLP } = await assetRouter.totalDeposits(
-                    pool
+                    gauge
                 )
                 assert.equal(
                     totalDepositsLP.toString(),
@@ -542,9 +515,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             })
             it('stakes tokens in StakingRewards contract', async () => {
                 assert.equal(
-                    (
-                        await masterJoe.userInfo(pid, farm.address)
-                    ).amount.toString(),
+                    (await gaugeContract.balanceOf(farm.address)).toString(),
                     amounts[0]
                         .add(amounts[1])
                         .add(amounts[2])
@@ -567,15 +538,17 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             let amountB
 
             before(async () => {
-                const routerContract = await IUniswapV2Router01.at(
-                    traderjoeRouter
+                const routerContract = await IRouter.at(
+                    velodromeRouter
                 )
-                await stakingToken.approve(traderjoeRouter, amounts[4], {
+                await stakingTokenIERC20.approve(velodromeRouter, amounts[4], {
                     from: account1
                 })
-                const tx = await routerContract.removeLiquidity(
+                const _balanceAbefore = await tokenA.balanceOf(account1)
+                const _balanceBbefore = await tokenB.balanceOf(account1); const tx = await routerContract.removeLiquidity(
                     tokenA.address,
                     tokenB.address,
+                    isStable,
                     amounts[4],
                     1,
                     1,
@@ -583,28 +556,20 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
                     '16415710000',
                     { from: account1 }
                 )
-                const event = tx.receipt.rawLogs.find(
-                    (l) => l.topics[0]
-                        === '0xdccd412f0b1252819cb1fd330b93224ca42612892bb3f4f789976e6d81936496'
-                )
-
-                amountA = web3.utils.hexToNumberString(
-                    event.data.substring(0, 66)
-                )
-                amountB = web3.utils.hexToNumberString(
-                    `0x${event.data.substring(66, 130)}`
-                )
 
                 balanceAbefore = await tokenA.balanceOf(account1)
-                balanceBbefore = await tokenB.balanceOf(account1);
+                balanceBbefore = await tokenB.balanceOf(account1)
+
+                amountA = balanceAbefore.sub(_balanceAbefore).toString()
+                amountB = balanceBbefore.sub(_balanceBbefore).toString();
                 ({
                     stakeLP: stakeLPBefore,
                     stakeA: stakeABefore,
                     stakeB: stakeBBefore
-                } = await assetRouter.userStake(account1, pool));
-                ({ totalDepositsLP: totalDepositsLPBefore } = await assetRouter.totalDeposits(pool))
+                } = await assetRouter.userStake(account1, gauge));
+                ({ totalDepositsLP: totalDepositsLPBefore } = await assetRouter.totalDeposits(gauge))
                 stakingRewardsBalanceBefore = new BN(
-                    (await masterJoe.userInfo(pid, farm.address))['0']
+                    (await gaugeContract.balanceOf(farm.address))
                 )
 
                 await tokenA.approve(assetRouter.address, amountA, {
@@ -615,34 +580,32 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
                 })
             })
             it('reverts if minAmountA > amountA || minAmountB > amountB', async () => {
-                await expectRevert(
+                await expectRevert.unspecified(
                     assetRouter.deposit(
-                        pool,
+                        gauge,
                         amountA,
                         new BN(1),
                         amountA,
                         0,
                         account1,
                         { from: account1 }
-                    ),
-                    'INSUFFICIENT_A_AMOUNT'
+                    )
                 )
-                await expectRevert(
+                await expectRevert.unspecified(
                     assetRouter.deposit(
-                        pool,
+                        gauge,
                         new BN(1),
                         amountB,
                         0,
                         amountB,
                         account1,
                         { from: account1 }
-                    ),
-                    'INSUFFICIENT_B_AMOUNT'
+                    )
                 )
             })
             it('fires events', async () => {
                 const receipt = await assetRouter.deposit(
-                    pool,
+                    gauge,
                     amountA,
                     amountB,
                     0,
@@ -651,7 +614,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
                     { from: account1 }
                 )
                 expectEvent(receipt, 'Deposit', {
-                    lpPool: pool,
+                    lpPool: gauge,
                     sender: account1,
                     recipient: account1
                 })
@@ -672,7 +635,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             it('updates stakes', async () => {
                 const { stakeLP, stakeA, stakeB } = await assetRouter.userStake(
                     account1,
-                    pool
+                    gauge
                 )
                 assert.ok(
                     stakeLP.gt(stakeLPBefore),
@@ -689,7 +652,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             })
             it('updates totalDeposits', async () => {
                 const { totalDepositsLP } = await assetRouter.totalDeposits(
-                    pool
+                    gauge
                 )
                 assert.ok(
                     totalDepositsLP.gt(totalDepositsLPBefore),
@@ -698,9 +661,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             })
             it('stakes tokens in StakingRewards contract', async () => {
                 assert.ok(
-                    new BN(
-                        (await masterJoe.userInfo(pid, farm.address))['0']
-                    ).gt(stakingRewardsBalanceBefore),
+                    new BN((await gaugeContract.balanceOf(farm.address))).gt(stakingRewardsBalanceBefore),
                     'StakingRewards balance was not increased'
                 )
             })
@@ -711,7 +672,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             it('reverts if the pool doesnt exist', async () => {
                 await expectRevertCustomError(
                     assetRouter.withdrawLP(
-                        pool2,
+                        gauge2,
                         amounts[0],
                         account1,
                         { from: account1 }
@@ -721,7 +682,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             })
             it('reverts if the stake is zero', async () => {
                 await expectRevertCustomError(
-                    assetRouter.withdrawLP(pool, new BN(1), admin, {
+                    assetRouter.withdrawLP(gauge, new BN(1), admin, {
                         from: admin
                     }),
                     'INSUFFICIENT_BALANCE'
@@ -730,7 +691,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             it('reverts if the withdraw amount requested is more than user stake', async () => {
                 await expectRevertCustomError(
                     assetRouter.withdrawLP(
-                        pool,
+                        gauge,
                         constants.MAX_UINT256,
                         account1,
                         { from: account1 }
@@ -740,7 +701,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             })
             it('reverts if amount provided is 0', async () => {
                 await expectRevertCustomError(
-                    assetRouter.withdrawLP(pool, 0, account1, {
+                    assetRouter.withdrawLP(gauge, 0, account1, {
                         from: account1
                     }),
                     'INSUFFICIENT_AMOUNT'
@@ -757,25 +718,25 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             let receipt2
 
             before(async () => {
-                balance1before = await stakingToken.balanceOf(account1)
-                balance2before = await stakingToken.balanceOf(account2);
+                balance1before = await stakingTokenIERC20.balanceOf(account1)
+                balance2before = await stakingTokenIERC20.balanceOf(account2);
                 ({ stakeLP: stake1before } = await assetRouter.userStake(
                     account1,
-                    pool
+                    gauge
                 ));
                 ({ stakeLP: stake2before } = await assetRouter.userStake(
                     account2,
-                    pool
+                    gauge
                 ))
 
                 receipt1 = await assetRouter.withdrawLP(
-                    pool,
+                    gauge,
                     amounts[0],
                     account1,
                     { from: account1 }
                 )
                 receipt2 = await assetRouter.withdrawLP(
-                    pool,
+                    gauge,
                     amounts[2],
                     account2,
                     { from: account2 }
@@ -783,13 +744,13 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             })
             it('fires events', async () => {
                 expectEvent(receipt1, 'Withdraw', {
-                    lpPool: pool,
+                    lpPool: gauge,
                     sender: account1,
                     recipient: account1,
                     amount: amounts[0]
                 })
                 expectEvent(receipt2, 'Withdraw', {
-                    lpPool: pool,
+                    lpPool: gauge,
                     sender: account2,
                     recipient: account2,
                     amount: amounts[2]
@@ -797,7 +758,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             })
 
             it('correctly updates userStake for account1', async () => {
-                const { stakeLP } = await assetRouter.userStake(account1, pool)
+                const { stakeLP } = await assetRouter.userStake(account1, gauge)
                 assert.equal(
                     stakeLP.toString(),
                     stake1before.sub(amounts[0]).toString(),
@@ -805,7 +766,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
                 )
             })
             it('correctly updates userStake for account2', async () => {
-                const { stakeLP } = await assetRouter.userStake(account2, pool)
+                const { stakeLP } = await assetRouter.userStake(account2, gauge)
                 assert.equal(
                     stakeLP.toString(),
                     stake2before.sub(amounts[2]).toString(),
@@ -814,7 +775,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             })
             it('correctly updates totalDeposits', async () => {
                 const { totalDepositsLP } = await assetRouter.totalDeposits(
-                    pool
+                    gauge
                 )
                 assert.equal(
                     totalDepositsLP.toString(),
@@ -826,13 +787,13 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
                 )
             })
             it('transfers tokens to user', async () => {
-                const balance1after = await stakingToken.balanceOf(account1)
+                const balance1after = await stakingTokenIERC20.balanceOf(account1)
                 assert.equal(
                     balance1after.sub(balance1before).toString(),
                     amounts[0].toString(),
                     'Tokens withdrawn for account1 do not equal provided in the withdraw function'
                 )
-                const balance2after = await stakingToken.balanceOf(account2)
+                const balance2after = await stakingTokenIERC20.balanceOf(account2)
                 assert.equal(
                     balance2after.sub(balance2before),
                     amounts[2].toString(),
@@ -848,19 +809,19 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
 
             let receipt
             before(async () => {
-                balance1before = await stakingToken.balanceOf(account1)
-                balance2before = await stakingToken.balanceOf(account2);
+                balance1before = await stakingTokenIERC20.balanceOf(account1)
+                balance2before = await stakingTokenIERC20.balanceOf(account2);
                 ({ stakeLP: stake1before } = await assetRouter.userStake(
                     account1,
-                    pool
+                    gauge
                 ));
                 ({ stakeLP: stake2before } = await assetRouter.userStake(
                     account2,
-                    pool
+                    gauge
                 ))
 
                 receipt = await assetRouter.withdrawLP(
-                    pool,
+                    gauge,
                     amounts[1],
                     account2,
                     { from: account1 }
@@ -868,14 +829,14 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             })
             it('fires events', async () => {
                 expectEvent(receipt, 'Withdraw', {
-                    lpPool: pool,
+                    lpPool: gauge,
                     sender: account1,
                     recipient: account2,
                     amount: amounts[1]
                 })
             })
             it('correctly changes userStake for account1', async () => {
-                const { stakeLP } = await assetRouter.userStake(account1, pool)
+                const { stakeLP } = await assetRouter.userStake(account1, gauge)
                 assert.equal(
                     stakeLP.toString(),
                     stake1before.sub(amounts[1]).toString(),
@@ -883,7 +844,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
                 )
             })
             it('doesnt change stake for account2', async () => {
-                const { stakeLP } = await assetRouter.userStake(account2, pool)
+                const { stakeLP } = await assetRouter.userStake(account2, gauge)
                 assert.equal(
                     stakeLP.toString(),
                     stake2before.toString(),
@@ -891,13 +852,13 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
                 )
             })
             it('transfers tokens to account2', async () => {
-                const balance1after = await stakingToken.balanceOf(account1)
+                const balance1after = await stakingTokenIERC20.balanceOf(account1)
                 assert.equal(
                     balance1after.sub(balance1before).toString(),
                     '0',
                     'Tokens were withdrawn for account1'
                 )
-                const balance2after = await stakingToken.balanceOf(account2)
+                const balance2after = await stakingTokenIERC20.balanceOf(account2)
                 assert.equal(
                     balance2after.sub(balance2before).toString(),
                     amounts[1].toString(),
@@ -924,14 +885,14 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
                     stakeLP: stakeLP1,
                     stakeA: stakeA1,
                     stakeB: stakeB1
-                } = await assetRouter.userStake(account1, pool));
+                } = await assetRouter.userStake(account1, gauge));
                 ({
                     stakeLP: stakeLP2,
                     stakeA: stakeA2,
                     stakeB: stakeB2
-                } = await assetRouter.userStake(account2, pool))
+                } = await assetRouter.userStake(account2, gauge))
                 receipt = await assetRouter.withdraw(
-                    pool,
+                    gauge,
                     stakeLP1,
                     0,
                     0,
@@ -941,7 +902,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             })
             it('fires events', async () => {
                 expectEvent(receipt, 'Withdraw', {
-                    lpPool: pool,
+                    lpPool: gauge,
                     sender: account1,
                     recipient: account1,
                     amount: stakeLP1
@@ -950,7 +911,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             it('correctly updates account1 stake', async () => {
                 const { stakeLP, stakeA, stakeB } = await assetRouter.userStake(
                     account1,
-                    pool
+                    gauge
                 )
                 assert.equal(stakeLP.toString(), '0', 'stakeLP is wrong')
                 assert.equal(stakeA.toString(), '0', 'stakeA is wrong')
@@ -959,7 +920,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             it('doesnt update account2 stake', async () => {
                 const { stakeLP, stakeA, stakeB } = await assetRouter.userStake(
                     account2,
-                    pool
+                    gauge
                 )
                 assert.equal(stakeLP.toString(), stakeLP2, 'stakeLP is wrong')
                 assert.equal(stakeA.toString(), stakeA2, 'stakeA is wrong')
@@ -1000,14 +961,14 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
                     stakeLP: stakeLP1,
                     stakeA: stakeA1,
                     stakeB: stakeB1
-                } = await assetRouter.userStake(account1, pool));
+                } = await assetRouter.userStake(account1, gauge));
                 ({
                     stakeLP: stakeLP2,
                     stakeA: stakeA2,
                     stakeB: stakeB2
-                } = await assetRouter.userStake(account2, pool))
+                } = await assetRouter.userStake(account2, gauge))
                 receipt = await assetRouter.withdraw(
-                    pool,
+                    gauge,
                     stakeLP2,
                     0,
                     0,
@@ -1017,7 +978,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             })
             it('fires events', async () => {
                 expectEvent(receipt, 'Withdraw', {
-                    lpPool: pool,
+                    lpPool: gauge,
                     sender: account2,
                     recipient: account1,
                     amount: stakeLP2
@@ -1026,7 +987,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             it('correctly updates account2 stake', async () => {
                 const { stakeLP, stakeA, stakeB } = await assetRouter.userStake(
                     account2,
-                    pool
+                    gauge
                 )
                 assert.equal(stakeLP.toString(), '0', 'stakeLP is wrong')
                 assert.equal(stakeA.toString(), '0', 'stakeA is wrong')
@@ -1035,7 +996,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             it('doesnt update account1 stake', async () => {
                 const { stakeLP, stakeA, stakeB } = await assetRouter.userStake(
                     account1,
-                    pool
+                    gauge
                 )
                 assert.equal(stakeLP.toString(), stakeLP1, 'stakeLP is wrong')
                 assert.equal(stakeA.toString(), stakeA1, 'stakeA is wrong')
@@ -1100,10 +1061,8 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             it('reverts if called not by distributor', async () => {
                 await expectRevertCustomError(
                     assetRouter.distribute(
-                        pool,
+                        gauge,
                         [
-                            { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 }
                         ],
@@ -1116,10 +1075,8 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             it('reverts if pool doesnt exist', async () => {
                 await expectRevertCustomError(
                     assetRouter.distribute(
-                        pool2,
+                        gauge2,
                         [
-                            { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 }
                         ],
@@ -1132,10 +1089,8 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             it('reverts if there is no liquidity in the pool', async () => {
                 await expectRevertCustomError(
                     assetRouter.distribute(
-                        pool,
+                        gauge,
                         [
-                            { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 },
                             { route: [], amountOutMin: 0 }
                         ],
@@ -1152,23 +1107,23 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             let balance2
             let feeCollectorRewardBalanceBefore
             before(async () => {
-                balance1 = await stakingToken.balanceOf(account1)
-                await stakingToken.approve(assetRouter.address, balance1, {
+                balance1 = await stakingTokenIERC20.balanceOf(account1)
+                await stakingTokenIERC20.approve(assetRouter.address, balance1, {
                     from: account1
                 })
                 await assetRouter.depositLP(
-                    pool,
+                    gauge,
                     balance1,
                     account1,
                     { from: account1 }
                 )
 
-                balance2 = await stakingToken.balanceOf(account2)
-                await stakingToken.approve(assetRouter.address, balance2, {
+                balance2 = await stakingTokenIERC20.balanceOf(account2)
+                await stakingTokenIERC20.approve(assetRouter.address, balance2, {
                     from: account2
                 })
                 await assetRouter.depositLP(
-                    pool,
+                    gauge,
                     balance2,
                     account2,
                     { from: account2 }
@@ -1180,7 +1135,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
                 await time.increase(5000000)
 
                 receipt = await assetRouter.distribute(
-                    pool,
+                    gauge,
                     [
                         {
                             route: [
@@ -1197,27 +1152,25 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
                                 tokenB.address
                             ],
                             amountOutMin: 0
-                        },
-                        { route: [], amountOutMin: 0 },
-                        { route: [], amountOutMin: 0 }
+                        }
                     ],
                     feeCollector,
                     { from: distributor }
                 )
             })
             it('emits event', async () => {
-                expectEvent(receipt, 'Distribute', { lpPool: pool })
+                expectEvent(receipt, 'Distribute', { lpPool: gauge })
             })
             it('increases token stakes', async () => {
                 const { stakeLP: stake1 } = await assetRouter.userStake(
                     account1,
-                    pool
+                    gauge
                 )
                 assert.ok(stake1.gt(balance1), 'Stake1 not increased')
 
                 const { stakeLP: stake2 } = await assetRouter.userStake(
                     account2,
-                    pool
+                    gauge
                 )
                 assert.ok(stake2.gt(balance2), 'Stake2 not increased')
             })
@@ -1234,7 +1187,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             it('reverts if passed wrong reward token', async () => {
                 await expectRevertCustomError(
                     assetRouter.distribute(
-                        pool,
+                        gauge,
                         [
                             {
                                 route: [
@@ -1251,9 +1204,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
                                     tokenB.address
                                 ],
                                 amountOutMin: 0
-                            },
-                            { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 }
+                            }
                         ],
                         feeCollector,
                         { from: distributor }
@@ -1262,7 +1213,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
                 )
                 await expectRevertCustomError(
                     assetRouter.distribute(
-                        pool,
+                        gauge,
                         [
                             {
                                 route: [
@@ -1279,9 +1230,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
                                     tokenB.address
                                 ],
                                 amountOutMin: 0
-                            },
-                            { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 }
+                            }
                         ],
                         feeCollector,
                         { from: distributor }
@@ -1292,7 +1241,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             it('reverts if passed wrong tokenA in reward route', async () => {
                 await expectRevertCustomError(
                     assetRouter.distribute(
-                        pool,
+                        gauge,
                         [
                             {
                                 route: [
@@ -1309,9 +1258,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
                                     tokenB.address
                                 ],
                                 amountOutMin: 0
-                            },
-                            { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 }
+                            }
                         ],
                         feeCollector,
                         { from: distributor }
@@ -1322,7 +1269,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             it('reverts if passed wrong tokenB in reward route', async () => {
                 await expectRevertCustomError(
                     assetRouter.distribute(
-                        pool,
+                        gauge,
                         [
                             {
                                 route: [
@@ -1339,9 +1286,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
                                     constants.ZERO_ADDRESS
                                 ],
                                 amountOutMin: 0
-                            },
-                            { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 }
+                            }
                         ],
                         feeCollector,
                         { from: distributor }
@@ -1352,30 +1297,30 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
         })
         describe('withdraws', () => {
             it('withdraws all tokens for account1', async () => {
-                let { stakeLP } = await assetRouter.userStake(account1, pool)
+                let { stakeLP } = await assetRouter.userStake(account1, gauge)
                 await assetRouter.withdrawLP(
-                    pool,
+                    gauge,
                     stakeLP,
                     account1,
                     { from: account1 }
                 );
-                ({ stakeLP } = await assetRouter.userStake(account1, pool))
+                ({ stakeLP } = await assetRouter.userStake(account1, gauge))
                 assert.equal(stakeLP.toString(), '0', 'acount1 stake not 0')
             })
             it('withdraws tokens for account2', async () => {
-                let { stakeLP } = await assetRouter.userStake(account2, pool)
+                let { stakeLP } = await assetRouter.userStake(account2, gauge)
                 await assetRouter.withdrawLP(
-                    pool,
+                    gauge,
                     stakeLP,
                     account2,
                     { from: account2 }
                 );
-                ({ stakeLP } = await assetRouter.userStake(account2, pool))
+                ({ stakeLP } = await assetRouter.userStake(account2, gauge))
                 assert.equal(stakeLP.toString(), '0', 'acount2 stake not 0')
             })
             it('not leaves any tokens', async () => {
                 const { totalDepositsLP } = await assetRouter.totalDeposits(
-                    pool
+                    gauge
                 )
                 assert.equal(
                     totalDepositsLP.toString(),
@@ -1398,48 +1343,33 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             let tokenBAddress
             let token
             let stakingRewardsBalanceBefore
-            let ETHPid
 
             before(async () => {
                 amountETH = new BN(4000000000000)
                 amountToken = new BN(40000000000);
-                [tokenAAddress, tokenBAddress] = await assetRouter.getTokens(
-                    pool
-                )
+                [tokenAAddress, tokenBAddress] = await assetRouter.getTokens(gauge2)
 
-                ethPooltokenA = await IUniswapV2Pair.at(tokenAAddress)
-                ethPooltokenB = await IUniswapV2Pair.at(tokenBAddress)
+                ethPooltokenA = await IERC20.at(tokenAAddress)
+                ethPooltokenB = await IERC20.at(tokenBAddress)
 
-                const poolLength = await masterJoe.poolLength()
-
-                for (let i = 0; i < poolLength.toNumber(); i++) {
-                    const lpToken = (await masterJoe.poolInfo(i)).lpToken
-                    if (lpToken.toString() === pool) {
-                        ETHPid = i
-                        break
-                    }
-                }
-
-                const farmAddress = await factory.Farms(pool)
+                const farmAddress = await factory.Farms(gauge2)
                 if (farmAddress === constants.ZERO_ADDRESS) {
                     stakingRewardsBalanceBefore = new BN(0)
                 } else {
                     const farmETH = await Farm.at(farmAddress)
-                    stakingRewardsBalanceBefore = new BN(
-                        (await masterJoe.userInfo(ETHPid, farmETH.address))['0']
-                    )
+                    stakingRewardsBalanceBefore = new BN((await gauge2Contract.balanceOf(farmETH.address)))
                 }
 
                 ({
                     stakeLP: stakeLPBefore,
                     stakeA: stakeABefore,
                     stakeB: stakeBBefore
-                } = await assetRouter.userStake(account3, pool));
-                ({ totalDepositsLP: totalDepositsLPBefore } = await assetRouter.totalDeposits(pool))
+                } = await assetRouter.userStake(account3, gauge2));
+                ({ totalDepositsLP: totalDepositsLPBefore } = await assetRouter.totalDeposits(gauge2))
 
                 if (
                     tokenAAddress.toLowerCase()
-                    === '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7'.toLowerCase()
+                    === '0x4200000000000000000000000000000000000006'.toLowerCase()
                 ) {
                     await ethPooltokenB.approve(
                         assetRouter.address,
@@ -1461,7 +1391,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             it('fires events', async () => {
                 ethBalanceBefore = new BN(await web3.eth.getBalance(account3))
                 const receipt = await assetRouter.depositETH(
-                    pool,
+                    gauge2,
                     amountToken,
                     0,
                     0,
@@ -1480,13 +1410,13 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
                 ETHSpentOnGas = gasUsed.mul(effectiveGasPrice)
 
                 expectEvent(receipt, 'Deposit', {
-                    lpPool: pool,
+                    lpPool: gauge2,
                     sender: account3,
                     recipient: account3
                 })
             })
             it('withdraws tokens and ETH from balance', async () => {
-                const { stakeA: stakeAAfter, stakeB: stakeBAfter } = await assetRouter.userStake(account3, pool)
+                const { stakeA: stakeAAfter, stakeB: stakeBAfter } = await assetRouter.userStake(account3, gauge2)
 
                 let tokenStakeDiff
                 let ETHStakeDiff
@@ -1506,25 +1436,23 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
                 assert.ok(!ETHStakeDiff.isNeg(), 'ETH Stake not increased')
             })
             it('updates stakes', async () => {
-                const { stakeLP } = await assetRouter.userStake(account3, pool)
+                const { stakeLP } = await assetRouter.userStake(account3, gauge2)
                 assert.ok(stakeLP.gt(stakeLPBefore), 'Stake not increased')
             })
             it('updates totalDeposits', async () => {
                 const { totalDepositsLP } = await assetRouter.totalDeposits(
-                    pool
+                    gauge2
                 )
                 assert.ok(
                     totalDepositsLP.gt(totalDepositsLPBefore),
                     'Stake not increased'
                 )
             })
-            it('stakes tokens in masterJoe', async () => {
-                const farmAddress = await factory.Farms(pool)
+            it('stakes tokens in gauge', async () => {
+                const farmAddress = await factory.Farms(gauge2)
                 const farmETH = await Farm.at(farmAddress)
 
-                const stakingRewardsBalance = new BN(
-                    (await masterJoe.userInfo(ETHPid, farmETH.address))['0']
-                )
+                const stakingRewardsBalance = new BN(await gauge2Contract.balanceOf(farmETH.address))
                 assert.ok(
                     stakingRewardsBalance.gt(stakingRewardsBalanceBefore),
                     'staking balance not increased'
@@ -1544,46 +1472,33 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
             let stakingRewardsBalanceBefore
             let ethBalanceBefore
             let ETHSpentOnGas
-            let ETHPid
 
             before(async () => {
                 [tokenAAddress, tokenBAddress] = await assetRouter.getTokens(
-                    pool
+                    gauge2
                 )
 
-                ethPooltokenA = await IUniswapV2Pair.at(tokenAAddress)
-                ethPooltokenB = await IUniswapV2Pair.at(tokenBAddress);
-                ({ totalDepositsLP: totalDepositsLPBefore } = await assetRouter.totalDeposits(pool))
+                ethPooltokenA = await IERC20.at(tokenAAddress)
+                ethPooltokenB = await IERC20.at(tokenBAddress);
+                ({ totalDepositsLP: totalDepositsLPBefore } = await assetRouter.totalDeposits(gauge2))
 
-                const poolLength = await masterJoe.poolLength()
-
-                for (let i = 0; i < poolLength.toNumber(); i++) {
-                    const lpToken = (await masterJoe.poolInfo(i)).lpToken
-                    if (lpToken.toString() === pool) {
-                        ETHPid = i
-                        break
-                    }
-                }
-
-                const farmAddress = await factory.Farms(pool)
+                const farmAddress = await factory.Farms(gauge2)
                 if (farmAddress === constants.ZERO_ADDRESS) {
                     stakingRewardsBalanceBefore = new BN(0)
                 } else {
                     const farmETH = await Farm.at(farmAddress)
-                    stakingRewardsBalanceBefore = new BN(
-                        (await masterJoe.userInfo(ETHPid, farmETH.address))['0']
-                    )
+                    stakingRewardsBalanceBefore = new BN(await gauge2Contract.balanceOf(farmETH.address))
                 }
 
                 ({
                     stakeLP: stakeLPBefore,
                     stakeA: stakeABefore,
                     stakeB: stakeBBefore
-                } = await assetRouter.userStake(account3, pool))
+                } = await assetRouter.userStake(account3, gauge2))
 
                 if (
                     tokenAAddress.toLowerCase()
-                    === '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7'.toLowerCase()
+                    === '0x4200000000000000000000000000000000000006'.toLowerCase()
                 ) {
                     token = ethPooltokenB
                     tokenBalanceBefore = await token.balanceOf(account3)
@@ -1596,7 +1511,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
                 ethBalanceBefore = new BN(await web3.eth.getBalance(account3))
 
                 const receipt = await assetRouter.withdrawETH(
-                    pool,
+                    gauge2,
                     stakeLPBefore,
                     0,
                     0,
@@ -1614,18 +1529,18 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
                 ETHSpentOnGas = gasUsed.mul(effectiveGasPrice)
 
                 expectEvent(receipt, 'Withdraw', {
-                    lpPool: pool,
+                    lpPool: gauge2,
                     sender: account3,
                     recipient: account3
                 })
             })
             it('updates stakes', async () => {
-                const { stakeLP } = await assetRouter.userStake(account3, pool)
+                const { stakeLP } = await assetRouter.userStake(account3, gauge2)
                 assert.ok(stakeLPBefore.gt(stakeLP), 'Stake not reduced')
             })
             it('updates totalDeposits', async () => {
                 const { totalDepositsLP } = await assetRouter.totalDeposits(
-                    pool
+                    gauge2
                 )
                 assert.ok(
                     totalDepositsLPBefore.gt(totalDepositsLP),
@@ -1633,19 +1548,17 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
                 )
             })
             it('unstakes tokens from StakingRewards contract', async () => {
-                const farmAddress = await factory.Farms(pool)
+                const farmAddress = await factory.Farms(gauge2)
                 const farmETH = await Farm.at(farmAddress)
 
-                const stakingRewardsBalance = new BN(
-                    (await masterJoe.userInfo(ETHPid, farmETH.address))['0']
-                )
+                const stakingRewardsBalance = new BN(await gauge2Contract.balanceOf(farmETH.address))
                 assert.ok(
                     stakingRewardsBalanceBefore.gt(stakingRewardsBalance),
                     'StakingRewards balance not increased'
                 )
             })
             it('adds tokens and ETH to balance', async () => {
-                const { stakeA: stakeAAfter, stakeB: stakeBAfter } = await assetRouter.userStake(account3, pool)
+                const { stakeA: stakeAAfter, stakeB: stakeBAfter } = await assetRouter.userStake(account3, gauge2)
                 const tokenBalanceAfter = await token.balanceOf(account3)
                 const ethBalanceAfter = new BN(
                     await web3.eth.getBalance(account3)
@@ -1661,7 +1574,7 @@ contract('UnoAssetRouterTraderjoe for MasterChefBoost', (accounts) => {
 
                 if (
                     tokenAAddress.toLowerCase()
-                    === '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7'.toLowerCase()
+                    === '0x4200000000000000000000000000000000000006'.toLowerCase()
                 ) {
                     tokenStakeDiff = stakeBAfter.sub(stakeBBefore)
                     ETHStakeDiff = stakeAAfter.sub(stakeABefore)

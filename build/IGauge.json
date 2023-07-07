@@ -1,0 +1,1928 @@
+{
+  "contractName": "IGauge",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "NotAlive",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NotAuthorized",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NotVoter",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "RewardRateTooHigh",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ZeroAmount",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ZeroRewardRate",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "spender",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "value",
+          "type": "uint256"
+        }
+      ],
+      "name": "Approval",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "from",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "claimed0",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "claimed1",
+          "type": "uint256"
+        }
+      ],
+      "name": "ClaimFees",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "from",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "ClaimRewards",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "from",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "Deposit",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "from",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "NotifyReward",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "from",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "value",
+          "type": "uint256"
+        }
+      ],
+      "name": "Transfer",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "from",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "Withdraw",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "spender",
+          "type": "address"
+        }
+      ],
+      "name": "allowance",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "spender",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "approve",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "balanceOf",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "totalSupply",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "transfer",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "from",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "transferFrom",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "rewardToken",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "rewardPerToken",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "_rewardPerToken",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "lastTimeRewardApplicable",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "_time",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_account",
+          "type": "address"
+        }
+      ],
+      "name": "earned",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "_earned",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "left",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "_left",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "isPool",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "_isPool",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "stakingToken",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "_pool",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_account",
+          "type": "address"
+        }
+      ],
+      "name": "getReward",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_amount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "_recipient",
+          "type": "address"
+        }
+      ],
+      "name": "deposit",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "deposit",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "withdraw",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "notifyRewardAmount",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "metadata": "{\"compiler\":{\"version\":\"0.8.10+commit.fc410830\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[],\"name\":\"NotAlive\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"NotAuthorized\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"NotVoter\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"RewardRateTooHigh\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"ZeroAmount\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"ZeroRewardRate\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"spender\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"Approval\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"claimed0\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"claimed1\",\"type\":\"uint256\"}],\"name\":\"ClaimFees\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"ClaimRewards\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"Deposit\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"NotifyReward\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"Transfer\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"Withdraw\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"spender\",\"type\":\"address\"}],\"name\":\"allowance\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"spender\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"approve\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"balanceOf\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_amount\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"_recipient\",\"type\":\"address\"}],\"name\":\"deposit\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_amount\",\"type\":\"uint256\"}],\"name\":\"deposit\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_account\",\"type\":\"address\"}],\"name\":\"earned\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"_earned\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_account\",\"type\":\"address\"}],\"name\":\"getReward\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"isPool\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"_isPool\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"lastTimeRewardApplicable\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"_time\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"left\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"_left\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"notifyRewardAmount\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"rewardPerToken\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"_rewardPerToken\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"rewardToken\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"stakingToken\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"_pool\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"totalSupply\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"transfer\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"transferFrom\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_amount\",\"type\":\"uint256\"}],\"name\":\"withdraw\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{\"allowance(address,address)\":{\"details\":\"Returns the remaining number of tokens that `spender` will be allowed to spend on behalf of `owner` through {transferFrom}. This is zero by default. This value changes when {approve} or {transferFrom} are called.\"},\"approve(address,uint256)\":{\"details\":\"Sets `amount` as the allowance of `spender` over the caller's tokens. Returns a boolean value indicating whether the operation succeeded. IMPORTANT: Beware that changing an allowance with this method brings the risk that someone may use both the old and the new allowance by unfortunate transaction ordering. One possible solution to mitigate this race condition is to first reduce the spender's allowance to 0 and set the desired value afterwards: https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729 Emits an {Approval} event.\"},\"balanceOf(address)\":{\"details\":\"Returns the amount of tokens owned by `account`.\"},\"deposit(uint256)\":{\"params\":{\"_amount\":\".\"}},\"deposit(uint256,address)\":{\"params\":{\"_amount\":\".\",\"_recipient\":\"Recipient to give balance to\"}},\"getReward(address)\":{\"details\":\"Throws if not called by same address or voter.\",\"params\":{\"_account\":\".\"}},\"notifyRewardAmount(uint256)\":{\"details\":\"Notifies gauge of gauge rewards. Assumes gauge reward tokens is 18 decimals.      If not 18 decimals, rewardRate may have rounding issues.\"},\"totalSupply()\":{\"details\":\"Returns the amount of tokens in existence.\"},\"transfer(address,uint256)\":{\"details\":\"Moves `amount` tokens from the caller's account to `to`. Returns a boolean value indicating whether the operation succeeded. Emits a {Transfer} event.\"},\"transferFrom(address,address,uint256)\":{\"details\":\"Moves `amount` tokens from `from` to `to` using the allowance mechanism. `amount` is then deducted from the caller's allowance. Returns a boolean value indicating whether the operation succeeded. Emits a {Transfer} event.\"},\"withdraw(uint256)\":{\"params\":{\"_amount\":\".\"}}},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{\"deposit(uint256)\":{\"notice\":\"Deposit LP tokens into gauge for msg.sender\"},\"deposit(uint256,address)\":{\"notice\":\"Deposit LP tokens into gauge for any user\"},\"earned(address)\":{\"notice\":\"Returns accrued balance to date from last claim / first deposit.\"},\"getReward(address)\":{\"notice\":\"Retrieve rewards for an address.\"},\"isPool()\":{\"notice\":\"Returns if gauge is linked to a legitimate Velodrome pool\"},\"lastTimeRewardApplicable()\":{\"notice\":\"Returns the last time the reward was modified or periodFinish if the reward has ended\"},\"withdraw(uint256)\":{\"notice\":\"Withdraw LP tokens for user\"}},\"version\":1}},\"settings\":{\"compilationTarget\":{\"project:/contracts/interfaces/IGauge.sol\":\"IGauge\"},\"evmVersion\":\"london\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[]},\"sources\":{\"@openzeppelin/contracts/token/ERC20/IERC20.sol\":{\"keccak256\":\"0x9750c6b834f7b43000631af5cc30001c5f547b3ceb3635488f140f60e897ea6b\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://5a7d5b1ef5d8d5889ad2ed89d8619c09383b80b72ab226e0fe7bde1636481e34\",\"dweb:/ipfs/QmebXWgtEfumQGBdVeM6c71McLixYXQP5Bk6kKXuoY4Bmr\"]},\"project:/contracts/interfaces/IGauge.sol\":{\"keccak256\":\"0x5b82cdd7496b1b6d55326aab501d3783154d8103a2b6ec0e6b592bda67ad71c6\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://63aed220ab004745a3f44fc12a6fd09af623ad7771fe385719b671dcbc7f2764\",\"dweb:/ipfs/QmQ3yBeTN4uLF49dJhcdbgDJosAhUEUvnjkq2UeXHazCPi\"]}},\"version\":1}",
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "immutableReferences": {},
+  "generatedSources": [],
+  "deployedGeneratedSources": [],
+  "sourceMap": "",
+  "deployedSourceMap": "",
+  "source": "// SPDX-License-Identifier: MIT\r\npragma solidity 0.8.10;\r\nimport '@openzeppelin/contracts/token/ERC20/IERC20.sol';\r\ninterface IGauge is IERC20 {\r\n    error NotAlive();\r\n    error NotAuthorized();\r\n    error NotVoter();\r\n    error RewardRateTooHigh();\r\n    error ZeroAmount();\r\n    error ZeroRewardRate();\r\n\r\n    event Deposit(address indexed from, address indexed to, uint256 amount);\r\n    event Withdraw(address indexed from, uint256 amount);\r\n    event NotifyReward(address indexed from, uint256 amount);\r\n    event ClaimFees(address indexed from, uint256 claimed0, uint256 claimed1);\r\n    event ClaimRewards(address indexed from, uint256 amount);\r\n\r\n    function rewardToken() external view returns (address);\r\n\r\n    function rewardPerToken() external view returns (uint256 _rewardPerToken);\r\n\r\n    /// @notice Returns the last time the reward was modified or periodFinish if the reward has ended\r\n    function lastTimeRewardApplicable() external view returns (uint256 _time);\r\n\r\n    /// @notice Returns accrued balance to date from last claim / first deposit.\r\n    function earned(address _account) external view returns (uint256 _earned);\r\n\r\n    function left() external view returns (uint256 _left);\r\n\r\n    /// @notice Returns if gauge is linked to a legitimate Velodrome pool\r\n    function isPool() external view returns (bool _isPool);\r\n\r\n    function stakingToken() external view returns (address _pool);\r\n\r\n    /// @notice Retrieve rewards for an address.\r\n    /// @dev Throws if not called by same address or voter.\r\n    /// @param _account .\r\n    function getReward(address _account) external;\r\n\r\n    /// @notice Deposit LP tokens into gauge for msg.sender\r\n    /// @param _amount .\r\n    function deposit(uint256 _amount) external;\r\n\r\n    /// @notice Deposit LP tokens into gauge for any user\r\n    /// @param _amount .\r\n    /// @param _recipient Recipient to give balance to\r\n    function deposit(uint256 _amount, address _recipient) external;\r\n\r\n    /// @notice Withdraw LP tokens for user\r\n    /// @param _amount .\r\n    function withdraw(uint256 _amount) external;\r\n\r\n    /// @dev Notifies gauge of gauge rewards. Assumes gauge reward tokens is 18 decimals.\r\n    ///      If not 18 decimals, rewardRate may have rounding issues.\r\n    function notifyRewardAmount(uint256 amount) external;\r\n}",
+  "sourcePath": "C:\\Users\\jugli\\Desktop\\uno\\uno-contracts-optimism\\contracts\\interfaces\\IGauge.sol",
+  "ast": {
+    "absolutePath": "project:/contracts/interfaces/IGauge.sol",
+    "exportedSymbols": {
+      "IERC20": [
+        1911
+      ],
+      "IGauge": [
+        6271
+      ]
+    },
+    "id": 6272,
+    "license": "MIT",
+    "nodeType": "SourceUnit",
+    "nodes": [
+      {
+        "id": 6149,
+        "literals": [
+          "solidity",
+          "0.8",
+          ".10"
+        ],
+        "nodeType": "PragmaDirective",
+        "src": "33:23:29"
+      },
+      {
+        "absolutePath": "@openzeppelin/contracts/token/ERC20/IERC20.sol",
+        "file": "@openzeppelin/contracts/token/ERC20/IERC20.sol",
+        "id": 6150,
+        "nameLocation": "-1:-1:-1",
+        "nodeType": "ImportDirective",
+        "scope": 6272,
+        "sourceUnit": 1912,
+        "src": "58:56:29",
+        "symbolAliases": [],
+        "unitAlias": ""
+      },
+      {
+        "abstract": false,
+        "baseContracts": [
+          {
+            "baseName": {
+              "id": 6151,
+              "name": "IERC20",
+              "nodeType": "IdentifierPath",
+              "referencedDeclaration": 1911,
+              "src": "136:6:29"
+            },
+            "id": 6152,
+            "nodeType": "InheritanceSpecifier",
+            "src": "136:6:29"
+          }
+        ],
+        "canonicalName": "IGauge",
+        "contractDependencies": [],
+        "contractKind": "interface",
+        "fullyImplemented": false,
+        "id": 6271,
+        "linearizedBaseContracts": [
+          6271,
+          1911
+        ],
+        "name": "IGauge",
+        "nameLocation": "126:6:29",
+        "nodeType": "ContractDefinition",
+        "nodes": [
+          {
+            "id": 6154,
+            "name": "NotAlive",
+            "nameLocation": "156:8:29",
+            "nodeType": "ErrorDefinition",
+            "parameters": {
+              "id": 6153,
+              "nodeType": "ParameterList",
+              "parameters": [],
+              "src": "164:2:29"
+            },
+            "src": "150:17:29"
+          },
+          {
+            "id": 6156,
+            "name": "NotAuthorized",
+            "nameLocation": "179:13:29",
+            "nodeType": "ErrorDefinition",
+            "parameters": {
+              "id": 6155,
+              "nodeType": "ParameterList",
+              "parameters": [],
+              "src": "192:2:29"
+            },
+            "src": "173:22:29"
+          },
+          {
+            "id": 6158,
+            "name": "NotVoter",
+            "nameLocation": "207:8:29",
+            "nodeType": "ErrorDefinition",
+            "parameters": {
+              "id": 6157,
+              "nodeType": "ParameterList",
+              "parameters": [],
+              "src": "215:2:29"
+            },
+            "src": "201:17:29"
+          },
+          {
+            "id": 6160,
+            "name": "RewardRateTooHigh",
+            "nameLocation": "230:17:29",
+            "nodeType": "ErrorDefinition",
+            "parameters": {
+              "id": 6159,
+              "nodeType": "ParameterList",
+              "parameters": [],
+              "src": "247:2:29"
+            },
+            "src": "224:26:29"
+          },
+          {
+            "id": 6162,
+            "name": "ZeroAmount",
+            "nameLocation": "262:10:29",
+            "nodeType": "ErrorDefinition",
+            "parameters": {
+              "id": 6161,
+              "nodeType": "ParameterList",
+              "parameters": [],
+              "src": "272:2:29"
+            },
+            "src": "256:19:29"
+          },
+          {
+            "id": 6164,
+            "name": "ZeroRewardRate",
+            "nameLocation": "287:14:29",
+            "nodeType": "ErrorDefinition",
+            "parameters": {
+              "id": 6163,
+              "nodeType": "ParameterList",
+              "parameters": [],
+              "src": "301:2:29"
+            },
+            "src": "281:23:29"
+          },
+          {
+            "anonymous": false,
+            "id": 6172,
+            "name": "Deposit",
+            "nameLocation": "318:7:29",
+            "nodeType": "EventDefinition",
+            "parameters": {
+              "id": 6171,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 6166,
+                  "indexed": true,
+                  "mutability": "mutable",
+                  "name": "from",
+                  "nameLocation": "342:4:29",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 6172,
+                  "src": "326:20:29",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_address",
+                    "typeString": "address"
+                  },
+                  "typeName": {
+                    "id": 6165,
+                    "name": "address",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "326:7:29",
+                    "stateMutability": "nonpayable",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_address",
+                      "typeString": "address"
+                    }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 6168,
+                  "indexed": true,
+                  "mutability": "mutable",
+                  "name": "to",
+                  "nameLocation": "364:2:29",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 6172,
+                  "src": "348:18:29",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_address",
+                    "typeString": "address"
+                  },
+                  "typeName": {
+                    "id": 6167,
+                    "name": "address",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "348:7:29",
+                    "stateMutability": "nonpayable",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_address",
+                      "typeString": "address"
+                    }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 6170,
+                  "indexed": false,
+                  "mutability": "mutable",
+                  "name": "amount",
+                  "nameLocation": "376:6:29",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 6172,
+                  "src": "368:14:29",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_uint256",
+                    "typeString": "uint256"
+                  },
+                  "typeName": {
+                    "id": 6169,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "368:7:29",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_uint256",
+                      "typeString": "uint256"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "325:58:29"
+            },
+            "src": "312:72:29"
+          },
+          {
+            "anonymous": false,
+            "id": 6178,
+            "name": "Withdraw",
+            "nameLocation": "396:8:29",
+            "nodeType": "EventDefinition",
+            "parameters": {
+              "id": 6177,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 6174,
+                  "indexed": true,
+                  "mutability": "mutable",
+                  "name": "from",
+                  "nameLocation": "421:4:29",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 6178,
+                  "src": "405:20:29",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_address",
+                    "typeString": "address"
+                  },
+                  "typeName": {
+                    "id": 6173,
+                    "name": "address",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "405:7:29",
+                    "stateMutability": "nonpayable",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_address",
+                      "typeString": "address"
+                    }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 6176,
+                  "indexed": false,
+                  "mutability": "mutable",
+                  "name": "amount",
+                  "nameLocation": "435:6:29",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 6178,
+                  "src": "427:14:29",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_uint256",
+                    "typeString": "uint256"
+                  },
+                  "typeName": {
+                    "id": 6175,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "427:7:29",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_uint256",
+                      "typeString": "uint256"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "404:38:29"
+            },
+            "src": "390:53:29"
+          },
+          {
+            "anonymous": false,
+            "id": 6184,
+            "name": "NotifyReward",
+            "nameLocation": "455:12:29",
+            "nodeType": "EventDefinition",
+            "parameters": {
+              "id": 6183,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 6180,
+                  "indexed": true,
+                  "mutability": "mutable",
+                  "name": "from",
+                  "nameLocation": "484:4:29",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 6184,
+                  "src": "468:20:29",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_address",
+                    "typeString": "address"
+                  },
+                  "typeName": {
+                    "id": 6179,
+                    "name": "address",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "468:7:29",
+                    "stateMutability": "nonpayable",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_address",
+                      "typeString": "address"
+                    }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 6182,
+                  "indexed": false,
+                  "mutability": "mutable",
+                  "name": "amount",
+                  "nameLocation": "498:6:29",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 6184,
+                  "src": "490:14:29",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_uint256",
+                    "typeString": "uint256"
+                  },
+                  "typeName": {
+                    "id": 6181,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "490:7:29",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_uint256",
+                      "typeString": "uint256"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "467:38:29"
+            },
+            "src": "449:57:29"
+          },
+          {
+            "anonymous": false,
+            "id": 6192,
+            "name": "ClaimFees",
+            "nameLocation": "518:9:29",
+            "nodeType": "EventDefinition",
+            "parameters": {
+              "id": 6191,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 6186,
+                  "indexed": true,
+                  "mutability": "mutable",
+                  "name": "from",
+                  "nameLocation": "544:4:29",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 6192,
+                  "src": "528:20:29",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_address",
+                    "typeString": "address"
+                  },
+                  "typeName": {
+                    "id": 6185,
+                    "name": "address",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "528:7:29",
+                    "stateMutability": "nonpayable",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_address",
+                      "typeString": "address"
+                    }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 6188,
+                  "indexed": false,
+                  "mutability": "mutable",
+                  "name": "claimed0",
+                  "nameLocation": "558:8:29",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 6192,
+                  "src": "550:16:29",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_uint256",
+                    "typeString": "uint256"
+                  },
+                  "typeName": {
+                    "id": 6187,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "550:7:29",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_uint256",
+                      "typeString": "uint256"
+                    }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 6190,
+                  "indexed": false,
+                  "mutability": "mutable",
+                  "name": "claimed1",
+                  "nameLocation": "576:8:29",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 6192,
+                  "src": "568:16:29",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_uint256",
+                    "typeString": "uint256"
+                  },
+                  "typeName": {
+                    "id": 6189,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "568:7:29",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_uint256",
+                      "typeString": "uint256"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "527:58:29"
+            },
+            "src": "512:74:29"
+          },
+          {
+            "anonymous": false,
+            "id": 6198,
+            "name": "ClaimRewards",
+            "nameLocation": "598:12:29",
+            "nodeType": "EventDefinition",
+            "parameters": {
+              "id": 6197,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 6194,
+                  "indexed": true,
+                  "mutability": "mutable",
+                  "name": "from",
+                  "nameLocation": "627:4:29",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 6198,
+                  "src": "611:20:29",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_address",
+                    "typeString": "address"
+                  },
+                  "typeName": {
+                    "id": 6193,
+                    "name": "address",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "611:7:29",
+                    "stateMutability": "nonpayable",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_address",
+                      "typeString": "address"
+                    }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 6196,
+                  "indexed": false,
+                  "mutability": "mutable",
+                  "name": "amount",
+                  "nameLocation": "641:6:29",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 6198,
+                  "src": "633:14:29",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_uint256",
+                    "typeString": "uint256"
+                  },
+                  "typeName": {
+                    "id": 6195,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "633:7:29",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_uint256",
+                      "typeString": "uint256"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "610:38:29"
+            },
+            "src": "592:57:29"
+          },
+          {
+            "functionSelector": "f7c618c1",
+            "id": 6203,
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "rewardToken",
+            "nameLocation": "666:11:29",
+            "nodeType": "FunctionDefinition",
+            "parameters": {
+              "id": 6199,
+              "nodeType": "ParameterList",
+              "parameters": [],
+              "src": "677:2:29"
+            },
+            "returnParameters": {
+              "id": 6202,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 6201,
+                  "mutability": "mutable",
+                  "name": "",
+                  "nameLocation": "-1:-1:-1",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 6203,
+                  "src": "703:7:29",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_address",
+                    "typeString": "address"
+                  },
+                  "typeName": {
+                    "id": 6200,
+                    "name": "address",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "703:7:29",
+                    "stateMutability": "nonpayable",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_address",
+                      "typeString": "address"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "702:9:29"
+            },
+            "scope": 6271,
+            "src": "657:55:29",
+            "stateMutability": "view",
+            "virtual": false,
+            "visibility": "external"
+          },
+          {
+            "functionSelector": "cd3daf9d",
+            "id": 6208,
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "rewardPerToken",
+            "nameLocation": "729:14:29",
+            "nodeType": "FunctionDefinition",
+            "parameters": {
+              "id": 6204,
+              "nodeType": "ParameterList",
+              "parameters": [],
+              "src": "743:2:29"
+            },
+            "returnParameters": {
+              "id": 6207,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 6206,
+                  "mutability": "mutable",
+                  "name": "_rewardPerToken",
+                  "nameLocation": "777:15:29",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 6208,
+                  "src": "769:23:29",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_uint256",
+                    "typeString": "uint256"
+                  },
+                  "typeName": {
+                    "id": 6205,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "769:7:29",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_uint256",
+                      "typeString": "uint256"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "768:25:29"
+            },
+            "scope": 6271,
+            "src": "720:74:29",
+            "stateMutability": "view",
+            "virtual": false,
+            "visibility": "external"
+          },
+          {
+            "documentation": {
+              "id": 6209,
+              "nodeType": "StructuredDocumentation",
+              "src": "802:97:29",
+              "text": "@notice Returns the last time the reward was modified or periodFinish if the reward has ended"
+            },
+            "functionSelector": "80faa57d",
+            "id": 6214,
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "lastTimeRewardApplicable",
+            "nameLocation": "914:24:29",
+            "nodeType": "FunctionDefinition",
+            "parameters": {
+              "id": 6210,
+              "nodeType": "ParameterList",
+              "parameters": [],
+              "src": "938:2:29"
+            },
+            "returnParameters": {
+              "id": 6213,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 6212,
+                  "mutability": "mutable",
+                  "name": "_time",
+                  "nameLocation": "972:5:29",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 6214,
+                  "src": "964:13:29",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_uint256",
+                    "typeString": "uint256"
+                  },
+                  "typeName": {
+                    "id": 6211,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "964:7:29",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_uint256",
+                      "typeString": "uint256"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "963:15:29"
+            },
+            "scope": 6271,
+            "src": "905:74:29",
+            "stateMutability": "view",
+            "virtual": false,
+            "visibility": "external"
+          },
+          {
+            "documentation": {
+              "id": 6215,
+              "nodeType": "StructuredDocumentation",
+              "src": "987:76:29",
+              "text": "@notice Returns accrued balance to date from last claim / first deposit."
+            },
+            "functionSelector": "008cc262",
+            "id": 6222,
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "earned",
+            "nameLocation": "1078:6:29",
+            "nodeType": "FunctionDefinition",
+            "parameters": {
+              "id": 6218,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 6217,
+                  "mutability": "mutable",
+                  "name": "_account",
+                  "nameLocation": "1093:8:29",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 6222,
+                  "src": "1085:16:29",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_address",
+                    "typeString": "address"
+                  },
+                  "typeName": {
+                    "id": 6216,
+                    "name": "address",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1085:7:29",
+                    "stateMutability": "nonpayable",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_address",
+                      "typeString": "address"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "1084:18:29"
+            },
+            "returnParameters": {
+              "id": 6221,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 6220,
+                  "mutability": "mutable",
+                  "name": "_earned",
+                  "nameLocation": "1134:7:29",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 6222,
+                  "src": "1126:15:29",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_uint256",
+                    "typeString": "uint256"
+                  },
+                  "typeName": {
+                    "id": 6219,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1126:7:29",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_uint256",
+                      "typeString": "uint256"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "1125:17:29"
+            },
+            "scope": 6271,
+            "src": "1069:74:29",
+            "stateMutability": "view",
+            "virtual": false,
+            "visibility": "external"
+          },
+          {
+            "functionSelector": "16e64048",
+            "id": 6227,
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "left",
+            "nameLocation": "1160:4:29",
+            "nodeType": "FunctionDefinition",
+            "parameters": {
+              "id": 6223,
+              "nodeType": "ParameterList",
+              "parameters": [],
+              "src": "1164:2:29"
+            },
+            "returnParameters": {
+              "id": 6226,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 6225,
+                  "mutability": "mutable",
+                  "name": "_left",
+                  "nameLocation": "1198:5:29",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 6227,
+                  "src": "1190:13:29",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_uint256",
+                    "typeString": "uint256"
+                  },
+                  "typeName": {
+                    "id": 6224,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1190:7:29",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_uint256",
+                      "typeString": "uint256"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "1189:15:29"
+            },
+            "scope": 6271,
+            "src": "1151:54:29",
+            "stateMutability": "view",
+            "virtual": false,
+            "visibility": "external"
+          },
+          {
+            "documentation": {
+              "id": 6228,
+              "nodeType": "StructuredDocumentation",
+              "src": "1213:69:29",
+              "text": "@notice Returns if gauge is linked to a legitimate Velodrome pool"
+            },
+            "functionSelector": "e2e1c6db",
+            "id": 6233,
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "isPool",
+            "nameLocation": "1297:6:29",
+            "nodeType": "FunctionDefinition",
+            "parameters": {
+              "id": 6229,
+              "nodeType": "ParameterList",
+              "parameters": [],
+              "src": "1303:2:29"
+            },
+            "returnParameters": {
+              "id": 6232,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 6231,
+                  "mutability": "mutable",
+                  "name": "_isPool",
+                  "nameLocation": "1334:7:29",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 6233,
+                  "src": "1329:12:29",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_bool",
+                    "typeString": "bool"
+                  },
+                  "typeName": {
+                    "id": 6230,
+                    "name": "bool",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1329:4:29",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_bool",
+                      "typeString": "bool"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "1328:14:29"
+            },
+            "scope": 6271,
+            "src": "1288:55:29",
+            "stateMutability": "view",
+            "virtual": false,
+            "visibility": "external"
+          },
+          {
+            "functionSelector": "72f702f3",
+            "id": 6238,
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "stakingToken",
+            "nameLocation": "1360:12:29",
+            "nodeType": "FunctionDefinition",
+            "parameters": {
+              "id": 6234,
+              "nodeType": "ParameterList",
+              "parameters": [],
+              "src": "1372:2:29"
+            },
+            "returnParameters": {
+              "id": 6237,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 6236,
+                  "mutability": "mutable",
+                  "name": "_pool",
+                  "nameLocation": "1406:5:29",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 6238,
+                  "src": "1398:13:29",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_address",
+                    "typeString": "address"
+                  },
+                  "typeName": {
+                    "id": 6235,
+                    "name": "address",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1398:7:29",
+                    "stateMutability": "nonpayable",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_address",
+                      "typeString": "address"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "1397:15:29"
+            },
+            "scope": 6271,
+            "src": "1351:62:29",
+            "stateMutability": "view",
+            "virtual": false,
+            "visibility": "external"
+          },
+          {
+            "documentation": {
+              "id": 6239,
+              "nodeType": "StructuredDocumentation",
+              "src": "1421:132:29",
+              "text": "@notice Retrieve rewards for an address.\n @dev Throws if not called by same address or voter.\n @param _account ."
+            },
+            "functionSelector": "c00007b0",
+            "id": 6244,
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "getReward",
+            "nameLocation": "1568:9:29",
+            "nodeType": "FunctionDefinition",
+            "parameters": {
+              "id": 6242,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 6241,
+                  "mutability": "mutable",
+                  "name": "_account",
+                  "nameLocation": "1586:8:29",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 6244,
+                  "src": "1578:16:29",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_address",
+                    "typeString": "address"
+                  },
+                  "typeName": {
+                    "id": 6240,
+                    "name": "address",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1578:7:29",
+                    "stateMutability": "nonpayable",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_address",
+                      "typeString": "address"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "1577:18:29"
+            },
+            "returnParameters": {
+              "id": 6243,
+              "nodeType": "ParameterList",
+              "parameters": [],
+              "src": "1604:0:29"
+            },
+            "scope": 6271,
+            "src": "1559:46:29",
+            "stateMutability": "nonpayable",
+            "virtual": false,
+            "visibility": "external"
+          },
+          {
+            "documentation": {
+              "id": 6245,
+              "nodeType": "StructuredDocumentation",
+              "src": "1613:81:29",
+              "text": "@notice Deposit LP tokens into gauge for msg.sender\n @param _amount ."
+            },
+            "functionSelector": "b6b55f25",
+            "id": 6250,
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "deposit",
+            "nameLocation": "1709:7:29",
+            "nodeType": "FunctionDefinition",
+            "parameters": {
+              "id": 6248,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 6247,
+                  "mutability": "mutable",
+                  "name": "_amount",
+                  "nameLocation": "1725:7:29",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 6250,
+                  "src": "1717:15:29",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_uint256",
+                    "typeString": "uint256"
+                  },
+                  "typeName": {
+                    "id": 6246,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1717:7:29",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_uint256",
+                      "typeString": "uint256"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "1716:17:29"
+            },
+            "returnParameters": {
+              "id": 6249,
+              "nodeType": "ParameterList",
+              "parameters": [],
+              "src": "1742:0:29"
+            },
+            "scope": 6271,
+            "src": "1700:43:29",
+            "stateMutability": "nonpayable",
+            "virtual": false,
+            "visibility": "external"
+          },
+          {
+            "documentation": {
+              "id": 6251,
+              "nodeType": "StructuredDocumentation",
+              "src": "1751:135:29",
+              "text": "@notice Deposit LP tokens into gauge for any user\n @param _amount .\n @param _recipient Recipient to give balance to"
+            },
+            "functionSelector": "6e553f65",
+            "id": 6258,
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "deposit",
+            "nameLocation": "1901:7:29",
+            "nodeType": "FunctionDefinition",
+            "parameters": {
+              "id": 6256,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 6253,
+                  "mutability": "mutable",
+                  "name": "_amount",
+                  "nameLocation": "1917:7:29",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 6258,
+                  "src": "1909:15:29",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_uint256",
+                    "typeString": "uint256"
+                  },
+                  "typeName": {
+                    "id": 6252,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1909:7:29",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_uint256",
+                      "typeString": "uint256"
+                    }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 6255,
+                  "mutability": "mutable",
+                  "name": "_recipient",
+                  "nameLocation": "1934:10:29",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 6258,
+                  "src": "1926:18:29",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_address",
+                    "typeString": "address"
+                  },
+                  "typeName": {
+                    "id": 6254,
+                    "name": "address",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "1926:7:29",
+                    "stateMutability": "nonpayable",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_address",
+                      "typeString": "address"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "1908:37:29"
+            },
+            "returnParameters": {
+              "id": 6257,
+              "nodeType": "ParameterList",
+              "parameters": [],
+              "src": "1954:0:29"
+            },
+            "scope": 6271,
+            "src": "1892:63:29",
+            "stateMutability": "nonpayable",
+            "virtual": false,
+            "visibility": "external"
+          },
+          {
+            "documentation": {
+              "id": 6259,
+              "nodeType": "StructuredDocumentation",
+              "src": "1963:65:29",
+              "text": "@notice Withdraw LP tokens for user\n @param _amount ."
+            },
+            "functionSelector": "2e1a7d4d",
+            "id": 6264,
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "withdraw",
+            "nameLocation": "2043:8:29",
+            "nodeType": "FunctionDefinition",
+            "parameters": {
+              "id": 6262,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 6261,
+                  "mutability": "mutable",
+                  "name": "_amount",
+                  "nameLocation": "2060:7:29",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 6264,
+                  "src": "2052:15:29",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_uint256",
+                    "typeString": "uint256"
+                  },
+                  "typeName": {
+                    "id": 6260,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "2052:7:29",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_uint256",
+                      "typeString": "uint256"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "2051:17:29"
+            },
+            "returnParameters": {
+              "id": 6263,
+              "nodeType": "ParameterList",
+              "parameters": [],
+              "src": "2077:0:29"
+            },
+            "scope": 6271,
+            "src": "2034:44:29",
+            "stateMutability": "nonpayable",
+            "virtual": false,
+            "visibility": "external"
+          },
+          {
+            "documentation": {
+              "id": 6265,
+              "nodeType": "StructuredDocumentation",
+              "src": "2086:156:29",
+              "text": "@dev Notifies gauge of gauge rewards. Assumes gauge reward tokens is 18 decimals.\n      If not 18 decimals, rewardRate may have rounding issues."
+            },
+            "functionSelector": "3c6b16ab",
+            "id": 6270,
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "notifyRewardAmount",
+            "nameLocation": "2257:18:29",
+            "nodeType": "FunctionDefinition",
+            "parameters": {
+              "id": 6268,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 6267,
+                  "mutability": "mutable",
+                  "name": "amount",
+                  "nameLocation": "2284:6:29",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 6270,
+                  "src": "2276:14:29",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_uint256",
+                    "typeString": "uint256"
+                  },
+                  "typeName": {
+                    "id": 6266,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "2276:7:29",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_uint256",
+                      "typeString": "uint256"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "2275:16:29"
+            },
+            "returnParameters": {
+              "id": 6269,
+              "nodeType": "ParameterList",
+              "parameters": [],
+              "src": "2300:0:29"
+            },
+            "scope": 6271,
+            "src": "2248:53:29",
+            "stateMutability": "nonpayable",
+            "virtual": false,
+            "visibility": "external"
+          }
+        ],
+        "scope": 6272,
+        "src": "116:2188:29",
+        "usedErrors": [
+          6154,
+          6156,
+          6158,
+          6160,
+          6162,
+          6164
+        ]
+      }
+    ],
+    "src": "33:2271:29"
+  },
+  "compiler": {
+    "name": "solc",
+    "version": "0.8.10+commit.fc410830.Emscripten.clang"
+  },
+  "networks": {},
+  "schemaVersion": "3.4.13",
+  "updatedAt": "2023-07-07T11:55:01.210Z",
+  "devdoc": {
+    "kind": "dev",
+    "methods": {
+      "allowance(address,address)": {
+        "details": "Returns the remaining number of tokens that `spender` will be allowed to spend on behalf of `owner` through {transferFrom}. This is zero by default. This value changes when {approve} or {transferFrom} are called."
+      },
+      "approve(address,uint256)": {
+        "details": "Sets `amount` as the allowance of `spender` over the caller's tokens. Returns a boolean value indicating whether the operation succeeded. IMPORTANT: Beware that changing an allowance with this method brings the risk that someone may use both the old and the new allowance by unfortunate transaction ordering. One possible solution to mitigate this race condition is to first reduce the spender's allowance to 0 and set the desired value afterwards: https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729 Emits an {Approval} event."
+      },
+      "balanceOf(address)": {
+        "details": "Returns the amount of tokens owned by `account`."
+      },
+      "deposit(uint256)": {
+        "params": {
+          "_amount": "."
+        }
+      },
+      "deposit(uint256,address)": {
+        "params": {
+          "_amount": ".",
+          "_recipient": "Recipient to give balance to"
+        }
+      },
+      "getReward(address)": {
+        "details": "Throws if not called by same address or voter.",
+        "params": {
+          "_account": "."
+        }
+      },
+      "notifyRewardAmount(uint256)": {
+        "details": "Notifies gauge of gauge rewards. Assumes gauge reward tokens is 18 decimals.      If not 18 decimals, rewardRate may have rounding issues."
+      },
+      "totalSupply()": {
+        "details": "Returns the amount of tokens in existence."
+      },
+      "transfer(address,uint256)": {
+        "details": "Moves `amount` tokens from the caller's account to `to`. Returns a boolean value indicating whether the operation succeeded. Emits a {Transfer} event."
+      },
+      "transferFrom(address,address,uint256)": {
+        "details": "Moves `amount` tokens from `from` to `to` using the allowance mechanism. `amount` is then deducted from the caller's allowance. Returns a boolean value indicating whether the operation succeeded. Emits a {Transfer} event."
+      },
+      "withdraw(uint256)": {
+        "params": {
+          "_amount": "."
+        }
+      }
+    },
+    "version": 1
+  },
+  "userdoc": {
+    "kind": "user",
+    "methods": {
+      "deposit(uint256)": {
+        "notice": "Deposit LP tokens into gauge for msg.sender"
+      },
+      "deposit(uint256,address)": {
+        "notice": "Deposit LP tokens into gauge for any user"
+      },
+      "earned(address)": {
+        "notice": "Returns accrued balance to date from last claim / first deposit."
+      },
+      "getReward(address)": {
+        "notice": "Retrieve rewards for an address."
+      },
+      "isPool()": {
+        "notice": "Returns if gauge is linked to a legitimate Velodrome pool"
+      },
+      "lastTimeRewardApplicable()": {
+        "notice": "Returns the last time the reward was modified or periodFinish if the reward has ended"
+      },
+      "withdraw(uint256)": {
+        "notice": "Withdraw LP tokens for user"
+      }
+    },
+    "version": 1
+  }
+}

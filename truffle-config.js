@@ -9,15 +9,15 @@ module.exports = {
     },
 
     networks: {
-        avalanche: {
+        optimism: {
             provider: new HDWalletProvider({
                 privateKeys: [process.env.PRIVATE_KEY],
                 providerOrUrl: 'https://rpc.ankr.com/avalanche',
-                chainId: 43114,
+                chainId: 10,
                 pollingInterval: 30000
             }),
             networkCheckTimeout: 10000,
-            network_id: 43114,
+            network_id: 10,
             addressIndex: 0,
             timeoutBlocks: 200
         },
@@ -25,8 +25,8 @@ module.exports = {
             host: '127.0.0.1',
             port: 8545,
             gas: 7500000,
-            gasPrice: 70000000000,
-            network_id: 43114,
+            gasPrice: 1000000000,
+            network_id: 10,
             networkCheckTimeout: 10000,
             timeoutBlocks: 200
         }

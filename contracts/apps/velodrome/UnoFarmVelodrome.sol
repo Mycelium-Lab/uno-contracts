@@ -25,7 +25,6 @@ contract UnoFarmVelodrome is Initializable, ReentrancyGuardUpgradeable, IUnoFarm
 	 * {velodromeRouter} - The contract that executes swaps.
 	 * {gauge} - Contract that distributes reward tokens.
 	 */
-	//TODO: v1 also
 	IRouter private constant velodromeRouter = IRouter(0xa062aE8A9c5e11aaA026fc2670B0D65cCc8B2858);
     IGauge public gauge;
 
