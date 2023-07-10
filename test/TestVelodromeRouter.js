@@ -545,7 +545,8 @@ contract('UnoAssetRouterVelodrome', (accounts) => {
                     from: account1
                 })
                 const _balanceAbefore = await tokenA.balanceOf(account1)
-                const _balanceBbefore = await tokenB.balanceOf(account1); const tx = await routerContract.removeLiquidity(
+                const _balanceBbefore = await tokenB.balanceOf(account1)
+                await routerContract.removeLiquidity(
                     tokenA.address,
                     tokenB.address,
                     isStable,
@@ -1134,23 +1135,24 @@ contract('UnoAssetRouterVelodrome', (accounts) => {
 
                 await time.increase(5000000)
 
+                console.log(rewardToken, tokenA.address, tokenB.address)
+
                 receipt = await assetRouter.distribute(
                     gauge,
                     [
                         {
                             route: [
-                                rewardToken,
-                                '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                tokenA.address
+                                {
+                                    from: rewardToken,
+                                    to: tokenA.address,
+                                    stable: false, // todo
+                                    factory: '0xF1046053aa5682b4F9a81b5481394DA16BE5FF5a'// todo
+                                }
                             ],
                             amountOutMin: 0
                         },
                         {
-                            route: [
-                                rewardToken,
-                                '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                tokenB.address
-                            ],
+                            route: [],
                             amountOutMin: 0
                         }
                     ],
@@ -1191,18 +1193,17 @@ contract('UnoAssetRouterVelodrome', (accounts) => {
                         [
                             {
                                 route: [
-                                    constants.ZERO_ADDRESS,
-                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    tokenA.address
+                                    {
+                                        from: constants.ZERO_ADDRESS,
+                                        to: tokenA.address,
+                                        stable: false, // todo
+                                        factory: '0xF1046053aa5682b4F9a81b5481394DA16BE5FF5a'// todo
+                                    }
                                 ],
                                 amountOutMin: 0
                             },
                             {
-                                route: [
-                                    rewardToken,
-                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    tokenB.address
-                                ],
+                                route: [],
                                 amountOutMin: 0
                             }
                         ],
@@ -1210,32 +1211,6 @@ contract('UnoAssetRouterVelodrome', (accounts) => {
                         { from: distributor }
                     ),
                     'BAD_REWARD_TOKEN_A_ROUTE'
-                )
-                await expectRevertCustomError(
-                    assetRouter.distribute(
-                        gauge,
-                        [
-                            {
-                                route: [
-                                    rewardToken,
-                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    tokenA.address
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [
-                                    constants.ZERO_ADDRESS,
-                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    tokenB.address
-                                ],
-                                amountOutMin: 0
-                            }
-                        ],
-                        feeCollector,
-                        { from: distributor }
-                    ),
-                    'BAD_REWARD_TOKEN_B_ROUTE'
                 )
             })
             it('reverts if passed wrong tokenA in reward route', async () => {
@@ -1245,18 +1220,17 @@ contract('UnoAssetRouterVelodrome', (accounts) => {
                         [
                             {
                                 route: [
-                                    rewardToken,
-                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    constants.ZERO_ADDRESS
+                                    {
+                                        from: rewardToken,
+                                        to: constants.ZERO_ADDRESS,
+                                        stable: false, // todo
+                                        factory: '0xF1046053aa5682b4F9a81b5481394DA16BE5FF5a'// todo
+                                    }
                                 ],
                                 amountOutMin: 0
                             },
                             {
-                                route: [
-                                    rewardToken,
-                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    tokenB.address
-                                ],
+                                route: [],
                                 amountOutMin: 0
                             }
                         ],
@@ -1264,34 +1238,6 @@ contract('UnoAssetRouterVelodrome', (accounts) => {
                         { from: distributor }
                     ),
                     'BAD_REWARD_TOKEN_A_ROUTE'
-                )
-            })
-            it('reverts if passed wrong tokenB in reward route', async () => {
-                await expectRevertCustomError(
-                    assetRouter.distribute(
-                        gauge,
-                        [
-                            {
-                                route: [
-                                    rewardToken,
-                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    tokenA.address
-                                ],
-                                amountOutMin: 0
-                            },
-                            {
-                                route: [
-                                    rewardToken,
-                                    '0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7',
-                                    constants.ZERO_ADDRESS
-                                ],
-                                amountOutMin: 0
-                            }
-                        ],
-                        feeCollector,
-                        { from: distributor }
-                    ),
-                    'BAD_REWARD_TOKEN_B_ROUTE'
                 )
             })
         })
