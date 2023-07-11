@@ -7,7 +7,7 @@
 
 3. Run specific migration: `npm run deploy-${appname}`, where appname can be:
 ```
-traderjoe
+velodrome
 ```
 
 # Testing
@@ -23,19 +23,19 @@ traderjoe
 
 # Deployed Smart Contracts
 
-All contracts are deployed on the Avalanche Blockchain
+All contracts are deployed on the Optimism Blockchain
 
 ### UnoAccessManager
 
-0x85f5A518399b072288Ff3fb7022EAdE71f99c7BC
+0x693148ae24AbB879e2f63f1b36f5594e54b19140
 
 
-## Traderjoe
+## Velodrome
 
-#### UnoAssetRouterTraderjoe
+#### UnoAssetRouterVelorome
 
-0xe137ca875d80470B1B552aAFf1488093063f4322
+0xAea777e4ee848CB99339719E663aF5320c2307A4
 
 #### UnoFarmFactory
 
-0x6Eae93D177BFDDAF5ee238F55C36A847A35E62A0
+0x59E6a7Ea02Fe7c373aa005e1ab2d250F08DBEa89

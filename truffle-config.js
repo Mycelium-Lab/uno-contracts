@@ -5,14 +5,14 @@ module.exports = {
     contracts_build_directory: './build',
 
     api_keys: {
-        snowtrace: process.env.SNOWTRACE
+        etherscan: process.env.ETHERSCAN
     },
 
     networks: {
         optimism: {
             provider: new HDWalletProvider({
                 privateKeys: [process.env.PRIVATE_KEY],
-                providerOrUrl: 'https://rpc.ankr.com/avalanche',
+                providerOrUrl: 'https://opt-mainnet.g.alchemy.com/v2/WFWF6gOioPPgruzoyKG1eOEAdgZI1pTs', // 'https://rpc.ankr.com/optimism',
                 chainId: 10,
                 pollingInterval: 30000
             }),

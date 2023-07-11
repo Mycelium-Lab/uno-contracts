@@ -46,7 +46,7 @@ module.exports = async (deployer, network) => {
         ))
 
         const proposal = await client.createProposal({
-            contractId: `avalanche-${UnoAssetRouter}`, // Target contract
+            contractId: `optimism-${UnoAssetRouter}`, // Target contract
             title: 'Upgrade', // Title of the proposal
             description: 'Upgrade', // Description of the proposal
             type: 'custom', // Use 'custom' for custom admin actions
@@ -85,7 +85,7 @@ module.exports = async (deployer, network) => {
         ))
 
         const proposal = await client.createProposal({
-            contractId: `avalanche-${UnoFarmFactory}`, // Target contract
+            contractId: `optimism-${UnoFarmFactory}`, // Target contract
             title: 'Upgrade', // Title of the proposal
             description: 'Upgrade', // Description of the proposal
             type: 'custom', // Use 'custom' for custom admin actions
