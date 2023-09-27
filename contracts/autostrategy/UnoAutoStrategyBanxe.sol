@@ -62,7 +62,7 @@ contract UnoAutoStrategyBanxe is Initializable, ERC20Upgradeable, ReentrancyGuar
      */
 
     address public banxe;
-    address private constant OdosRouter = 0xa32EE1C40594249eb3183c10792BcF573D4Da47C;
+    address private constant OdosRouter = 0x4E3288c9ca110bCC82bf38F09A7b425c095d92Bf;
 
     uint256 public poolID;
     PoolInfo[] public pools;
