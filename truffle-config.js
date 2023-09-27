@@ -9,7 +9,7 @@ module.exports = {
     },
 
     networks: {
-        optimism: {
+        /* optimism: {
             provider: new HDWalletProvider({
                 privateKeys: [process.env.PRIVATE_KEY],
                 providerOrUrl: 'https://opt-mainnet.g.alchemy.com/v2/WFWF6gOioPPgruzoyKG1eOEAdgZI1pTs', // 'https://rpc.ankr.com/optimism',
@@ -18,27 +18,27 @@ module.exports = {
             }),
             networkCheckTimeout: 10000,
             network_id: 10,
+            gas: 7500000,
             addressIndex: 0,
             timeoutBlocks: 200
         },
         test: {
             host: '127.0.0.1',
             port: 8545,
-            gas: 7500000,
             gasPrice: 1000000000,
             network_id: 10,
             networkCheckTimeout: 10000,
             timeoutBlocks: 200
-        }
+        } */
     },
     plugins: ['truffle-contract-size', 'truffle-plugin-verify'],
     compilers: {
         solc: {
-            version: '0.8.10',
+            version: '0.8.19',
             settings: {
                 optimizer: {
                     enabled: true,
-                    runs: 200
+                    runs: 8000
                 }
             }
         }

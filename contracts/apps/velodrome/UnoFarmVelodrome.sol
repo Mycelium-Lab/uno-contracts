@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.10;
+pragma solidity 0.8.19;
 
 import './interfaces/IUnoFarmVelodrome.sol';
 import "../../interfaces/IPool.sol";
@@ -98,7 +98,7 @@ contract UnoFarmVelodrome is Initializable, ReentrancyGuardUpgradeable, IUnoFarm
 	 * @dev Function that makes the deposits.
 	 * Stakes {amount} of LP tokens from this contract's balance in the {MasterChef}.
 	 */
-	function deposit(uint256 amount, address recipient) external nonReentrant onlyAssetRouter{
+	function deposit(uint256 amount, address recipient) external onlyAssetRouter{
         if(amount == 0) revert NO_LIQUIDITY_PROVIDED();
 
 		_updateDeposit(recipient);
@@ -115,21 +115,22 @@ contract UnoFarmVelodrome is Initializable, ReentrancyGuardUpgradeable, IUnoFarm
 		uint256 amount,
 		address origin,
 		address recipient
-	) external nonReentrant onlyAssetRouter {
+	) external onlyAssetRouter {
         if(amount == 0) revert INSUFFICIENT_AMOUNT();
 
 		_updateDeposit(origin);
 		UserInfo storage user = userInfo[origin];
 		// Subtract amount from user.reward first, then subtract remainder from user.stake.
-		if (amount > user.reward) {
-			uint256 balance = user.stake + user.reward;
+		uint256 reward = user.reward;
+		if (amount > reward) {
+			uint256 balance = user.stake + reward;
             if(amount > balance) revert INSUFFICIENT_BALANCE();
 
 			user.stake = balance - amount;
-			totalDeposits = totalDeposits + user.reward - amount;
+			totalDeposits = totalDeposits + reward - amount;
 			user.reward = 0;
 		} else {
-			user.reward -= amount;
+			user.reward = reward - amount;
 		}
 
 		gauge.withdraw(amount);
@@ -145,31 +146,30 @@ contract UnoFarmVelodrome is Initializable, ReentrancyGuardUpgradeable, IUnoFarm
 	function distribute(
 		SwapInfo[2] calldata swapInfos,
 		FeeInfo calldata feeInfo
-	) external onlyAssetRouter nonReentrant returns (uint256 reward) {
+	) external onlyAssetRouter returns (uint256 reward) {
 		if(totalDeposits == 0) revert NO_LIQUIDITY();
         if(distributionInfo[distributionID - 1].block == block.number) revert CALL_ON_THE_SAME_BLOCK();
 
-		gauge.getReward(address(this));
+		IGauge _gauge = gauge;
+		_gauge.getReward(address(this));
+		address _rewardToken = rewardToken;
+        _collectFees(IERC20(_rewardToken), IERC20(_rewardToken).balanceOf(address(this)), feeInfo);
 
-        uint256 balance = IERC20(rewardToken).balanceOf(address(this));
-        balance -= _collectFees(IERC20(rewardToken), balance, feeInfo);
-        uint256 rewardTokenHalf = balance / 2;
-
-		if (rewardTokenHalf > 0) {
-			if (tokenA != rewardToken) {
-				IRouter.Route[] calldata route = swapInfos[0].route;
-				if(route[0].from != rewardToken || route[route.length - 1].to != tokenA) revert INVALID_ROUTE(rewardToken, tokenA);
-				velodromeRouter.swapExactTokensForTokens(rewardTokenHalf, swapInfos[0].amountOutMin, route, address(this), block.timestamp);
-			}
-
-			if (tokenB != rewardToken) {
-				IRouter.Route[] calldata route = swapInfos[1].route;
-                if(route[0].from != rewardToken || route[route.length - 1].to != tokenB) revert INVALID_ROUTE(rewardToken, tokenB);
-				velodromeRouter.swapExactTokensForTokens(rewardTokenHalf, swapInfos[1].amountOutMin, route, address(this), block.timestamp);
-			}
+		IRouter _velodromeRouter = velodromeRouter;
+		address _tokenA = tokenA;
+		address _tokenB = tokenB;
+		if (_tokenA != _rewardToken && swapInfos[0].amount != 0) {
+			IRouter.Route[] calldata route = swapInfos[0].route;
+			if(route[0].from != _rewardToken || route[route.length - 1].to != _tokenA) revert INVALID_ROUTE(_rewardToken, _tokenA);
+			_velodromeRouter.swapExactTokensForTokens(swapInfos[0].amount, swapInfos[0].amountOutMin, route, address(this), block.timestamp);
 		}
 
-		(,,reward) = velodromeRouter.addLiquidity(tokenA, tokenB, isStable, IERC20(tokenA).balanceOf(address(this)), IERC20(tokenB).balanceOf(address(this)), swapInfos[0].amountOutMin, swapInfos[1].amountOutMin, address(this), block.timestamp);
+		if (_tokenB != _rewardToken && swapInfos[1].amount != 0) {
+			IRouter.Route[] calldata route = swapInfos[1].route;
+            if(route[0].from != _rewardToken || route[route.length - 1].to != _tokenB) revert INVALID_ROUTE(_rewardToken, _tokenB);
+			_velodromeRouter.swapExactTokensForTokens(swapInfos[1].amount, swapInfos[1].amountOutMin, route, address(this), block.timestamp);
+		}
+		(,,reward) = _velodromeRouter.addLiquidity(_tokenA, _tokenB, isStable, IERC20(_tokenA).balanceOf(address(this)), IERC20(_tokenB).balanceOf(address(this)), swapInfos[0].amountOutMin, swapInfos[1].amountOutMin, address(this), block.timestamp);
 
 		uint256 rewardPerDepositAge = (reward * fractionMultiplier) / (totalDepositAge + totalDeposits * (block.number - totalDepositLastUpdate));
 		uint256 cumulativeRewardAgePerDepositAge = distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge + rewardPerDepositAge * (block.number - distributionInfo[distributionID - 1].block);
@@ -180,15 +180,15 @@ contract UnoFarmVelodrome is Initializable, ReentrancyGuardUpgradeable, IUnoFarm
 		totalDepositLastUpdate = block.number;
 		totalDepositAge = 0;
 
-        gauge.deposit(reward);
+        _gauge.deposit(reward);
 	}
 
     /**
 	 * @dev Sends fees to feeTo.
 	 */
-	function _collectFees(IERC20 token, uint256 balance, FeeInfo calldata feeInfo) internal returns(uint256 feeAmount) {
+	function _collectFees(IERC20 token, uint256 balance, FeeInfo calldata feeInfo) internal {
 		if (feeInfo.feeTo != address(0)) {
-			feeAmount = balance * feeInfo.fee / fractionMultiplier;
+			uint256 feeAmount = balance * feeInfo.fee / fractionMultiplier;
 			if (feeAmount > 0) {
 				token.safeTransfer(feeInfo.feeTo, feeAmount);
 			}

@@ -239,8 +239,8 @@ contract('UnoAssetRouterVelodrome', (accounts) => {
                     assetRouter.distribute(
                         gauge,
                         [
-                            { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 }
+                            { amount: 0, route: [], amountOutMin: 0 },
+                            { amount: 0, route: [], amountOutMin: 0 }
                         ],
                         feeCollector,
                         { from: account1 }
@@ -279,8 +279,8 @@ contract('UnoAssetRouterVelodrome', (accounts) => {
                     assetRouter.distribute(
                         gauge,
                         [
-                            { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 }
+                            { amount: 0, route: [], amountOutMin: 0 },
+                            { amount: 0, route: [], amountOutMin: 0 }
                         ],
                         feeCollector,
                         { from: account1 }
@@ -1064,8 +1064,8 @@ contract('UnoAssetRouterVelodrome', (accounts) => {
                     assetRouter.distribute(
                         gauge,
                         [
-                            { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 }
+                            { amount: 0, route: [], amountOutMin: 0 },
+                            { amount: 0, route: [], amountOutMin: 0 }
                         ],
                         feeCollector,
                         { from: pauser }
@@ -1078,8 +1078,8 @@ contract('UnoAssetRouterVelodrome', (accounts) => {
                     assetRouter.distribute(
                         gauge2,
                         [
-                            { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 }
+                            { amount: 0, route: [], amountOutMin: 0 },
+                            { amount: 0, route: [], amountOutMin: 0 }
                         ],
                         feeCollector,
                         { from: distributor }
@@ -1092,8 +1092,8 @@ contract('UnoAssetRouterVelodrome', (accounts) => {
                     assetRouter.distribute(
                         gauge,
                         [
-                            { route: [], amountOutMin: 0 },
-                            { route: [], amountOutMin: 0 }
+                            { amount: 0, route: [], amountOutMin: 0 },
+                            { amount: 0, route: [], amountOutMin: 0 }
                         ],
                         feeCollector,
                         { from: distributor }
@@ -1141,6 +1141,7 @@ contract('UnoAssetRouterVelodrome', (accounts) => {
                     gauge,
                     [
                         {
+                            amount: 1000000,
                             route: [
                                 {
                                     from: rewardToken,
@@ -1152,6 +1153,7 @@ contract('UnoAssetRouterVelodrome', (accounts) => {
                             amountOutMin: 0
                         },
                         {
+                            amount: 1000000,
                             route: [],
                             amountOutMin: 0
                         }
@@ -1192,6 +1194,7 @@ contract('UnoAssetRouterVelodrome', (accounts) => {
                         gauge,
                         [
                             {
+                                amount: 1000000,
                                 route: [
                                     {
                                         from: constants.ZERO_ADDRESS,
@@ -1203,6 +1206,7 @@ contract('UnoAssetRouterVelodrome', (accounts) => {
                                 amountOutMin: 0
                             },
                             {
+                                amount: 1000000,
                                 route: [],
                                 amountOutMin: 0
                             }
@@ -1219,6 +1223,7 @@ contract('UnoAssetRouterVelodrome', (accounts) => {
                         gauge,
                         [
                             {
+                                amount: 1000000,
                                 route: [
                                     {
                                         from: rewardToken,
@@ -1230,6 +1235,7 @@ contract('UnoAssetRouterVelodrome', (accounts) => {
                                 amountOutMin: 0
                             },
                             {
+                                amount: 1000000,
                                 route: [],
                                 amountOutMin: 0
                             }
