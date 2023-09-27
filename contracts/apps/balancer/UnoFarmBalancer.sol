@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.10;
+pragma solidity 0.8.19;
  
  
 import './interfaces/IUnoFarmBalancer.sol';
@@ -105,7 +105,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable, IUnoFarmB
      * @dev Function that makes the deposits.
      * Deposits {amount} of LP tokens from this contract's balance to the {Vault}.
      */
-    function deposit(uint256 amount, address recipient) external nonReentrant onlyAssetRouter{
+    function deposit(uint256 amount, address recipient) external onlyAssetRouter{
         if(amount == 0) revert NO_LIQUIDITY_PROVIDED();
         
         _updateDeposit(recipient);
@@ -118,7 +118,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable, IUnoFarmB
     /**
      * @dev Withdraws funds from {origin} and sends them to the {recipient}.
      */
-    function withdraw(uint256 amount, address origin, address recipient) external nonReentrant onlyAssetRouter{
+    function withdraw(uint256 amount, address origin, address recipient) external onlyAssetRouter{
         _onWithdrawUpdate(amount, origin);
         gauge.withdraw(amount);
         IERC20(lpPool).safeTransfer(recipient, amount);
@@ -127,7 +127,12 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable, IUnoFarmB
     /**
      * @dev Withdraws tokens from {origin} and sends them to the {recipient}. Saves gas compared to doing it in asset router.
      */
-    function withdrawTokens(bytes calldata userData, uint256[] calldata minAmountsOut, address origin, address recipient) external nonReentrant onlyAssetRouter returns(uint256[] memory amounts, uint256 liquidity){
+    function withdrawTokens(
+        bytes calldata userData, 
+        uint256[] calldata minAmountsOut, 
+        address origin, 
+        address recipient
+    ) external onlyAssetRouter returns(uint256[] memory amounts, uint256 liquidity){
         (IERC20[] memory tokens, , ) = Vault.getPoolTokens(poolId);
         if(minAmountsOut.length != tokens.length) revert INVALID_MIN_AMOUNTS_OUT_LENGTH();
 
@@ -139,18 +144,19 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable, IUnoFarmB
         if(amount == 0) revert INSUFFICIENT_AMOUNT();
 
         _updateDeposit(origin);
-        UserInfo storage user = userInfo[origin];
-        // Subtract amount from user.reward first, then subtract remainder from user.stake.
-        if(amount > user.reward){
-            uint256 balance = user.stake + user.reward;
+		UserInfo storage user = userInfo[origin];
+		// Subtract amount from user.reward first, then subtract remainder from user.stake.
+		uint256 reward = user.reward;
+		if (amount > reward) {
+			uint256 balance = user.stake + reward;
             if(amount > balance) revert INSUFFICIENT_BALANCE();
 
-            user.stake = balance - amount;
-            totalDeposits = totalDeposits + user.reward - amount;
-            user.reward = 0;
-        } else {
-            user.reward -= amount;
-        }
+			user.stake = balance - amount;
+			totalDeposits = totalDeposits + reward - amount;
+			user.reward = 0;
+		} else {
+			user.reward = reward - amount;
+		}
     }
 
     // Move logic to separate function to avoid "Stack too deep" errors.
@@ -185,35 +191,39 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable, IUnoFarmB
     function distribute(
         SwapInfo[] calldata swapInfos,
         FeeInfo calldata feeInfo
-    ) external onlyAssetRouter nonReentrant returns(uint256 reward){
+    ) external onlyAssetRouter returns(uint256 reward){
         if(totalDeposits == 0) revert NO_LIQUIDITY();
         if(distributionInfo[distributionID - 1].block == block.number) revert CALL_ON_THE_SAME_BLOCK();
 
-        uint256 rewardCount = streamer.reward_count();
+        IChildChainStreamer _streamer = streamer;
+        uint256 rewardCount = _streamer.reward_count();
         if(swapInfos.length != rewardCount) revert PARAMS_LENGTHS_NOT_MATCH_REWARD_COUNT();
 
-        gauge.claim_rewards();
+        IRewardsOnlyGauge _gauge = gauge;
+        IVault _Vault = Vault;
+        address _lpPool = lpPool;
+        _gauge.claim_rewards();
         for (uint256 i = 0; i < rewardCount; i++) {
-            IERC20 rewardToken = streamer.reward_tokens(i);
-            if (address(rewardToken) != address(gauge) && address(rewardToken) != lpPool) {  //can't use LP tokens in swap
+            IERC20 rewardToken = _streamer.reward_tokens(i);
+            if (address(rewardToken) != address(_gauge) && address(rewardToken) != _lpPool) {  //can't use LP tokens in swap
                 uint256 balance = rewardToken.balanceOf(address(this));
                 balance -= _collectFees(rewardToken, balance, feeInfo);
                 if(balance > 0){
-                    rewardToken.approve(address(Vault), balance);
+                    rewardToken.approve(address(_Vault), balance);
                     _batchSwap(swapInfos[i], payable(address(this)));
                 }
             }
         }
 
-        (IERC20[] memory tokens, , ) = Vault.getPoolTokens(poolId);
+        (IERC20[] memory tokens, , ) = _Vault.getPoolTokens(poolId);
         address[] memory _tokens = new address[](tokens.length);
         uint256[] memory joinAmounts = new uint256[](tokens.length);
         for (uint256 i = 0; i < tokens.length; i++) {
             _tokens[i] = address(tokens[i]);
-            if (address(tokens[i]) != lpPool){
+            if (address(tokens[i]) != _lpPool){
                 joinAmounts[i] = tokens[i].balanceOf(address(this));
                 if (joinAmounts[i] > 0){
-                    tokens[i].approve(address(Vault), joinAmounts[i]);
+                    tokens[i].approve(address(_Vault), joinAmounts[i]);
                 }
             }
         }
@@ -224,7 +234,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable, IUnoFarmB
             uint256[] memory _joinAmounts = new uint256[](joinAmounts.length - 1);
             uint256 _i = 0;
             for (uint256 i = 0; i < tokens.length; i++) {
-                if(address(tokens[i]) != lpPool){
+                if(address(tokens[i]) != _lpPool){
                     _joinAmounts[_i] = joinAmounts[i];
                     _i += 1;
                 }
@@ -233,9 +243,9 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable, IUnoFarmB
         } else {
             userData = abi.encode(1, joinAmounts, 1);
         }
-        Vault.joinPool(poolId, address(this), address(this), IVault.JoinPoolRequest(_tokens, joinAmounts, userData, false));
+        _Vault.joinPool(poolId, address(this), address(this), IVault.JoinPoolRequest(_tokens, joinAmounts, userData, false));
 
-        reward = IERC20(lpPool).balanceOf(address(this));
+        reward = IERC20(_lpPool).balanceOf(address(this));
 
         uint256 rewardPerDepositAge = reward * fractionMultiplier / (totalDepositAge + totalDeposits * (block.number - totalDepositLastUpdate));
         uint256 cumulativeRewardAgePerDepositAge = distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge + rewardPerDepositAge * (block.number - distributionInfo[distributionID - 1].block);
@@ -250,7 +260,7 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable, IUnoFarmB
         totalDepositLastUpdate = block.number;
         totalDepositAge = 0;
 
-        gauge.deposit(reward);
+        _gauge.deposit(reward);
     }
 
     /**

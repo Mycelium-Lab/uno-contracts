@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.10;
+pragma solidity 0.8.19;
 
 import {IUnoFarmQuickswapDual as Farm} from '../apps/quickswapDual/interfaces/IUnoFarmQuickswapDual.sol'; 
 import '../interfaces/IUnoFarm.sol';
@@ -190,62 +190,7 @@ contract UnoAssetRouterQuickswapDualV2 is Initializable, PausableUpgradeable, UU
         
         emit Deposit(lpStakingPool, msg.sender, recipient, liquidity);
     }
-     
-    /**
-     * @dev Deposits single MATIC in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool}, swaps MATIC for pool tokens and deposits them. Emits a {Deposit} event.
-     * @param lpStakingPool - Address of the pool to deposit tokens in.
-     * @param swapData - Parameter with which 1inch router is being called with. NOTE: Use WMATIC as toToken.
-     * @param amountAMin - Bounds the extent to which the B/A price can go up before the transaction reverts.
-     * @param amountBMin - Bounds the extent to which the A/B price can go up before the transaction reverts.
-     * @param recipient - Address which will receive the deposit.
-     
-     * @return sentETH - Total MATIC amount sent to the farm. NOTE: Returns dust left from swap in MATIC, but if A/B amount are not correct also returns dust in pool's tokens.
-     * @return liquidity - Total liquidity sent to the farm (in lpTokens).
-     */
-    function depositSingleETH(address lpStakingPool, bytes[2] calldata swapData, uint256 amountAMin, uint256 amountBMin, address recipient) external payable whenNotPaused returns(uint256 sentETH, uint256 liquidity){
-        require(msg.value > 0, "NO_MATIC_SENT");
-        Farm farm = Farm(farmFactory.Farms(lpStakingPool));
-        if(farm == Farm(address(0))){
-            farm = Farm(farmFactory.createFarm(lpStakingPool));
-        }
-
-        uint256 amount = msg.value;
-        IWMATIC(WMATIC).deposit{value: amount}();
-        IERC20Upgradeable(WMATIC).approve(OneInchRouter, amount);
-
-        sentETH = amount;
-        uint256 amountA;
-        uint256 amountB;
-        address tokenA = farm.tokenA();
-        address tokenB = farm.tokenB();
-
-        if (tokenA != WMATIC) {
-            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[0], tokenA);
-            amount -= spentAmount;
-            amountA = returnAmount;
-        }
-        if (tokenB != WMATIC) {
-            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[1], tokenB);
-            amount -= spentAmount;
-            amountB = returnAmount;
-        }
-
-        if (tokenA == WMATIC) {
-            amountA = amount;
-        } else if (tokenB == WMATIC) {
-            amountB = amount;
-        } else if (amount > 0) {
-            sentETH -= amount;
-            IWMATIC(WMATIC).withdraw(amount);
-            payable(msg.sender).transfer(amount);
-        }
-
-        require(amountA > 0 && amountB > 0, "NO_TOKENS_SENT");
-        (,,liquidity) = _addLiquidity(tokenA, tokenB, amountA, amountB, amountAMin, amountBMin, address(farm));
-        farm.deposit(liquidity, recipient);
-
-        emit Deposit(lpStakingPool, msg.sender, recipient, liquidity);
-    }
+    
 
     /**
      * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpStakingPool} and deposits tokens in it. Emits a {Deposit} event.
@@ -367,54 +312,6 @@ contract UnoAssetRouterQuickswapDualV2 is Initializable, PausableUpgradeable, UU
         emit Withdraw(lpStakingPool, msg.sender, recipient, amount);
     }
      
-    /**
-     * @dev Withdraws single MATIC from the given pool. Emits a {Withdraw} event. Note: If there are any tokens left to be withdrawn after swaps they will be sent to the {{recipient}} in a respective token (not in MATIC).
-     * @param lpStakingPool - LP pool to withdraw from.
-     * @param amount - LP amount to withdraw. 
-     * @param swapData - Parameter with which 1inch router is being called with.
-     * @param recipient - Address which will receive the deposit.
-     
-     * @return amountETH - MATIC amount sent to the {recipient}.
-     * @return amountA - Token A dust sent to the {recipient}.
-     * @return amountB - Token B dust sent to the {recipient}.
-     */
-    function withdrawSingleETH(address lpStakingPool,  uint256 amount, bytes[2] calldata swapData, address recipient) external whenNotPaused returns(uint256 amountETH, uint256 amountA, uint256 amountB){
-        Farm farm = Farm(farmFactory.Farms(lpStakingPool));
-        require(farm != Farm(address(0)),'FARM_NOT_EXISTS');
-
-        farm.withdraw(amount, msg.sender, address(this));
-
-        address tokenA = farm.tokenA();
-        address tokenB = farm.tokenB();
-        (amountA, amountB) = _removeLiquidity(farm.lpPool(), tokenA, tokenB, amount, 0, 0, address(this));
-
-        if (tokenA != WMATIC) {
-            IERC20Upgradeable(tokenA).approve(OneInchRouter, amountA);
-            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[0], WMATIC);
-            amountETH += returnAmount;
-
-            amountA = amountA - spentAmount;
-            IERC20Upgradeable(tokenA).safeTransfer(recipient, amountA);
-        } else {
-            amountETH += amountA;
-        }
-
-        if (tokenB != WMATIC) {
-            IERC20Upgradeable(tokenB).approve(OneInchRouter, amountB);
-            (uint256 returnAmount, uint256 spentAmount) = _swap(swapData[1], WMATIC);
-            amountETH += returnAmount;
-
-            amountB = amountB - spentAmount;
-            IERC20Upgradeable(tokenB).safeTransfer(recipient, amountB);
-        } else {
-            amountETH += amountB;
-        }
-
-        IWMATIC(WMATIC).withdraw(amountETH);
-        payable(recipient).transfer(amountETH);
-
-        emit Withdraw(lpStakingPool, msg.sender, recipient, amount);
-    }
 
     /** 
      * @dev Withdraws LP tokens from the given pool. Emits a {Withdraw} event.

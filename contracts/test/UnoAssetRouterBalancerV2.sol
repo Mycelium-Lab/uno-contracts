@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.10;
+pragma solidity 0.8.19;
 
 import {IUnoFarmBalancer as Farm} from '../apps/balancer/interfaces/IUnoFarmBalancer.sol'; 
 import '../interfaces/IUnoFarm.sol';
@@ -205,85 +205,7 @@ contract UnoAssetRouterBalancerV2 is Initializable, PausableUpgradeable, UUPSUpg
 
         emit Deposit(lpPool, msg.sender, recipient, liquidity);
     }
-
-    /**
-     * @dev Deposits single MATIC in the given pool. Creates new Farm contract if there isn't one deployed for the {lpPool}, swaps MATIC for pool tokens and deposits them. Emits a {Deposit} event.
-     * @param lpPool - Address of the pool to deposit tokens in.
-     * @param swapData - Parameter with which 1inch router is being called with.
-     * @param minAmountLP - Minimum LP the user will receive from {tokens} deposit.
-     * @param recipient - Address which will receive the deposit.
-     
-     * @return sentETH - Total MATIC amount sent to the farm. 
-     * @return liquidity - Total liquidity sent to the farm (in lpTokens).
-     */
-    function depositSingleETH(address lpPool, bytes[] calldata swapData, uint256 minAmountLP, address recipient) external payable whenNotPaused returns(uint256 sentETH, uint256 liquidity){
-        require (msg.value > 0, "NO_MATIC_SENT");
-        address[] memory tokens = _convertToAddressArray(getTokens(lpPool));
-        require (swapData.length == tokens.length, 'INPUT_PARAMS_LENGTHS_NOT_MATCH');
-
-        Farm farm = Farm(farmFactory.Farms(lpPool));
-        if(farm == Farm(address(0))){
-            farm = Farm(farmFactory.createFarm(lpPool));
-        }
-
-        uint256 amount = msg.value;
-        IWMATIC(WMATIC).deposit{value: amount}();
-        IERC20Upgradeable(WMATIC).approve(OneInchRouter, amount);
-
-        uint256[] memory amounts = new uint256[](tokens.length);
-        {
-        sentETH = amount;
-        int256 wmaticIndex = -1;
-        for (uint256 i = 0; i < tokens.length; i++) {
-            if (tokens[i] == lpPool) {
-                continue;
-            }
-            if (tokens[i] == WMATIC) {
-                wmaticIndex = int(i);
-                continue;
-            }
-            bytes memory data = _swap(swapData[i], tokens[i]);
-            (uint256 returnAmount, uint256 spentAmount) = abi.decode(data, (uint256, uint256));
-            if (returnAmount > 0) {
-                amounts[i] = returnAmount;
-            }
-            amount -= spentAmount;
-        }
-
-        if (wmaticIndex != -1) {
-            amounts[uint(wmaticIndex)] = amount;
-        } else if (amount > 0){
-            sentETH -= amount;
-            IWMATIC(WMATIC).withdraw(amount);
-            payable(msg.sender).transfer(amount);
-        }
-        }
-
-        liquidity = _addLiquidity(amounts, tokens, minAmountLP, farm.lpPool(), farm.poolId(), farm);//Have to use farm.lpPool() instead of lpPool to avoid stack too deep error
-        farm.deposit(liquidity, recipient);
-
-        emit Deposit(lpPool, msg.sender, recipient, liquidity);
-    }
-
-    /**
-     * @dev Deposits tokens in the given pool. Creates new Farm contract if there isn't one deployed for the {lpPool} and deposits tokens in it. Emits a {Deposit} event.
-     * @param lpPool - Address of the pool to deposit tokens in.
-     * @param amount - LP Token amount to deposit.
-     * @param recipient - Address which will receive the deposit.
-     */
-    function depositLP(address lpPool, uint256 amount, address recipient) external whenNotPaused{
-        require(amount > 0, "NO_TOKEN_SENT");
-        Farm farm = Farm(farmFactory.Farms(lpPool));
-        if(farm == Farm(address(0))){
-            farm = Farm(farmFactory.createFarm(lpPool));
-        }
-
-        IERC20Upgradeable(lpPool).safeTransferFrom(msg.sender, address(farm), amount);
-        farm.deposit(amount, recipient);
-
-        emit Deposit(lpPool, msg.sender, recipient, amount); 
-    }
-
+    
     /** 
      * @dev Withdraws tokens from the given pool. 
      * @param lpPool - LP pool to withdraw from.
