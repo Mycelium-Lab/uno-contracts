@@ -157,10 +157,10 @@ contract UnoFarmApeswap is Initializable, ReentrancyGuardUpgradeable, IUnoFarmAp
         FeeInfo calldata feeInfo
     ) external onlyAssetRouter returns(uint256 reward){
         if(totalDeposits == 0) revert NO_LIQUIDITY();
-        if(distributionInfo[distributionID - 1].block == block.number) revert CALL_ON_THE_SAME_BLOCK();
+        uint32 _distributionID = distributionID;
+        if(distributionInfo[_distributionID - 1].block == block.number) revert CALL_ON_THE_SAME_BLOCK();
 
-        IMiniApeV2 _MiniApe = MiniApe;
-        _MiniApe.harvest(pid, address(this));
+        MiniApe.harvest(pid, address(this));
 
         address _tokenA = tokenA;
         address _tokenB = tokenB;
@@ -214,19 +214,19 @@ contract UnoFarmApeswap is Initializable, ReentrancyGuardUpgradeable, IUnoFarmAp
         (,,reward) = _apeswapRouter.addLiquidity(_tokenA, _tokenB, IERC20(_tokenA).balanceOf(address(this)), IERC20(_tokenB).balanceOf(address(this)), swapInfos[0].amountOutMin + swapInfos[2].amountOutMin, swapInfos[1].amountOutMin + swapInfos[3].amountOutMin, address(this), block.timestamp);
         
         uint256 rewardPerDepositAge = reward * fractionMultiplier / (totalDepositAge + totalDeposits * (block.number - totalDepositLastUpdate));
-        uint256 cumulativeRewardAgePerDepositAge = distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge + rewardPerDepositAge * (block.number - distributionInfo[distributionID - 1].block);
+        uint256 cumulativeRewardAgePerDepositAge = distributionInfo[_distributionID - 1].cumulativeRewardAgePerDepositAge + rewardPerDepositAge * (block.number - distributionInfo[_distributionID - 1].block);
 
-        distributionInfo[distributionID] = DistributionInfo({
+        distributionInfo[_distributionID] = DistributionInfo({
             block: block.number,
             rewardPerDepositAge: rewardPerDepositAge,
             cumulativeRewardAgePerDepositAge: cumulativeRewardAgePerDepositAge
         });
 
-        distributionID += 1;
+        distributionID = _distributionID + 1;
         totalDepositLastUpdate = block.number;
         totalDepositAge = 0;
             
-        _MiniApe.deposit(pid, reward, address(this));
+        MiniApe.deposit(pid, reward, address(this));
     }
     
     /**

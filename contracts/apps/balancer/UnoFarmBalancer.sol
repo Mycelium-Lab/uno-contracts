@@ -193,7 +193,8 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable, IUnoFarmB
         FeeInfo calldata feeInfo
     ) external onlyAssetRouter returns(uint256 reward){
         if(totalDeposits == 0) revert NO_LIQUIDITY();
-        if(distributionInfo[distributionID - 1].block == block.number) revert CALL_ON_THE_SAME_BLOCK();
+        uint32 _distributionID = distributionID;
+        if(distributionInfo[_distributionID - 1].block == block.number) revert CALL_ON_THE_SAME_BLOCK();
 
         IChildChainStreamer _streamer = streamer;
         uint256 rewardCount = _streamer.reward_count();
@@ -248,15 +249,15 @@ contract UnoFarmBalancer is Initializable, ReentrancyGuardUpgradeable, IUnoFarmB
         reward = IERC20(_lpPool).balanceOf(address(this));
 
         uint256 rewardPerDepositAge = reward * fractionMultiplier / (totalDepositAge + totalDeposits * (block.number - totalDepositLastUpdate));
-        uint256 cumulativeRewardAgePerDepositAge = distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge + rewardPerDepositAge * (block.number - distributionInfo[distributionID - 1].block);
+        uint256 cumulativeRewardAgePerDepositAge = distributionInfo[_distributionID - 1].cumulativeRewardAgePerDepositAge + rewardPerDepositAge * (block.number - distributionInfo[_distributionID - 1].block);
 
-        distributionInfo[distributionID] = DistributionInfo({
+        distributionInfo[_distributionID] = DistributionInfo({
             block: block.number,
             rewardPerDepositAge: rewardPerDepositAge,
             cumulativeRewardAgePerDepositAge: cumulativeRewardAgePerDepositAge
         });
 
-        distributionID += 1;
+        distributionID = _distributionID + 1;
         totalDepositLastUpdate = block.number;
         totalDepositAge = 0;
 

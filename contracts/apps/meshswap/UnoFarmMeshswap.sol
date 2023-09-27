@@ -138,14 +138,18 @@ contract UnoFarmMeshswap is Initializable, ReentrancyGuardUpgradeable, IUnoFarmM
 		FeeInfo calldata feeInfo
 	) external onlyAssetRouter returns (uint256 reward) {
         if(totalDeposits == 0) revert NO_LIQUIDITY();
-		if(distributionInfo[distributionID - 1].block == block.number) revert CALL_ON_THE_SAME_BLOCK();
+		uint32 _distributionID = distributionID;
+		if(distributionInfo[_distributionID - 1].block == block.number) revert CALL_ON_THE_SAME_BLOCK();
 
 		IExchangeMeshwap(lpPool).claimReward();
 
 		address _rewardToken = rewardToken;
+		uint256 rewardTokenHalf;
+		{
 		uint256 balance = IERC20(_rewardToken).balanceOf(address(this));
 		balance -= _collectFees(IERC20(_rewardToken), balance, feeInfo);
-		uint256 rewardTokenHalf = balance / 2;
+		rewardTokenHalf = balance / 2;
+		}
 
 		address _tokenA = tokenA;
         address _tokenB = tokenB;
@@ -165,15 +169,15 @@ contract UnoFarmMeshswap is Initializable, ReentrancyGuardUpgradeable, IUnoFarmM
 		(,,reward) = _MeshswapRouter.addLiquidity(_tokenA, _tokenB, IERC20(_tokenA).balanceOf(address(this)), IERC20(_tokenB).balanceOf(address(this)), swapInfos[0].amountOutMin, swapInfos[1].amountOutMin, address(this), block.timestamp);
 
 		uint256 rewardPerDepositAge = reward * fractionMultiplier / (totalDepositAge + totalDeposits * (block.number - totalDepositLastUpdate));
-		uint256 cumulativeRewardAgePerDepositAge = distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge + rewardPerDepositAge * (block.number - distributionInfo[distributionID - 1].block);
+		uint256 cumulativeRewardAgePerDepositAge = distributionInfo[_distributionID - 1].cumulativeRewardAgePerDepositAge + rewardPerDepositAge * (block.number - distributionInfo[_distributionID - 1].block);
 
-		distributionInfo[distributionID] = DistributionInfo({
+		distributionInfo[_distributionID] = DistributionInfo({
 			block: block.number,
 			rewardPerDepositAge: rewardPerDepositAge,
 			cumulativeRewardAgePerDepositAge: cumulativeRewardAgePerDepositAge
 		});
 
-		distributionID += 1;
+		distributionID = _distributionID + 1;
 		totalDepositLastUpdate = block.number;
 		totalDepositAge = 0;
 	}
