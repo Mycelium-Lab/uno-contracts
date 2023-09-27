@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.10;
-pragma experimental ABIEncoderV2;
+pragma solidity 0.8.19;
 
 contract UnoAccessManager {
     bytes32 public constant ADMIN_ROLE = 0x00;

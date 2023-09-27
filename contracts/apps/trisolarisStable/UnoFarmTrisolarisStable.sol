@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.10;
+pragma solidity 0.8.19;
 
 import './interfaces/IUnoFarmTrisolarisStable.sol';
 import "../../interfaces/IUniswapV2Pair.sol";
@@ -117,7 +117,7 @@ contract UnoFarmTrisolarisStable is Initializable, ReentrancyGuardUpgradeable, I
      * @dev Function that makes the deposits.
      * Stakes {amount} of LP tokens from this contract's balance in the {MasterChef}.
      */
-    function deposit(uint256 amount, address recipient) external nonReentrant onlyAssetRouter {
+    function deposit(uint256 amount, address recipient) external onlyAssetRouter {
         if(amount == 0) revert NO_LIQUIDITY_PROVIDED();
 
         _updateDeposit(recipient);
@@ -134,22 +134,23 @@ contract UnoFarmTrisolarisStable is Initializable, ReentrancyGuardUpgradeable, I
         uint256 amount,
         address origin,
         address recipient
-    ) external nonReentrant onlyAssetRouter {
+    ) external onlyAssetRouter {
         if(amount == 0) revert INSUFFICIENT_AMOUNT();
 
         _updateDeposit(origin);
-        UserInfo storage user = userInfo[origin];
-        // Subtract amount from user.reward first, then subtract remainder from user.stake.
-        if (amount > user.reward) {
-            uint256 balance = user.stake + user.reward;
+		UserInfo storage user = userInfo[origin];
+		// Subtract amount from user.reward first, then subtract remainder from user.stake.
+		uint256 reward = user.reward;
+		if (amount > reward) {
+			uint256 balance = user.stake + reward;
             if(amount > balance) revert INSUFFICIENT_BALANCE();
 
-            user.stake = balance - amount;
-            totalDeposits = totalDeposits + user.reward - amount;
-            user.reward = 0;
-        } else {
-            user.reward -= amount;
-        }
+			user.stake = balance - amount;
+			totalDeposits = totalDeposits + reward - amount;
+			user.reward = 0;
+		} else {
+			user.reward = reward - amount;
+		}
 
         MasterChef.withdraw(pid, amount, recipient);
     }
@@ -164,69 +165,69 @@ contract UnoFarmTrisolarisStable is Initializable, ReentrancyGuardUpgradeable, I
         SwapInfo[] calldata rewardSwapInfos,
         SwapInfo[] calldata rewarderSwapInfos,
         FeeInfo calldata feeInfo
-    ) external onlyAssetRouter nonReentrant returns (uint256 reward) {
+    ) external onlyAssetRouter returns (uint256 reward) {
         if(totalDeposits == 0) revert NO_LIQUIDITY();
-        if(distributionInfo[distributionID - 1].block == block.number) revert CALL_ON_THE_SAME_BLOCK();
+        uint32 _distributionID = distributionID;
+        if(distributionInfo[_distributionID - 1].block == block.number) revert CALL_ON_THE_SAME_BLOCK();
 
-        if(rewardSwapInfos.length != tokens.length) revert INVALID_REWARD_SWAP_INFOS_LENGTH(tokens.length);
-        if(rewardSwapInfos.length != tokens.length) revert INVALID_REWARDER_SWAP_INFOS_LENGTH(tokens.length);
+        uint256 _tokensLength = tokens.length;
+        if(rewardSwapInfos.length != _tokensLength) revert INVALID_REWARD_SWAP_INFOS_LENGTH(_tokensLength);
+        if(rewarderSwapInfos.length != _tokensLength) revert INVALID_REWARDER_SWAP_INFOS_LENGTH(_tokensLength);
 
         MasterChef.harvest(pid, address(this));
 
         { // scope to avoid stack too deep errors
         uint256 rewardTokenFraction;
+        address _rewardToken = rewardToken;
         {
-            uint256 balance = IERC20(rewardToken).balanceOf(address(this));
-            balance -= _collectFees(IERC20(rewardToken), balance, feeInfo);
-            rewardTokenFraction = balance / tokens.length;
+            uint256 balance = IERC20(_rewardToken).balanceOf(address(this));
+            balance -= _collectFees(IERC20(_rewardToken), balance, feeInfo);
+            rewardTokenFraction = balance / _tokensLength;
         }
         uint256 rewarderTokenFraction;
-        if (rewarderToken != address(0)) {
-            uint256 balance = IERC20(rewarderToken).balanceOf(address(this));
-            balance -= _collectFees(IERC20(rewarderToken), balance, feeInfo);
-            rewarderTokenFraction = balance / tokens.length;
+        address _rewarderToken = rewarderToken;
+        if (_rewarderToken != address(0)) {
+            uint256 balance = IERC20(_rewarderToken).balanceOf(address(this));
+            balance -= _collectFees(IERC20(_rewarderToken), balance, feeInfo);
+            rewarderTokenFraction = balance / _tokensLength;
         }
 
-        if (rewardTokenFraction > 0) {
-            for (uint256 i = 0; i < tokens.length; i++) {
-                if (tokens[i] != rewardToken) {
-                    address[] calldata route = rewardSwapInfos[i].route;
-                    if(route[0] != rewardToken || route[route.length - 1] != tokens[i]) revert INVALID_ROUTE(rewardToken, tokens[i]);
-                    trisolarisRouter.swapExactTokensForTokens(rewardTokenFraction, rewardSwapInfos[i].amountOutMin, route, address(this), block.timestamp);
-                }
-            }
-        }
-
-        if (rewarderTokenFraction > 0) {
-            for (uint256 i = 0; i < tokens.length; i++) {
-                if (tokens[i] != rewarderToken) {
-                    address[] calldata route = rewarderSwapInfos[i].route;
-                    if (route[0] != rewarderToken || route[route.length - 1] != tokens[i]) revert INVALID_ROUTE(rewarderToken, tokens[i]);
-                    trisolarisRouter.swapExactTokensForTokens(rewarderTokenFraction, rewarderSwapInfos[i].amountOutMin, route, address(this), block.timestamp);
-                }
-            }
-        }
+        _swapTokens(rewardTokenFraction, _rewardToken, rewardSwapInfos);
+        _swapTokens(rewarderTokenFraction, _rewarderToken, rewarderSwapInfos);
         }
         
         uint256[] memory amounts = new uint256[](tokens.length);
-        for (uint256 i = 0; i < tokens.length; i++) {
+        for (uint256 i = 0; i < _tokensLength; i++) {
             amounts[i] = IERC20(tokens[i]).balanceOf(address(this));
         }
 
         reward = swap.addLiquidity(amounts, 1, block.timestamp);
         uint256 rewardPerDepositAge = reward * fractionMultiplier / (totalDepositAge + totalDeposits * (block.number - totalDepositLastUpdate));
-        uint256 cumulativeRewardAgePerDepositAge = distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge + rewardPerDepositAge * (block.number - distributionInfo[distributionID - 1].block);
-        distributionInfo[distributionID] = DistributionInfo({
+        uint256 cumulativeRewardAgePerDepositAge = distributionInfo[_distributionID - 1].cumulativeRewardAgePerDepositAge + rewardPerDepositAge * (block.number - distributionInfo[_distributionID - 1].block);
+        distributionInfo[_distributionID] = DistributionInfo({
             block: block.number,
             rewardPerDepositAge: rewardPerDepositAge,
             cumulativeRewardAgePerDepositAge: cumulativeRewardAgePerDepositAge
         });
 
-        distributionID += 1;
+        distributionID = _distributionID + 1;
         totalDepositLastUpdate = block.number;
         totalDepositAge = 0;
 
         MasterChef.deposit(pid, reward, address(this));
+    }
+
+    function _swapTokens(uint256 fraction, address _rewardToken, SwapInfo[] calldata swapInfos) internal {
+        if (fraction > 0) {
+            for (uint256 i = 0; i < swapInfos.length; i++) {
+                address _token = tokens[i];
+                if (_token != _rewardToken) {
+                    address[] calldata route = swapInfos[i].route;
+                    if (route[0] != _rewardToken || route[route.length - 1] != _token) revert INVALID_ROUTE(_rewardToken, _token);
+                    trisolarisRouter.swapExactTokensForTokens(fraction, swapInfos[i].amountOutMin, route, address(this), block.timestamp);
+                }
+            }
+        }
     }
 
     /**

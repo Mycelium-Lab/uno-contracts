@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.10;
+pragma solidity 0.8.19;
 
 import {IUnoFarmTrisolarisStandard as Farm} from './IUnoFarmTrisolarisStandard.sol'; 
 import '../../../interfaces/IUnoAssetRouter.sol';
