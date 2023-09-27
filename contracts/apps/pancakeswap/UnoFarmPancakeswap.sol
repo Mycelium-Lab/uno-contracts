@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.10;
+pragma solidity 0.8.19;
  
 import './interfaces/IUnoFarmPancakeswap.sol';
 import '../../interfaces/IUniswapV2Pair.sol';
@@ -103,7 +103,7 @@ contract UnoFarmPancakeswap is Initializable, ReentrancyGuardUpgradeable, IUnoFa
      * @dev Function that makes the deposits.
      * Stakes {amount} of LP tokens from this contract's balance in the {MasterChef}.
      */
-    function deposit(uint256 amount, address recipient) external nonReentrant onlyAssetRouter {
+    function deposit(uint256 amount, address recipient) external onlyAssetRouter {
         if(amount == 0) revert NO_LIQUIDITY_PROVIDED();
 
         _updateDeposit(recipient);
@@ -116,22 +116,23 @@ contract UnoFarmPancakeswap is Initializable, ReentrancyGuardUpgradeable, IUnoFa
     /**
      * @dev Withdraws funds from {origin} and sends them to the {recipient}.
      */
-    function withdraw(uint256 amount, address origin, address recipient) external nonReentrant onlyAssetRouter{
+    function withdraw(uint256 amount, address origin, address recipient) external onlyAssetRouter{
         if(amount == 0) revert INSUFFICIENT_AMOUNT();
 
         _updateDeposit(origin);
-        UserInfo storage user = userInfo[origin];
-        // Subtract amount from user.reward first, then subtract remainder from user.stake.
-        if(amount > user.reward){
-            uint256 balance = user.stake + user.reward;
+		UserInfo storage user = userInfo[origin];
+		// Subtract amount from user.reward first, then subtract remainder from user.stake.
+		uint256 reward = user.reward;
+		if (amount > reward) {
+			uint256 balance = user.stake + reward;
             if(amount > balance) revert INSUFFICIENT_BALANCE();
 
-            user.stake = balance - amount;
-            totalDeposits = totalDeposits + user.reward - amount;
-            user.reward = 0;
-        } else {
-            user.reward -= amount;
-        }
+			user.stake = balance - amount;
+			totalDeposits = totalDeposits + reward - amount;
+			user.reward = 0;
+		} else {
+			user.reward = reward - amount;
+		}
 
         MasterChef.withdraw(pid, amount);
         IERC20(lpPool).safeTransfer(recipient, amount);
@@ -146,39 +147,48 @@ contract UnoFarmPancakeswap is Initializable, ReentrancyGuardUpgradeable, IUnoFa
     function distribute(
         SwapInfo[2] calldata swapInfos,
         FeeInfo calldata feeInfo
-    ) external onlyAssetRouter nonReentrant returns(uint256 reward){
+    ) external onlyAssetRouter returns(uint256 reward){
         if(totalDeposits == 0) revert NO_LIQUIDITY();
-        if(distributionInfo[distributionID - 1].block == block.number) revert CALL_ON_THE_SAME_BLOCK();
+        uint32 _distributionID = distributionID;
+        if(distributionInfo[_distributionID - 1].block == block.number) revert CALL_ON_THE_SAME_BLOCK();
 
         MasterChef.withdraw(pid, 0);
 
-        uint256 balance = IERC20(rewardToken).balanceOf(address(this));
-		balance -= _collectFees(IERC20(rewardToken), balance, feeInfo);
+        address _tokenA = tokenA;
+        address _tokenB = tokenB;
+        IUniswapV2Router01 _pancakeswapRouter = pancakeswapRouter;
+
+        {
+        address _rewardToken = rewardToken;
+        uint256 balance = IERC20(_rewardToken).balanceOf(address(this));
+		balance -= _collectFees(IERC20(_rewardToken), balance, feeInfo);
 		uint256 rewardTokenHalf = balance / 2;
-        if (tokenA != rewardToken) {
+        
+        if (_tokenA != _rewardToken) {
             address[] calldata route = swapInfos[0].route;
-            if(route[0] != rewardToken || route[route.length - 1] != tokenA) revert INVALID_ROUTE(rewardToken, tokenA);
-            pancakeswapRouter.swapExactTokensForTokens(rewardTokenHalf, swapInfos[0].amountOutMin, route, address(this), block.timestamp);
+            if(route[0] != _rewardToken || route[route.length - 1] != _tokenA) revert INVALID_ROUTE(_rewardToken, _tokenA);
+            _pancakeswapRouter.swapExactTokensForTokens(rewardTokenHalf, swapInfos[0].amountOutMin, route, address(this), block.timestamp);
         }
 
-        if (tokenB != rewardToken) {
+        if (_tokenB != _rewardToken) {
             address[] calldata route = swapInfos[1].route;
-            if(route[0] != rewardToken || route[route.length - 1] != tokenB) revert INVALID_ROUTE(rewardToken, tokenB);
-            pancakeswapRouter.swapExactTokensForTokens(rewardTokenHalf, swapInfos[1].amountOutMin, route, address(this), block.timestamp);
+            if(route[0] != _rewardToken || route[route.length - 1] != _tokenB) revert INVALID_ROUTE(_rewardToken, _tokenB);
+            _pancakeswapRouter.swapExactTokensForTokens(rewardTokenHalf, swapInfos[1].amountOutMin, route, address(this), block.timestamp);
+        }
         }
 
-        (,,reward) = pancakeswapRouter.addLiquidity(tokenA, tokenB, IERC20(tokenA).balanceOf(address(this)), IERC20(tokenB).balanceOf(address(this)), swapInfos[0].amountOutMin, swapInfos[1].amountOutMin, address(this), block.timestamp);
+        (,,reward) = _pancakeswapRouter.addLiquidity(_tokenA, _tokenB, IERC20(_tokenA).balanceOf(address(this)), IERC20(_tokenB).balanceOf(address(this)), swapInfos[0].amountOutMin, swapInfos[1].amountOutMin, address(this), block.timestamp);
         
         uint256 rewardPerDepositAge = reward * fractionMultiplier / (totalDepositAge + totalDeposits * (block.number - totalDepositLastUpdate));
-        uint256 cumulativeRewardAgePerDepositAge = distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge + rewardPerDepositAge * (block.number - distributionInfo[distributionID - 1].block);
+        uint256 cumulativeRewardAgePerDepositAge = distributionInfo[_distributionID - 1].cumulativeRewardAgePerDepositAge + rewardPerDepositAge * (block.number - distributionInfo[_distributionID - 1].block);
 
-        distributionInfo[distributionID] = DistributionInfo({
+        distributionInfo[_distributionID] = DistributionInfo({
             block: block.number,
             rewardPerDepositAge: rewardPerDepositAge,
             cumulativeRewardAgePerDepositAge: cumulativeRewardAgePerDepositAge
         });
 
-        distributionID += 1;
+        distributionID = _distributionID + 1;
         totalDepositLastUpdate = block.number;
         totalDepositAge = 0;
             

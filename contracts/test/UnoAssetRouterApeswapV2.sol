@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.10;
+pragma solidity 0.8.19;
 
 import {IUnoFarmApeswap as Farm} from '../apps/apeswap/interfaces/IUnoFarmApeswap.sol'; 
 import '../interfaces/IUnoFarm.sol';

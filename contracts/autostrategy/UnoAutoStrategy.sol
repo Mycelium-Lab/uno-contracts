@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.10;
+pragma solidity 0.8.19;
 
-import "../interfaces/IOdosRouter.sol";   
 import "../interfaces/IUnoAssetRouter.sol";   
 import "../interfaces/IUnoAutoStrategyFactory.sol";  
 import "../interfaces/IAggregationRouterV5.sol";
@@ -62,7 +61,7 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
      * {MINIMUM_LIQUIDITY} - Ameliorates rounding errors.
      */
 
-    IOdosRouter private constant OdosRouter = IOdosRouter(0x9f138be5aA5cC442Ea7cC7D18cD9E30593ED90b9);
+    address private constant OdosRouter = 0x89b8AA89FDd0507a99d334CBe3C808fAFC7d850E;
 
     uint256 public poolID;
     PoolInfo[] public pools;
@@ -117,8 +116,9 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
     error CALLER_NOT_LIQUIDITY_MANAGER();
     error NO_LIQUIDITY();
     error CANT_CALL_ON_THE_SAME_BLOCK();
-    error BAD_SWAP_A();
-    error BAD_SWAP_B();
+    error SWAP_NOT_SUCCESSFUL();
+    error TOKEN_A_DUST_LEFT();
+    error TOKEN_B_DUST_LEFT();
     error INSUFFICIENT_LIQUIDITY();
     error NOT_ETH_POOL();
     error TRANSFER_NOT_SUCCESSFUL();
@@ -406,14 +406,13 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
     /**
      * @dev Moves liquidity from {pools[poolID]} to {pools[_poolID]}. Emits {MoveLiquidity} event.
      * @param _poolID - Pool ID to move liquidity to.
-     * @param swapAData - Data for tokenA swap.
-     * @param swapBData - Data for tokenB swap.
+     * @param swapData - Data for tokens swap.
      * @param amountAMin - The minimum amount of tokenA that must be deposited in {pools[_poolID]} for the transaction not to revert.
      * @param amountBMin - The minimum amount of tokenB that must be deposited in {pools[_poolID]} for the transaction not to revert.
      *
      * Note: This function can only be called by LiquidityManager.
      */
-    function moveLiquidity(uint256 _poolID, bytes calldata swapAData, bytes calldata swapBData, uint256 amountAMin, uint256 amountBMin) whenNotPaused nonReentrant external {
+    function moveLiquidity(uint256 _poolID, bytes calldata swapData, uint256 amountAMin, uint256 amountBMin) whenNotPaused nonReentrant external {
         if(!accessManager.hasRole(LIQUIDITY_MANAGER_ROLE, msg.sender)) revert CALLER_NOT_LIQUIDITY_MANAGER();
         if(totalSupply() == 0) revert NO_LIQUIDITY();
         if(lastMoveInfo.block == block.number) revert CANT_CALL_ON_THE_SAME_BLOCK();
@@ -425,58 +424,26 @@ contract UnoAutoStrategy is Initializable, ERC20Upgradeable, ReentrancyGuardUpgr
         (uint256 _totalDeposits,,) = currentPool.assetRouter.userStake(address(this), currentPool.pool);
         currentPool.assetRouter.withdraw(currentPool.pool, _totalDeposits, 0, 0, address(this));
 
-        uint256 tokenABalance = currentPool.tokenA.balanceOf(address(this));
-        uint256 tokenBBalance = currentPool.tokenB.balanceOf(address(this));
+        if(currentPool.tokenA != newPool.tokenA || currentPool.tokenB != newPool.tokenB){
+            address odosRouter = OdosRouter;
+            currentPool.tokenA.approve(odosRouter, currentPool.tokenA.balanceOf(address(this)));
+            currentPool.tokenB.approve(odosRouter, currentPool.tokenB.balanceOf(address(this)));
+            (bool success,) = odosRouter.call(swapData);
+            if(!success) revert SWAP_NOT_SUCCESSFUL();
 
-        if(currentPool.tokenA != newPool.tokenA){
-            (
-                IOdosRouter.inputToken[] memory inputs, 
-                IOdosRouter.outputToken[] memory outputs, 
-                ,
-                uint256 valueOutMin,
-                address executor,
-                bytes memory pathDefinition
-            ) = abi.decode(swapAData[4:], (IOdosRouter.inputToken[],IOdosRouter.outputToken[],uint256,uint256,address,bytes));
-
-            // More descriptive errors would be nice but our contract size is very limited
-            if(
-                ((inputs.length != 1) || (outputs.length != 1)) ||
-                (inputs[0].tokenAddress != address(currentPool.tokenA)) ||
-                (outputs[0].tokenAddress != address(newPool.tokenA))
-            ) revert BAD_SWAP_A();
-
-            inputs[0].amountIn = tokenABalance;
-            currentPool.tokenA.approve(address(OdosRouter), tokenABalance);
-            OdosRouter.swap(inputs, outputs, type(uint256).max, valueOutMin, executor, pathDefinition);
-        }
-
-        if(currentPool.tokenB != newPool.tokenB){
-            (
-                IOdosRouter.inputToken[] memory inputs,
-                IOdosRouter.outputToken[] memory outputs,
-                ,
-                uint256 valueOutMin,
-                address executor,
-                bytes memory pathDefinition
-            ) = abi.decode(swapBData[4:], (IOdosRouter.inputToken[],IOdosRouter.outputToken[],uint256,uint256,address,bytes));
-
-            // More descriptive errors would be nice but our contract size is very limited
-            if(
-                ((inputs.length != 1) || (outputs.length != 1)) ||
-                (inputs[0].tokenAddress != address(currentPool.tokenB)) ||
-                (outputs[0].tokenAddress != address(newPool.tokenB))
-            ) revert BAD_SWAP_B();
-
-            inputs[0].amountIn = tokenBBalance;
-            currentPool.tokenB.approve(address(OdosRouter), tokenBBalance);
-            OdosRouter.swap(inputs, outputs, type(uint256).max, valueOutMin, executor, pathDefinition);
+            if(currentPool.tokenA != newPool.tokenA && currentPool.tokenA != newPool.tokenB){
+                if(currentPool.tokenA.balanceOf(address(this)) != 0) revert TOKEN_A_DUST_LEFT();
+            }
+            if(currentPool.tokenB != newPool.tokenA && currentPool.tokenB != newPool.tokenB){
+                if(currentPool.tokenB.balanceOf(address(this)) != 0) revert TOKEN_B_DUST_LEFT();
+            }
         }
 
         uint256 newTokenABalance = newPool.tokenA.balanceOf(address(this));
         uint256 newTokenBBalance = newPool.tokenB.balanceOf(address(this));
         
-        newPool.tokenB.approve(address(newPool.assetRouter), newTokenBBalance);
         newPool.tokenA.approve(address(newPool.assetRouter), newTokenABalance);
+        newPool.tokenB.approve(address(newPool.assetRouter), newTokenBBalance);
         (,,reserveLP) = newPool.assetRouter.deposit(newPool.pool, newTokenABalance, newTokenBBalance, amountAMin, amountBMin, address(this));
        
         lastMoveInfo = MoveLiquidityInfo({
