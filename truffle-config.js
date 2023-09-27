@@ -9,7 +9,7 @@ module.exports = {
     },
 
     networks: {
-        /* optimism: {
+        optimism: {
             provider: new HDWalletProvider({
                 privateKeys: [process.env.PRIVATE_KEY],
                 providerOrUrl: 'https://opt-mainnet.g.alchemy.com/v2/WFWF6gOioPPgruzoyKG1eOEAdgZI1pTs', // 'https://rpc.ankr.com/optimism',
@@ -29,7 +29,7 @@ module.exports = {
             network_id: 10,
             networkCheckTimeout: 10000,
             timeoutBlocks: 200
-        } */
+        }
     },
     plugins: ['truffle-contract-size', 'truffle-plugin-verify'],
     compilers: {
