@@ -34,11 +34,11 @@ module.exports = {
     plugins: ['truffle-contract-size', 'truffle-plugin-verify'],
     compilers: {
         solc: {
-            version: '0.8.10',
+            version: '0.8.19',
             settings: {
                 optimizer: {
                     enabled: true,
-                    runs: 200
+                    runs: 8000
                 }
             }
         }
