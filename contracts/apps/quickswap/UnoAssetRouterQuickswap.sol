@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.10;
+pragma solidity 0.8.19;
 
 import './interfaces/IUnoAssetRouterQuickswap.sol'; 
 import '../../interfaces/IUnoFarm.sol';

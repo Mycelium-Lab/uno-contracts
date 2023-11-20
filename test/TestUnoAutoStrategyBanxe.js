@@ -552,7 +552,7 @@ contract('UnoAutoStrategyBanxe', (accounts) => {
             it('reverts if called not by liquidity manager', async () => {
                 const poolID = await autoStrategy.poolID()
                 await expectRevertCustomError(
-                    autoStrategy.moveLiquidity(poolID.add(new BN(1)), '0x', '0x', 0, 0, {
+                    autoStrategy.moveLiquidity(poolID.add(new BN(1)), '0x', 0, 0, {
                         from: account1
                     }),
                     'CALLER_NOT_LIQUIDITY_MANAGER'
@@ -578,7 +578,7 @@ contract('UnoAutoStrategyBanxe', (accounts) => {
                 })
 
                 await expectRevertCustomError(
-                    autoStrategy.moveLiquidity(poolID, '0x', '0x', 0, 0, {
+                    autoStrategy.moveLiquidity(poolID, '0x', 0, 0, {
                         from: liquidityManager
                     }),
                     'BAD_POOL_ID'
@@ -623,7 +623,7 @@ contract('UnoAutoStrategyBanxe', (accounts) => {
                 } = await autoStrategy.userStake(account1));
                 ({ totalDepositsA: totalDepositsABefore, totalDepositsB: totalDepositsBBefore } = await autoStrategy.totalDeposits())
 
-                receipt = await autoStrategy.moveLiquidity(id.add(new BN(1)), '0x', '0x', 0, 0, {
+                receipt = await autoStrategy.moveLiquidity(id.add(new BN(1)), '0x', 0, 0, {
                     from: liquidityManager
                 })
             })
@@ -687,7 +687,7 @@ contract('UnoAutoStrategyBanxe', (accounts) => {
                 tokenBBalanceBefore
 
             before(async () => {
-                await autoStrategy.moveLiquidity(0, '0x', '0x', 0, 0, {
+                await autoStrategy.moveLiquidity(0, '0x', 0, 0, {
                     from: liquidityManager
                 })
 
@@ -830,7 +830,7 @@ contract('UnoAutoStrategyBanxe', (accounts) => {
             it('reverts moveLiquidity if paused', async () => {
                 const poolID = await autoStrategy.poolID()
                 await expectRevertCustomError(
-                    autoStrategy.moveLiquidity(poolID.add(new BN(1)), '0x', '0x', 0, 0, {
+                    autoStrategy.moveLiquidity(poolID.add(new BN(1)), '0x', 0, 0, {
                         from: account1
                     }),
                     'PAUSABLE_PAUSED'

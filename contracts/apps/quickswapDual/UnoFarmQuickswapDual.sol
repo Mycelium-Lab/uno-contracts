@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.10;
+pragma solidity 0.8.19;
  
 import './interfaces/IUnoFarmQuickswapDual.sol';
 import '../../interfaces/IUniswapV2Pair.sol';
@@ -102,7 +102,7 @@ contract UnoFarmQuickswapDual is Initializable, ReentrancyGuardUpgradeable, IUno
      * @dev Function that makes the deposits.
      * Stakes {amount} of LP tokens from this contract's balance in the {lpStakingPool}.
      */
-    function deposit(uint256 amount, address recipient) external nonReentrant onlyAssetRouter{
+    function deposit(uint256 amount, address recipient) external onlyAssetRouter{
         if(amount == 0) revert NO_LIQUIDITY_PROVIDED();
 
         _updateDeposit(recipient);
@@ -115,22 +115,23 @@ contract UnoFarmQuickswapDual is Initializable, ReentrancyGuardUpgradeable, IUno
     /**
      * @dev Withdraws funds from {origin} and sends them to the {recipient}.
      */
-    function withdraw(uint256 amount, address origin, address recipient) external nonReentrant onlyAssetRouter{
+    function withdraw(uint256 amount, address origin, address recipient) external onlyAssetRouter{
         if(amount == 0) revert INSUFFICIENT_AMOUNT();
 
         _updateDeposit(origin);
-        UserInfo storage user = userInfo[origin];
-        // Subtract amount from user.reward first, then subtract remainder from user.stake.
-        if(amount > user.reward){
-            uint256 balance = user.stake + user.reward;
+		UserInfo storage user = userInfo[origin];
+		// Subtract amount from user.reward first, then subtract remainder from user.stake.
+		uint256 reward = user.reward;
+		if (amount > reward) {
+			uint256 balance = user.stake + reward;
             if(amount > balance) revert INSUFFICIENT_BALANCE();
 
-            user.stake = balance - amount;
-            totalDeposits = totalDeposits + user.reward - amount;
-            user.reward = 0;
-        } else {
-            user.reward -= amount;
-        }
+			user.stake = balance - amount;
+			totalDeposits = totalDeposits + reward - amount;
+			user.reward = 0;
+		} else {
+			user.reward = reward - amount;
+		}
 
         lpStakingPool.withdraw(amount);
         IERC20(lpPool).safeTransfer(recipient, amount);
@@ -145,65 +146,72 @@ contract UnoFarmQuickswapDual is Initializable, ReentrancyGuardUpgradeable, IUno
     function distribute(
         SwapInfo[4] calldata swapInfos,
         FeeInfo calldata feeInfo
-    ) external onlyAssetRouter nonReentrant returns(uint256 reward){
+    ) external onlyAssetRouter returns(uint256 reward){
         if(totalDeposits == 0) revert NO_LIQUIDITY();
-        if(distributionInfo[distributionID - 1].block == block.number) revert CALL_ON_THE_SAME_BLOCK();
+        uint32 _distributionID = distributionID;
+        if(distributionInfo[_distributionID - 1].block == block.number) revert CALL_ON_THE_SAME_BLOCK();
 
         lpStakingPool.getReward();
+
+        address _tokenA = tokenA;
+        address _tokenB = tokenB;
+        IUniswapV2Router01 _quickswapRouter = quickswapRouter;
         { // scope to avoid stack too deep errors
         uint256 rewardTokenAHalf;
+        address _rewardTokenA = rewardTokenA;
         {
-            uint256 balance = IERC20(rewardTokenA).balanceOf(address(this));
-            balance -= _collectFees(IERC20(rewardTokenA), balance, feeInfo);
+            uint256 balance = IERC20(_rewardTokenA).balanceOf(address(this));
+            balance -= _collectFees(IERC20(_rewardTokenA), balance, feeInfo);
             rewardTokenAHalf = balance / 2;
         }
         uint256 rewardTokenBHalf;
+        address _rewardTokenB = rewardTokenB;
         {
-            uint256 balance = IERC20(rewardTokenB).balanceOf(address(this));
-            balance -= _collectFees(IERC20(rewardTokenB), balance, feeInfo);
+            uint256 balance = IERC20(_rewardTokenB).balanceOf(address(this));
+            balance -= _collectFees(IERC20(_rewardTokenB), balance, feeInfo);
             rewardTokenBHalf = balance / 2;
         }
 
         if (rewardTokenAHalf > 0) {
-            if (tokenA != rewardTokenA) {
+            if (_tokenA != _rewardTokenA) {
                 address[] calldata route = swapInfos[0].route;
-                if(route[0] != rewardTokenA || route[route.length - 1] != tokenA) revert INVALID_ROUTE(rewardTokenA, tokenA);
-                quickswapRouter.swapExactTokensForTokens(rewardTokenAHalf, swapInfos[0].amountOutMin, route, address(this), block.timestamp);
+                if(route[0] != _rewardTokenA || route[route.length - 1] != _tokenA) revert INVALID_ROUTE(_rewardTokenA, _tokenA);
+                _quickswapRouter.swapExactTokensForTokens(rewardTokenAHalf, swapInfos[0].amountOutMin, route, address(this), block.timestamp);
             }
 
-            if (tokenB != rewardTokenA) {
+            if (_tokenB != _rewardTokenA) {
                 address[] calldata route = swapInfos[1].route;
-                if(route[0] != rewardTokenA || route[route.length - 1] != tokenB) revert INVALID_ROUTE(rewardTokenA, tokenB);
-                quickswapRouter.swapExactTokensForTokens(rewardTokenAHalf, swapInfos[1].amountOutMin, route, address(this), block.timestamp);
+                if(route[0] != _rewardTokenA || route[route.length - 1] != _tokenB) revert INVALID_ROUTE(_rewardTokenA, _tokenB);
+                _quickswapRouter.swapExactTokensForTokens(rewardTokenAHalf, swapInfos[1].amountOutMin, route, address(this), block.timestamp);
             }
         }
         if (rewardTokenBHalf > 0) {
-            if (tokenA != rewardTokenB) {
+            if (_tokenA != _rewardTokenB) {
                 address[] calldata route = swapInfos[2].route;
-                if (route[0] != rewardTokenB || route[route.length - 1] != tokenA) revert INVALID_ROUTE(rewardTokenB, tokenA);
-                quickswapRouter.swapExactTokensForTokens(rewardTokenBHalf, swapInfos[2].amountOutMin, route, address(this), block.timestamp);
+                if (route[0] != _rewardTokenB || route[route.length - 1] != _tokenA) revert INVALID_ROUTE(_rewardTokenB, _tokenA);
+                _quickswapRouter.swapExactTokensForTokens(rewardTokenBHalf, swapInfos[2].amountOutMin, route, address(this), block.timestamp);
             }
     
-            if (tokenB != rewardTokenB) {
+            if (_tokenB != _rewardTokenB) {
                 address[] calldata route = swapInfos[3].route;
-                if (route[0] != rewardTokenB || route[route.length - 1] != tokenB) revert INVALID_ROUTE(rewardTokenB, tokenB);
-                quickswapRouter.swapExactTokensForTokens(rewardTokenBHalf, swapInfos[3].amountOutMin, route, address(this), block.timestamp);
+                if (route[0] != _rewardTokenB || route[route.length - 1] != _tokenB) revert INVALID_ROUTE(_rewardTokenB, _tokenB);
+                _quickswapRouter.swapExactTokensForTokens(rewardTokenBHalf, swapInfos[3].amountOutMin, route, address(this), block.timestamp);
             }
         }
         }
         
-        (,,reward) = quickswapRouter.addLiquidity(tokenA, tokenB, IERC20(tokenA).balanceOf(address(this)), IERC20(tokenB).balanceOf(address(this)), swapInfos[0].amountOutMin + swapInfos[2].amountOutMin, swapInfos[1].amountOutMin + swapInfos[3].amountOutMin, address(this), block.timestamp);
+        (,,reward) = _quickswapRouter.addLiquidity(_tokenA, _tokenB, IERC20(_tokenA).balanceOf(address(this)), IERC20(_tokenB).balanceOf(address(this)), swapInfos[0].amountOutMin + swapInfos[2].amountOutMin, swapInfos[1].amountOutMin + swapInfos[3].amountOutMin, address(this), block.timestamp);
 
         uint256 rewardPerDepositAge = reward * fractionMultiplier / (totalDepositAge + totalDeposits * (block.number - totalDepositLastUpdate));
-        uint256 cumulativeRewardAgePerDepositAge = distributionInfo[distributionID - 1].cumulativeRewardAgePerDepositAge + rewardPerDepositAge * (block.number - distributionInfo[distributionID - 1].block);
+        uint256 cumulativeRewardAgePerDepositAge = distributionInfo[_distributionID - 1].cumulativeRewardAgePerDepositAge + rewardPerDepositAge * (block.number - distributionInfo[_distributionID - 1].block);
 
-        distributionInfo[distributionID] = DistributionInfo({
+        distributionInfo[_distributionID] = DistributionInfo({
             block: block.number,
             rewardPerDepositAge: rewardPerDepositAge,
             cumulativeRewardAgePerDepositAge: cumulativeRewardAgePerDepositAge
         });
 
-        distributionID += 1;
+        distributionID = _distributionID + 1;
         totalDepositLastUpdate = block.number;
         totalDepositAge = 0;
 

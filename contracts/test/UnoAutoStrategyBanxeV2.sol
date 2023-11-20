@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.10;
+pragma solidity 0.8.19;
 import "../interfaces/IOdosRouter.sol";
 import "../interfaces/IUnoAssetRouter.sol";   
 import "../interfaces/IUnoAutoStrategyFactory.sol";
@@ -212,79 +212,6 @@ contract UnoAutoStrategyBanxeV2 is Initializable, ERC20Upgradeable, ReentrancyGu
         }
     }
 
-    /**
-     * @dev Moves liquidity from {pools[poolID]} to {pools[_poolID]}. Emits {MoveLiquidity} event.
-     * @param _poolID - Pool ID to move liquidity to.
-     * @param swapAData - Data for tokenA swap.
-     * @param swapBData - Data for tokenB swap.
-     * @param amountAMin - The minimum amount of tokenA that must be deposited in {pools[_poolID]} for the transaction not to revert.
-     * @param amountBMin - The minimum amount of tokenB that must be deposited in {pools[_poolID]} for the transaction not to revert.
-     *
-     * Note: This function can only be called by LiquidityManager.
-     */
-    function moveLiquidity(uint256 _poolID, bytes calldata swapAData, bytes calldata swapBData, uint256 amountAMin, uint256 amountBMin) whenNotPaused nonReentrant external {
-        require(accessManager.hasRole(LIQUIDITY_MANAGER_ROLE, msg.sender), 'CALLER_NOT_LIQUIDITY_MANAGER');
-        require(totalSupply() != 0, 'NO_LIQUIDITY');
-        require(lastMoveInfo.block != block.number, 'CANT_CALL_ON_THE_SAME_BLOCK');
-        require((_poolID < pools.length) && (_poolID != poolID), 'BAD_POOL_ID');
-
-        PoolInfo memory currentPool = pools[poolID];
-        PoolInfo memory newPool = pools[_poolID];
-
-        (uint256 _totalDeposits,,) = currentPool.assetRouter.userStake(address(this), currentPool.pool);
-        currentPool.assetRouter.withdraw(currentPool.pool, _totalDeposits, 0, 0, address(this));
-
-        uint256 tokenABalance = currentPool.tokenA.balanceOf(address(this));
-        uint256 tokenBBalance = currentPool.tokenB.balanceOf(address(this));
-
-        if(currentPool.tokenA != newPool.tokenA){
-            (
-                IOdosRouter.inputToken[] memory inputs, 
-                IOdosRouter.outputToken[] memory outputs, 
-                ,
-                uint256 valueOutMin,
-                address executor,
-                bytes memory pathDefinition
-            ) = abi.decode(swapAData[4:], (IOdosRouter.inputToken[],IOdosRouter.outputToken[],uint256,uint256,address,bytes));
-
-            require((inputs.length == 1) && (outputs.length == 1), 'BAD_SWAP_A_TOKENS_LENGTH');
-            require(inputs[0].tokenAddress == address(currentPool.tokenA), 'BAD_SWAP_A_INPUT_TOKEN');
-            require(outputs[0].tokenAddress == address(newPool.tokenA), 'BAD_SWAP_A_OUTPUT_TOKEN');
-
-            inputs[0].amountIn = tokenABalance;
-            OdosRouter.swap(inputs, outputs, type(uint256).max, valueOutMin, executor, pathDefinition);
-        }
-
-        if(currentPool.tokenB != newPool.tokenB){
-            (
-                IOdosRouter.inputToken[] memory inputs,
-                IOdosRouter.outputToken[] memory outputs,
-                ,
-                uint256 valueOutMin,
-                address executor,
-                bytes memory pathDefinition
-            ) = abi.decode(swapBData[4:], (IOdosRouter.inputToken[],IOdosRouter.outputToken[],uint256,uint256,address,bytes));
-
-            require((inputs.length == 1) && (outputs.length == 1), 'BAD_SWAP_B_TOKENS_LENGTH');
-            require(inputs[0].tokenAddress == address(currentPool.tokenB), 'BAD_SWAP_B_INPUT_TOKEN');
-            require(outputs[0].tokenAddress == address(newPool.tokenB), 'BAD_SWAP_B_OUTPUT_TOKEN');
-
-            inputs[0].amountIn = tokenBBalance;
-            OdosRouter.swap(inputs, outputs, type(uint256).max, valueOutMin, executor, pathDefinition);
-        }
-        
-        (,,reserveLP) = newPool.assetRouter.deposit(newPool.pool, newPool.tokenA.balanceOf(address(this)), newPool.tokenB.balanceOf(address(this)), amountAMin, amountBMin, address(this));
-       
-        lastMoveInfo = MoveLiquidityInfo({
-            leftoverA: newPool.tokenA.balanceOf(address(this)),
-            leftoverB: newPool.tokenB.balanceOf(address(this)),
-            totalSupply: totalSupply(),
-            block: block.number
-        });
-
-        emit MoveLiquidity(poolID, _poolID); 
-        poolID = _poolID;
-    }
 
     /**
      * @dev Returns tokens staked by the {_address}. 

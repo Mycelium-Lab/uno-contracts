@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.10;
+pragma solidity 0.8.19;
 
 import {IUnoFarmBalancer as Farm} from './IUnoFarmBalancer.sol'; 
 import '../../../interfaces/IUnoFarmFactory.sol';
