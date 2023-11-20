@@ -130,6 +130,11 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
         const complexRewarder = (await MasterChef.rewarder(pid)).toString()
 
         if (complexRewarder !== constants.ZERO_ADDRESS) {
+            console.log('a')
+            await web3.eth.sendTransaction({ to: AURORAholder, from: accounts[3], value: web3.utils.toWei('10') })
+            await web3.eth.sendTransaction({ to: accountNormalTokens, from: accounts[3], value: web3.utils.toWei('10') })
+
+            console.log('b')
             const ComplexRewarder = await IComplexRewarder.at(complexRewarder)
             const data = await ComplexRewarder.pendingTokens(pid, constants.ZERO_ADDRESS, 0)
             rewarderTokenAddress = data['0']['0'].toString()
@@ -137,6 +142,7 @@ contract('UnoAssetRouterTrisolarisStable', (accounts) => {
             const AURORAtoken = await IERC20.at(rewarderTokenAddress)
             const AURORAbalance = await AURORAtoken.balanceOf(AURORAholder)
             await AURORAtoken.transfer(complexRewarder, AURORAbalance, { from: AURORAholder })
+            console.log('c')
         } else {
             rewarderTokenAddress = constants.ZERO_ADDRESS
         }
