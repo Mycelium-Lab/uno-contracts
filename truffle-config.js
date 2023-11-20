@@ -18,13 +18,13 @@ module.exports = {
             }),
             networkCheckTimeout: 10000,
             network_id: 10,
+            gas: 7500000,
             addressIndex: 0,
             timeoutBlocks: 200
         },
         test: {
             host: '127.0.0.1',
             port: 8545,
-            gas: 7500000,
             gasPrice: 1000000000,
             network_id: 10,
             networkCheckTimeout: 10000,
@@ -34,11 +34,11 @@ module.exports = {
     plugins: ['truffle-contract-size', 'truffle-plugin-verify'],
     compilers: {
         solc: {
-            version: '0.8.10',
+            version: '0.8.19',
             settings: {
                 optimizer: {
                     enabled: true,
-                    runs: 200
+                    runs: 8000
                 }
             }
         }

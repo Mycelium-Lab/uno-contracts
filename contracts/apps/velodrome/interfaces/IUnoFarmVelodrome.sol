@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.10;
+pragma solidity 0.8.19;
 
 import '../../../interfaces/IUnoFarm.sol';
 import "../../../interfaces/IGauge.sol"; 
@@ -8,12 +8,14 @@ import "../../../interfaces/IRouter.sol";
 interface IUnoFarmVelodrome is IUnoFarm { 
 	/**
      * @dev SwapInfo:
+     * {amount} - 
      * {route} - Array of token addresses describing swap routes.
      * {amountOutMin} - The minimum amount of output token that must be received for the transaction not to revert.
      */
     struct SwapInfo{
-        IRouter.Route[] route;
+        uint256 amount;
         uint256 amountOutMin;
+        IRouter.Route[] route;
     }
 
     error INVALID_GAUGE();

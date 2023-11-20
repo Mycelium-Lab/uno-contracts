@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.10;
+pragma solidity 0.8.19;
 
 import {IUnoFarmVelodrome as Farm} from './IUnoFarmVelodrome.sol'; 
 import '../../../interfaces/IUnoAssetRouter.sol';

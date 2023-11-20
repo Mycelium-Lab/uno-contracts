@@ -29,6 +29,10 @@ All contracts are deployed on the Optimism Blockchain
 
 0x693148ae24AbB879e2f63f1b36f5594e54b19140
 
+## UnoAutoStrategyFactory
+
+0xDB4fB4E10f11829a08dB0b76E27C6366F58C4812
+
 
 ## Velodrome
 
