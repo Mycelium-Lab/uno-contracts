@@ -751,7 +751,7 @@ contract('UnoAutoStrategy', (accounts) => {
             it('reverts if called not by liquidity manager', async () => {
                 const poolID = await autoStrategy.poolID()
                 await expectRevertCustomError(
-                    autoStrategy.moveLiquidity(poolID.add(new BN(1)), '0x', '0x', 0, 0, {
+                    autoStrategy.moveLiquidity(poolID.add(new BN(1)), '0x', 0, 0, {
                         from: account1
                     }),
                     'CALLER_NOT_LIQUIDITY_MANAGER'
@@ -764,7 +764,7 @@ contract('UnoAutoStrategy', (accounts) => {
                 console.log(`### Reverting to snapshot: ${snapshotId}`)
 
                 await expectRevertCustomError(
-                    autoStrategy.moveLiquidity(poolID.add(new BN(1)), '0x', '0x', 0, 0, {
+                    autoStrategy.moveLiquidity(poolID.add(new BN(1)), '0x', 0, 0, {
                         from: liquidityManager
                     }),
                     'NO_LIQUIDITY'
@@ -792,7 +792,7 @@ contract('UnoAutoStrategy', (accounts) => {
                 })
 
                 await expectRevertCustomError(
-                    autoStrategy.moveLiquidity(poolID, '0x', '0x', 0, 0, {
+                    autoStrategy.moveLiquidity(poolID, '0x', 0, 0, {
                         from: liquidityManager
                     }),
                     'BAD_POOL_ID'
@@ -850,7 +850,7 @@ contract('UnoAutoStrategy', (accounts) => {
                 totalDepositsABefore = totalDepositsA
                 totalDepositsBBefore = totalDepositsB
 
-                receipt = await autoStrategy.moveLiquidity(id.add(new BN(1)), '0x', '0x', 0, 0, {
+                receipt = await autoStrategy.moveLiquidity(id.add(new BN(1)), '0x', 0, 0, {
                     from: liquidityManager
                 })
             })
@@ -893,7 +893,7 @@ contract('UnoAutoStrategy', (accounts) => {
                 tokenBBalanceBefore
 
             before(async () => {
-                await autoStrategy.moveLiquidity(0, '0x', '0x', 0, 0, {
+                await autoStrategy.moveLiquidity(0, '0x', 0, 0, {
                     from: liquidityManager
                 })
 
@@ -1036,7 +1036,7 @@ contract('UnoAutoStrategy', (accounts) => {
             it('reverts moveLiquidity if paused', async () => {
                 const poolID = await autoStrategy.poolID()
                 await expectRevertCustomError(
-                    autoStrategy.moveLiquidity(poolID.add(new BN(1)), '0x', '0x', 0, 0, {
+                    autoStrategy.moveLiquidity(poolID.add(new BN(1)), '0x', 0, 0, {
                         from: account1
                     }),
                     'PAUSABLE_PAUSED'

@@ -24,7 +24,7 @@ module.exports = {
             host: '127.0.0.1',
             port: 8545,
             gas: 7500000,
-            gasPrice: 200000,
+            gasPrice: 875000000,
             network_id: 56
         }
     },
@@ -34,11 +34,11 @@ module.exports = {
     ],
     compilers: {
         solc: {
-            version: '0.8.10',
+            version: '0.8.19',
             settings: {
                 optimizer: {
                     enabled: true,
-                    runs: 200
+                    runs: 8000
                 }
             }
         }
